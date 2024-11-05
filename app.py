@@ -1,4 +1,5 @@
-from flask import Flask, render_template_string, jsonify
+# First let's generate the complete code with proper formatting
+code = """from flask import Flask, render_template_string, jsonify
 from datetime import datetime
 import os
 import logging
@@ -18,11 +19,26 @@ html_template = '''<!DOCTYPE html>
     <title>Network Viewer</title>
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/css/bootstrap.min.css" rel="stylesheet">
     <script src="https://unpkg.com/vis-network/standalone/umd/vis-network.min.js"></script>
+    <style>
+        #graph-container {
+            height: 600px;
+            border: 1px solid #ddd;
+            background-color: #f8f9fa;
+        }
+        .node-info {
+            padding: 10px;
+            background-color: white;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            margin-top: 10px;
+        }
+    </style>
 </head>
 <body>
     <div class="container mt-4">
         <div class="row">
             <div class="col-12">
+                <h2 class="mb-4">Network Visualization</h2>
                 <div class="mb-3">
                     <select id="locationFilter" class="form-select d-inline-block w-auto me-2">
                         <option value="">Filter by Location</option>
@@ -31,12 +47,20 @@ html_template = '''<!DOCTYPE html>
                         <option value="">Filter by Type</option>
                     </select>
                     <button class="btn btn-secondary" onclick="clearFilters()">Clear Filters</button>
-                    <button class="btn btn-primary ms-2" onclick="toggleNodeList()">View All</button>
+                    <button class="btn btn-primary ms-2" onclick="toggleNodeList()">Toggle Node List</button>
                 </div>
-                <div id="graph-container" style="height: 600px; border: 1px solid #ddd;"></div>
+                <div id="graph-container"></div>
                 <div id="nodeList" style="display: none;" class="mt-3">
-                    <table class="table">
-                        <thead><tr><th>ID</th><th>Label</th><th>Type</th><th>Location</th></tr></thead>
+                    <h3>Node List</h3>
+                    <table class="table table-striped">
+                        <thead>
+                            <tr>
+                                <th>ID</th>
+                                <th>Label</th>
+                                <th>Type</th>
+                                <th>Location</th>
+                            </tr>
+                        </thead>
                         <tbody id="nodeListBody"></tbody>
                     </table>
                 </div>
@@ -49,10 +73,49 @@ html_template = '''<!DOCTYPE html>
 
         function initNetwork(data) {
             const container = document.getElementById('graph-container');
-            network = new vis.Network(container, data, {
-                nodes: {shape: 'dot', size: 30},
-                physics: {enabled: true}
+            const options = {
+                nodes: {
+                    shape: 'dot',
+                    size: 30,
+                    font: {
+                        size: 12,
+                        color: '#333'
+                    },
+                    borderWidth: 2,
+                    shadow: true
+                },
+                edges: {
+                    width: 2,
+                    color: {
+                        color: '#2B7CE9',
+                        highlight: '#1B4C89',
+                        hover: '#1B4C89'
+                    },
+                    smooth: {
+                        type: 'continuous'
+                    }
+                },
+                physics: {
+                    stabilization: true,
+                    barnesHut: {
+                        gravitationalConstant: -80000,
+                        springConstant: 0.001,
+                        springLength: 200
+                    }
+                },
+                interaction: {
+                    hover: true,
+                    tooltipDelay: 200
+                }
+            };
+            
+            network = new vis.Network(container, data, options);
+            network.on('hoverNode', function(params) {
+                const node = data.nodes.get(params.node);
+                container.title = `Type: ${node.properties.type}\\
+Location: ${node.properties.location}`;
             });
+            
             updateFilters(data.nodes);
             updateNodeList(data.nodes);
         }
@@ -65,7 +128,7 @@ html_template = '''<!DOCTYPE html>
                 const select = document.getElementById(id);
                 const values = i === 0 ? locations : types;
                 select.innerHTML = `<option value="">${id === 'locationFilter' ? 'Filter by Location' : 'Filter by Type'}</option>`;
-                values.forEach(v => select.add(new Option(v, v)));
+                values.sort().forEach(v => select.add(new Option(v, v)));
             });
         }
 
@@ -127,7 +190,8 @@ html_template = '''<!DOCTYPE html>
                         edges: new vis.DataSet(allEdges)
                     });
                 }
-            });
+            })
+            .catch(error => console.error('Error loading data:', error));
 
         ['locationFilter', 'typeFilter'].forEach(id =>
             document.getElementById(id).addEventListener('change', applyFilters)
@@ -145,30 +209,43 @@ def refresh_data():
     nodes = []
     edges = []
     
+    # Define meaningful locations and types
+    locations = ['San Francisco', 'New York', 'London', 'Tokyo', 'Singapore']
+    node_types = ['Server', 'Database', 'Client']
+    
     # Generate test data
     for i in range(1, 501):
+        node_name = f'Node_{i}'
+        location = locations[i % len(locations)]
+        node_type = node_types[i % len(node_types)]
+        
         nodes.append({
             'id': str(i),
-            'label': 'Node ' + str(i),
+            'label': node_name,
             'properties': {
-                'location': 'Location ' + str((i % 5) + 1),
-                'type': 'Type ' + str((i % 3) + 1)
+                'location': location,
+                'type': node_type
             }
         })
         
+        # Create edges (connecting each node to several others)
         if i > 1:
+            # Connect to previous node
             edges.append({
                 'from': str(i),
                 'to': str(i-1),
                 'label': 'CONNECTS_TO'
             })
+            # Add some random connections for more interesting visualization
             if i > 10:
-                random_target = random.randint(1, i-2)
-                edges.append({
-                    'from': str(i),
-                    'to': str(random_target),
-                    'label': 'CONNECTS_TO'
-                })
+                # Add 1-3 random connections
+                for _ in range(random.randint(1, 3)):
+                    random_target = random.randint(1, i-2)
+                    edges.append({
+                        'from': str(i),
+                        'to': str(random_target),
+                        'label': 'CONNECTS_TO'
+                    })
     
     return jsonify({
         'success': True,
@@ -178,10 +255,29 @@ def refresh_data():
             'edges': edges
         },
         'filters': {
-            'locations': ['Location ' + str(i) for i in range(1, 6)],
-            'types': ['Type ' + str(i) for i in range(1, 4)]
+            'locations': locations,
+            'types': node_types
         }
     })
 
 if __name__ == '__main__':
-    app.run(debug=True)
+    port = int(os.environ.get('PORT', 5000))
+    app.run(host='0.0.0.0', port=port)
+"""
+
+# Write the complete code to a file
+with open('app.py', 'w') as f:
+    f.write(code)
+
+print("Complete app.py has been generated with the following improvements:")
+print("1. Enhanced UI with better styling and layout")
+print("2. Meaningful location names and node types")
+print("3. Improved network visualization options")
+print("4. Better error handling and logging")
+print("5. Hover tooltips for nodes")
+print("6. More random connections for interesting visualization")
+print("7. Sorted filter options")
+print("\
+File size:", len(code), "bytes")
+print("\
+You can now copy this code and deploy it to Render.")
