@@ -2,15 +2,22 @@ from flask import Flask, render_template_string, jsonify
 from datetime import datetime
 import os
 import logging
+from neo4j import GraphDatabase
 import json
-import random
-import pandas as pd
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 app = Flask(__name__)
+
+# Neo4j Configuration
+NEO4J_URI = os.getenv('NEO4J_URI', 'bolt://localhost:7687')
+NEO4J_USER = os.getenv('NEO4J_USER', 'neo4j')
+NEO4J_PASSWORD = os.getenv('NEO4J_PASSWORD', 'password')
+
+# Initialize Neo4j driver
+driver = GraphDatabase.driver(NEO4J_URI, auth=(NEO4J_USER, NEO4J_PASSWORD))
 
 html_template = '''<!DOCTYPE html>
 <html>
@@ -42,6 +49,9 @@ html_template = '''<!DOCTYPE html>
                     <select id="locationFilter" class="form-select d-inline-block w-auto me-2">
                         <option value="">Filter by Location</option>
                     </select>
+                    <select id="sublocationFilter" class="form-select d-inline-block w-auto me-2">
+                        <option value="">Filter by Sublocation</option>
+                    </select>
                     <select id="typeFilter" class="form-select d-inline-block w-auto me-2">
                         <option value="">Filter by Type</option>
                     </select>
@@ -58,6 +68,7 @@ html_template = '''<!DOCTYPE html>
                                 <th>Label</th>
                                 <th>Type</th>
                                 <th>Location</th>
+                                <th>Sublocation</th>
                             </tr>
                         </thead>
                         <tbody id="nodeListBody"></tbody>
@@ -111,7 +122,7 @@ html_template = '''<!DOCTYPE html>
             network = new vis.Network(container, data, options);
             network.on('hoverNode', function(params) {
                 const node = data.nodes.get(params.node);
-                container.title = `Type: ${node.properties.type}\nLocation: ${node.properties.location}`;
+                container.title = `Type: ${node.properties.type}\nLocation: ${node.properties.location}\nSublocation: ${node.properties.sublocation}`;
             });
             
             updateFilters(data.nodes);
@@ -120,14 +131,19 @@ html_template = '''<!DOCTYPE html>
 
         function updateFilters(nodes) {
             const locations = [...new Set(nodes.map(n => n.properties.location).filter(Boolean))];
+            const sublocations = [...new Set(nodes.map(n => n.properties.sublocation).filter(Boolean))];
             const types = [...new Set(nodes.map(n => n.properties.type).filter(Boolean))];
             
-            ['locationFilter', 'typeFilter'].forEach((id, i) => {
+            const updateSelect = (id, values) => {
                 const select = document.getElementById(id);
-                const values = i === 0 ? locations : types;
-                select.innerHTML = `<option value="">${id === 'locationFilter' ? 'Filter by Location' : 'Filter by Type'}</option>`;
+                const placeholder = select.options[0].text;
+                select.innerHTML = `<option value="">${placeholder}</option>`;
                 values.sort().forEach(v => select.add(new Option(v, v)));
-            });
+            };
+
+            updateSelect('locationFilter', locations);
+            updateSelect('sublocationFilter', sublocations);
+            updateSelect('typeFilter', types);
         }
 
         function updateNodeList(nodes) {
@@ -138,6 +154,7 @@ html_template = '''<!DOCTYPE html>
                     <td>${node.label}</td>
                     <td>${node.properties.type || ''}</td>
                     <td>${node.properties.location || ''}</td>
+                    <td>${node.properties.sublocation || ''}</td>
                 </tr>
             `).join('');
         }
@@ -149,10 +166,12 @@ html_template = '''<!DOCTYPE html>
 
         function applyFilters() {
             const location = document.getElementById('locationFilter').value;
+            const sublocation = document.getElementById('sublocationFilter').value;
             const type = document.getElementById('typeFilter').value;
 
             const filteredNodes = allNodes.filter(node => 
                 (!location || node.properties.location === location) &&
+                (!sublocation || node.properties.sublocation === sublocation) &&
                 (!type || node.properties.type === type)
             );
 
@@ -167,7 +186,7 @@ html_template = '''<!DOCTYPE html>
         }
 
         function clearFilters() {
-            ['locationFilter', 'typeFilter'].forEach(id => 
+            ['locationFilter', 'sublocationFilter', 'typeFilter'].forEach(id => 
                 document.getElementById(id).value = ''
             );
             network.setData({
@@ -191,12 +210,61 @@ html_template = '''<!DOCTYPE html>
             })
             .catch(error => console.error('Error loading data:', error));
 
-        ['locationFilter', 'typeFilter'].forEach(id =>
+        ['locationFilter', 'sublocationFilter', 'typeFilter'].forEach(id =>
             document.getElementById(id).addEventListener('change', applyFilters)
         );
     </script>
 </body>
 </html>'''
+
+def get_graph_data():
+    with driver.session() as session:
+        # Query to get all nodes with their properties
+        nodes_query = '''
+        MATCH (n)
+        RETURN id(n) as id, 
+               labels(n)[0] as label, 
+               properties(n) as properties
+        '''
+        
+        # Query to get all relationships
+        edges_query = '''
+        MATCH (n)-[r]->(m)
+        RETURN id(n) as source, 
+               id(m) as target,
+               type(r) as type
+        '''
+        
+        # Execute queries
+        nodes_result = session.run(nodes_query)
+        edges_result = session.run(edges_query)
+        
+        # Process nodes
+        nodes = []
+        for record in nodes_result:
+            node = {
+                'id': str(record['id']),
+                'label': record['properties'].get('name', record['label']),
+                'properties': {
+                    'type': record['label'],
+                    'location': record['properties'].get('location', ''),
+                    'sublocation': record['properties'].get('sublocation', ''),
+                    'direction': record['properties'].get('direction', ''),
+                }
+            }
+            nodes.append(node)
+        
+        # Process relationships
+        edges = []
+        for record in edges_result:
+            edge = {
+                'from': str(record['source']),
+                'to': str(record['target']),
+                'label': record['type']
+            }
+            edges.append(edge)
+            
+        return {'nodes': nodes, 'edges': edges}
 
 @app.route('/')
 def home():
@@ -205,54 +273,11 @@ def home():
 @app.route('/refresh-data')
 def refresh_data():
     try:
-        # Load data from StrokeChaser.xlsx
-        df_nodes = pd.read_excel('StrokeChaser.xlsx', sheet_name='Node Logic')
-        df_relationships = pd.read_excel('StrokeChaser.xlsx', sheet_name='Database')
-        
-        # Create nodes dictionary to map node names to IDs
-        node_dict = {}
-        nodes = []
-        
-        # Extract nodes and their properties
-        for index, row in df_nodes.iterrows():
-            node_id = str(index)
-            node_name = row['Node']
-            node_dict[node_name] = node_id
-            
-            nodes.append({
-                'id': node_id,
-                'label': node_name,
-                'properties': {
-                    'location': row['Location'],
-                    'sublocation': row['Sublocation'],
-                    'type': row['Type'],
-                    'direction': row['Direction'] if 'Direction' in row else None,
-                    'x': float(row['X']) if 'X' in row and pd.notna(row['X']) else 0,
-                    'y': float(row['Y']) if 'Y' in row and pd.notna(row['Y']) else 0
-                }
-            })
-        
-        # Create edges from relationships
-        edges = []
-        for _, rel in df_relationships.iterrows():
-            node1 = rel['Node 1']
-            node2 = rel['Node 2']
-            
-            # Only create edge if both nodes exist
-            if node1 in node_dict and node2 in node_dict:
-                edges.append({
-                    'from': node_dict[node1],
-                    'to': node_dict[node2],
-                    'label': rel['Type of Relationship']
-                })
-        
+        graph_data = get_graph_data()
         return jsonify({
             'success': True,
             'timestamp': datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
-            'graph_data': {
-                'nodes': nodes,
-                'edges': edges
-            }
+            'graph_data': graph_data
         })
     except Exception as e:
         logger.error(f"Error refreshing data: {str(e)}")
