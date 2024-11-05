@@ -211,41 +211,55 @@ def refresh_data():
     locations = ['San Francisco', 'New York', 'London', 'Tokyo', 'Singapore']
     node_types = ['Server', 'Database', 'Client']
     
-    # Generate test data
-    for i in range(1, 501):
-        node_name = f'Node_{i}'
-        location = locations[i % len(locations)]
-        node_type = node_types[i % len(node_types)]
-        
+    
+    # Load data from StrokeChaser.xlsx
+    import pandas as pd
+    df = pd.read_excel('StrokeChaser.xlsx')
+
+    # Extract nodes and their properties
+    nodes = []
+    for index, row in df.iterrows():
         nodes.append({
-            'id': str(i),
-            'label': node_name,
+            'id': str(index),
+            'label': row['Node'],
             'properties': {
-                'location': location,
-                'type': node_type
+                'location': row['Location'],
+                'sublocation': row['Sublocation'],
+                'type': row['Type']
             }
         })
-        
-        # Create edges (connecting each node to several others)
-        if i > 1:
-            # Connect to previous node
-            edges.append({
-                'from': str(i),
-                'to': str(i-1),
-                'label': 'CONNECTS_TO'
-            })
-            # Add some random connections for more interesting visualization
-            if i > 10:
-                # Add 1-3 random connections
-                for _ in range(random.randint(1, 3)):
-                    random_target = random.randint(1, i-2)
-                    edges.append({
-                        'from': str(i),
-                        'to': str(random_target),
-                        'label': 'CONNECTS_TO'
-                    })
-    
+
+    # Generate edges based on some logic (e.g., same location or type)
+    edges = []
+    for i in range(len(nodes)):
+        for j in range(i + 1, len(nodes)):
+            if nodes[i]['properties']['location'] == nodes[j]['properties']['location']:
+                edges.append({
+                    'from': nodes[i]['id'],
+                    'to': nodes[j]['id'],
+                    'label': 'SAME_LOCATION'
+                })
+            elif nodes[i]['properties']['type'] == nodes[j]['properties']['type']:
+                edges.append({
+                    'from': nodes[i]['id'],
+                    'to': nodes[j]['id'],
+                    'label': 'SAME_TYPE'
+                })
+
+    # Return the response with properly formatted JSON
     return jsonify({
+        'success': True,
+        'timestamp': datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+        'graph_data': {
+            'nodes': nodes,
+            'edges': edges
+        },
+        'filters': {
+            'locations': df['Location'].unique().tolist(),
+            'types': df['Type'].unique().tolist()
+        }
+    })
+return jsonify({
         'success': True,
         'timestamp': datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
         'graph_data': {
