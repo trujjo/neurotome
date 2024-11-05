@@ -11,13 +11,28 @@ logger = logging.getLogger(__name__)
 
 app = Flask(__name__)
 
-# Neo4j Configuration
+# Neo4j Aura Configuration
 NEO4J_URI = os.getenv('NEO4J_URI', 'neo4j+s://4e5eeae5.databases.neo4j.io')
 NEO4J_USER = os.getenv('NEO4J_USER', 'neo4j')
 NEO4J_PASSWORD = os.getenv('NEO4J_PASSWORD', 'Poconoco16!')
 
-# Initialize Neo4j driver
-driver = GraphDatabase.driver(NEO4J_URI, auth=(NEO4J_USER, NEO4J_PASSWORD))
+# Initialize Neo4j driver with Aura settings
+try:
+    driver = GraphDatabase.driver(
+        NEO4J_URI,
+        auth=(NEO4J_USER, NEO4J_PASSWORD),
+        max_connection_lifetime=30 * 60,  # 30 minutes
+        max_connection_pool_size=50,
+        connection_timeout=10,  # 10 seconds
+    )
+    # Verify connection
+    with driver.session() as session:
+        result = session.run("RETURN 1")
+        result.single()
+    logger.info("Successfully connected to Neo4j database")
+except Exception as e:
+    logger.error(f"Failed to connect to Neo4j: {str(e)}")
+    raise
 
 html_template = '''<!DOCTYPE html>
 <html>
@@ -219,52 +234,59 @@ html_template = '''<!DOCTYPE html>
 
 def get_graph_data():
     with driver.session() as session:
-        # Query to get all nodes with their properties
-        nodes_query = '''
-        MATCH (n)
-        RETURN id(n) as id, 
-               labels(n)[0] as label, 
-               properties(n) as properties
-        '''
-        
-        # Query to get all relationships
-        edges_query = '''
-        MATCH (n)-[r]->(m)
-        RETURN id(n) as source, 
-               id(m) as target,
-               type(r) as type
-        '''
-        
-        # Execute queries
-        nodes_result = session.run(nodes_query)
-        edges_result = session.run(edges_query)
-        
-        # Process nodes
-        nodes = []
-        for record in nodes_result:
-            node = {
-                'id': str(record['id']),
-                'label': record['properties'].get('name', record['label']),
-                'properties': {
-                    'type': record['label'],
-                    'location': record['properties'].get('location', ''),
-                    'sublocation': record['properties'].get('sublocation', ''),
-                    'direction': record['properties'].get('direction', ''),
-                }
-            }
-            nodes.append(node)
-        
-        # Process relationships
-        edges = []
-        for record in edges_result:
-            edge = {
-                'from': str(record['source']),
-                'to': str(record['target']),
-                'label': record['type']
-            }
-            edges.append(edge)
+        try:
+            # Query to get all nodes with their properties
+            nodes_query = '''
+            MATCH (n)
+            RETURN id(n) as id, 
+                   labels(n)[0] as label, 
+                   properties(n) as properties
+            '''
             
-        return {'nodes': nodes, 'edges': edges}
+            # Query to get all relationships
+            edges_query = '''
+            MATCH (n)-[r]->(m)
+            RETURN id(n) as source, 
+                   id(m) as target,
+                   type(r) as type
+            '''
+            
+            # Execute queries with logging
+            logger.info("Executing nodes query...")
+            nodes_result = session.run(nodes_query)
+            logger.info("Executing edges query...")
+            edges_result = session.run(edges_query)
+            
+            # Process nodes
+            nodes = []
+            for record in nodes_result:
+                node = {
+                    'id': str(record['id']),
+                    'label': record['properties'].get('name', record['label']),
+                    'properties': {
+                        'type': record['label'],
+                        'location': record['properties'].get('location', ''),
+                        'sublocation': record['properties'].get('sublocation', ''),
+                        'direction': record['properties'].get('direction', ''),
+                    }
+                }
+                nodes.append(node)
+            
+            # Process relationships
+            edges = []
+            for record in edges_result:
+                edge = {
+                    'from': str(record['source']),
+                    'to': str(record['target']),
+                    'label': record['type']
+                }
+                edges.append(edge)
+            
+            logger.info(f"Retrieved {len(nodes)} nodes and {len(edges)} edges")
+            return {'nodes': nodes, 'edges': edges}
+        except Exception as e:
+            logger.error(f"Error in get_graph_data: {str(e)}")
+            raise
 
 @app.route('/')
 def home():
