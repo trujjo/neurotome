@@ -1,5 +1,4 @@
-# First let's generate the complete code with proper formatting
-code = """from flask import Flask, render_template_string, jsonify
+from flask import Flask, render_template_string, jsonify
 from datetime import datetime
 import os
 import logging
@@ -112,8 +111,7 @@ html_template = '''<!DOCTYPE html>
             network = new vis.Network(container, data, options);
             network.on('hoverNode', function(params) {
                 const node = data.nodes.get(params.node);
-                container.title = `Type: ${node.properties.type}\\
-Location: ${node.properties.location}`;
+                container.title = `Type: ${node.properties.type}\nLocation: ${node.properties.location}`;
             });
             
             updateFilters(data.nodes);
@@ -263,21 +261,3 @@ def refresh_data():
 if __name__ == '__main__':
     port = int(os.environ.get('PORT', 5000))
     app.run(host='0.0.0.0', port=port)
-"""
-
-# Write the complete code to a file
-with open('app.py', 'w') as f:
-    f.write(code)
-
-print("Complete app.py has been generated with the following improvements:")
-print("1. Enhanced UI with better styling and layout")
-print("2. Meaningful location names and node types")
-print("3. Improved network visualization options")
-print("4. Better error handling and logging")
-print("5. Hover tooltips for nodes")
-print("6. More random connections for interesting visualization")
-print("7. Sorted filter options")
-print("\
-File size:", len(code), "bytes")
-print("\
-You can now copy this code and deploy it to Render.")
