@@ -4,6 +4,7 @@ import os
 import logging
 import json
 import random
+import pandas as pd
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)
@@ -11,7 +12,6 @@ logger = logging.getLogger(__name__)
 
 app = Flask(__name__)
 
-# Define the HTML template
 html_template = '''<!DOCTYPE html>
 <html>
 <head>
@@ -204,73 +204,62 @@ def home():
 
 @app.route('/refresh-data')
 def refresh_data():
-    nodes = []
-    edges = []
-    
-    # Define meaningful locations and types
-    locations = ['San Francisco', 'New York', 'London', 'Tokyo', 'Singapore']
-    node_types = ['Server', 'Database', 'Client']
-    
-    
-    # Load data from StrokeChaser.xlsx
-    import pandas as pd
-    df = pd.read_excel('StrokeChaser.xlsx')
-
-    # Extract nodes and their properties
-    nodes = []
-    for index, row in df.iterrows():
-        nodes.append({
-            'id': str(index),
-            'label': row['Node'],
-            'properties': {
-                'location': row['Location'],
-                'sublocation': row['Sublocation'],
-                'type': row['Type']
+    try:
+        # Load data from StrokeChaser.xlsx
+        df_nodes = pd.read_excel('StrokeChaser.xlsx', sheet_name='Node Logic')
+        df_relationships = pd.read_excel('StrokeChaser.xlsx', sheet_name='Database')
+        
+        # Create nodes dictionary to map node names to IDs
+        node_dict = {}
+        nodes = []
+        
+        # Extract nodes and their properties
+        for index, row in df_nodes.iterrows():
+            node_id = str(index)
+            node_name = row['Node']
+            node_dict[node_name] = node_id
+            
+            nodes.append({
+                'id': node_id,
+                'label': node_name,
+                'properties': {
+                    'location': row['Location'],
+                    'sublocation': row['Sublocation'],
+                    'type': row['Type'],
+                    'direction': row['Direction'] if 'Direction' in row else None,
+                    'x': float(row['X']) if 'X' in row and pd.notna(row['X']) else 0,
+                    'y': float(row['Y']) if 'Y' in row and pd.notna(row['Y']) else 0
+                }
+            })
+        
+        # Create edges from relationships
+        edges = []
+        for _, rel in df_relationships.iterrows():
+            node1 = rel['Node 1']
+            node2 = rel['Node 2']
+            
+            # Only create edge if both nodes exist
+            if node1 in node_dict and node2 in node_dict:
+                edges.append({
+                    'from': node_dict[node1],
+                    'to': node_dict[node2],
+                    'label': rel['Type of Relationship']
+                })
+        
+        return jsonify({
+            'success': True,
+            'timestamp': datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+            'graph_data': {
+                'nodes': nodes,
+                'edges': edges
             }
         })
-
-    # Generate edges based on some logic (e.g., same location or type)
-    edges = []
-    for i in range(len(nodes)):
-        for j in range(i + 1, len(nodes)):
-            if nodes[i]['properties']['location'] == nodes[j]['properties']['location']:
-                edges.append({
-                    'from': nodes[i]['id'],
-                    'to': nodes[j]['id'],
-                    'label': 'SAME_LOCATION'
-                })
-            elif nodes[i]['properties']['type'] == nodes[j]['properties']['type']:
-                edges.append({
-                    'from': nodes[i]['id'],
-                    'to': nodes[j]['id'],
-                    'label': 'SAME_TYPE'
-                })
-
-    # Return the response with properly formatted JSON
-    return jsonify({
-        'success': True,
-        'timestamp': datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
-        'graph_data': {
-            'nodes': nodes,
-            'edges': edges
-        },
-        'filters': {
-            'locations': df['Location'].unique().tolist(),
-            'types': df['Type'].unique().tolist()
-        }
-    })
-return jsonify({
-        'success': True,
-        'timestamp': datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
-        'graph_data': {
-            'nodes': nodes,
-            'edges': edges
-        },
-        'filters': {
-            'locations': locations,
-            'types': node_types
-        }
-    })
+    except Exception as e:
+        logger.error(f"Error refreshing data: {str(e)}")
+        return jsonify({
+            'success': False,
+            'error': str(e)
+        }), 500
 
 if __name__ == '__main__':
     port = int(os.environ.get('PORT', 5000))
