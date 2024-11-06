@@ -1,0 +1,20 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Neo4j Data Visualization</title>
+</head>
+<body>
+    <h1>Neo4j Data Visualization</h1>
+    <ul>
+        {% for item in data %}
+            <li>
+                Node 1: {{ item.node1 }} <br>
+                Relationship: {{ item.relationship }} <br>
+                Node 2: {{ item.node2 }}
+            </li>
+        {% endfor %}
+    </ul>
+</body>
+</html>
