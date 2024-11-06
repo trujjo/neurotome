@@ -68,9 +68,58 @@ def get_graph_metadata():
     except Exception as e:
         logger.error(f"Error fetching metadata: {str(e)}")
         raise
-    finally:
-        if 'driver' in locals():
-            driver.close()
+
+def get_filtered_graph_data(selected_labels=None, selected_relationships=None):
+    try:
+        driver = get_neo4j_driver()
+        with driver.session() as session:
+            # Build query based on filters
+            query = """
+            MATCH (n)-[r]->(m)
+            WHERE 1=1
+            """
+            if selected_labels:
+                query += " AND any(label IN labels(n) WHERE label IN $selected_labels)"
+            if selected_relationships:
+                query += " AND type(r) IN $selected_relationships"
+            query += """
+            RETURN 
+                id(n) as source_id, labels(n) as source_labels, properties(n) as source_props,
+                type(r) as relationship,
+                id(m) as target_id, labels(m) as target_labels, properties(m) as target_props
+            """
+            result = session.run(query, selected_labels=selected_labels, selected_relationships=selected_relationships)
+            
+            nodes = {}
+            edges = []
+            for record in result:
+                source_id = record['source_id']
+                target_id = record['target_id']
+                if source_id not in nodes:
+                    nodes[source_id] = {
+                        'id': source_id,
+                        'label': record['source_props'].get('name', str(source_id)),
+                        'title': str(record['source_props']),
+                        'x': record['source_props'].get('x', None),
+                        'y': record['source_props'].get('y', None)
+                    }
+                if target_id not in nodes:
+                    nodes[target_id] = {
+                        'id': target_id,
+                        'label': record['target_props'].get('name', str(target_id)),
+                        'title': str(record['target_props']),
+                        'x': record['target_props'].get('x', None),
+                        'y': record['target_props'].get('y', None)
+                    }
+                edges.append({
+                    'from': source_id,
+                    'to': target_id,
+                    'label': record['relationship']
+                })
+            return {'nodes': list(nodes.values()), 'edges': edges}
+    except Exception as e:
+        logger.error(f"Error fetching graph data: {str(e)}")
+        raise
 
 @app.route('/')
 def index():
@@ -78,18 +127,15 @@ def index():
         metadata = get_graph_metadata()
         return render_template('index.html', metadata=metadata)
     except Exception as e:
-        error_msg = str(e)
-        logger.error(f"Error in index route: {error_msg}")
-        return render_template('index.html', error=error_msg)
+        return render_template('index.html', error=str(e))
 
 @app.route('/get_nodes', methods=['POST'])
 def get_nodes():
     try:
-        data = request.get_json()
+        data = request.json
         node_type = data.get('node_type')
         location = data.get('location')
         sublocation = data.get('sublocation')
-        
         driver = get_neo4j_driver()
         with driver.session() as session:
             query = """
@@ -97,55 +143,51 @@ def get_nodes():
             WHERE 1=1
             """
             if node_type:
-                query += f" AND any(label IN labels(n) WHERE label = '{node_type}')"
+                query += " AND $node_type IN labels(n)"
             if location:
-                query += f" AND n.location = '{location}'"
+                query += " AND n.location = $location"
             if sublocation:
-                query += f" AND n.sublocation = '{sublocation}'"
-            
+                query += " AND n.sublocation = $sublocation"
             query += " RETURN id(n) as id, labels(n) as labels, properties(n) as props"
-            
-            result = session.run(query)
+            result = session.run(query, node_type=node_type, location=location, sublocation=sublocation)
             nodes = []
             for record in result:
-                node = {
-                    'id': str(record['id']),
-                    'label': ', '.join(record['labels']),
+                nodes.append({
+                    'id': record['id'],
+                    'label': record['props'].get('name', str(record['id'])),
                     'title': str(record['props']),
-                    'x': record['props'].get('x', 0),
-                    'y': record['props'].get('y', 0)
-                }
-                nodes.append(node)
+                    'x': record['props'].get('x', None),
+                    'y': record['props'].get('y', None)
+                })
             return jsonify(nodes)
     except Exception as e:
-        return jsonify({'error': str(e)}), 500
+        logger.error(f"Error fetching nodes: {str(e)}")
+        return jsonify([])
 
 @app.route('/get_relationships', methods=['POST'])
 def get_relationships():
     try:
-        data = request.get_json()
-        rel_type = data.get('relationship_type')
-        
+        data = request.json
+        relationship_type = data.get('relationship_type')
         driver = get_neo4j_driver()
         with driver.session() as session:
             query = """
             MATCH (n)-[r]->(m)
-            WHERE type(r) = $rel_type
+            WHERE type(r) = $relationship_type
             RETURN id(n) as source_id, id(m) as target_id, type(r) as type
             """
-            result = session.run(query, rel_type=rel_type)
+            result = session.run(query, relationship_type=relationship_type)
             edges = []
             for record in result:
-                edge = {
-                    'from': str(record['source_id']),
-                    'to': str(record['target_id']),
+                edges.append({
+                    'from': record['source_id'],
+                    'to': record['target_id'],
                     'label': record['type']
-                }
-                edges.append(edge)
+                })
             return jsonify(edges)
     except Exception as e:
-        return jsonify({'error': str(e)}), 500
+        logger.error(f"Error fetching relationships: {str(e)}")
+        return jsonify([])
 
 if __name__ == '__main__':
-    port = int(os.environ.get('PORT', 10000))
-    app.run(host='0.0.0.0', port=port)
+    app.run(debug=True)
