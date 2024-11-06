@@ -1,3 +1,4 @@
+<!-- index.html -->
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -38,7 +39,7 @@
             margin-bottom: 10px;
         }
         button {
-            background-color: #CC5500;  /* Burnt Orange */
+            background-color: #CC5500;
             color: white;
             border: none;
             padding: 8px 16px;
@@ -105,7 +106,6 @@
     </div>
 
     <script type="text/javascript">
-        // Create a network visualization
         var container = document.getElementById('mynetwork');
         var nodes = new vis.DataSet([]);
         var edges = new vis.DataSet([]);
@@ -118,14 +118,20 @@
         var options = {
             nodes: {
                 shape: 'dot',
-                size: 30,
+                size: 15,
                 font: {
-                    size: 14
+                    size: 12,
+                    color: '#000000',
+                    face: 'arial'
+                },
+                color: {
+                    background: '#97C2FC',
+                    border: '#2B7CE9'
                 }
             },
             edges: {
                 font: {
-                    size: 14,
+                    size: 12,
                     align: 'middle'
                 },
                 arrows: 'to',
@@ -134,7 +140,7 @@
                     highlight: '#848484',
                     hover: '#848484'
                 },
-                width: 2
+                width: 1.5
             },
             physics: {
                 enabled: false
@@ -143,7 +149,6 @@
         
         var network = new vis.Network(container, data, options);
 
-        // Network manipulation functions
         function addNodesByType(nodeType) {
             fetch('/get_nodes', {
                 method: 'POST',
@@ -197,7 +202,6 @@
             .then(newEdges => {
                 edges.clear();
                 edges.update(newEdges);
-                // Show only nodes that are part of these relationships
                 const connectedNodeIds = new Set();
                 newEdges.forEach(edge => {
                     connectedNodeIds.add(edge.from);
