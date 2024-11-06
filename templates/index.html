@@ -45,11 +45,12 @@
             margin: 4px;
             border-radius: 4px;
             cursor: pointer;
-            transition: opacity 0.3s;
+            transition: all 0.3s ease;
         }
         button:disabled {
             opacity: 0.5;
             cursor: not-allowed;
+            background-color: #888888;
         }
         button:hover:not(:disabled) {
             opacity: 0.8;
@@ -59,6 +60,10 @@
         }
         .clear-button {
             background-color: #ff3333;
+        }
+        .active-filter {
+            background-color: #994000;
+            border: 2px solid #ffffff;
         }
     </style>
 </head>
@@ -97,6 +102,7 @@
             </div>
 
             <button class="clear-button" onclick="clearNetwork()">Clear All</button>
+            <button class="clear-button" onclick="clearFilters()">Clear Filters</button>
         </div>
         
         <div class="visualization">
@@ -122,7 +128,12 @@
                     size: 8,
                     color: '#000000',
                     face: 'arial',
-                    vadjust: -8
+                    vadjust: -8,
+                    multi: true,
+                    bold: true,
+                    ital: true,
+                    wordWrap: true,
+                    maxWidth: 100
                 },
                 color: {
                     background: '#97C2FC',
@@ -181,6 +192,7 @@
         };
         
         var network = new vis.Network(container, data, options);
+        var activeFilters = new Set();
 
         function addNodesByType(nodeType) {
             fetch('/get_nodes', {
@@ -200,28 +212,33 @@
         }
 
         function filterByLocation(location) {
-            const visibleNodes = nodes.get().filter(node => 
-                JSON.parse(node.title).location === location
-            );
-            nodes.update(visibleNodes.map(node => ({...node, hidden: false})));
-            nodes.update(nodes.get().filter(node => 
-                !visibleNodes.find(vn => vn.id === node.id)
-            ).map(node => ({...node, hidden: true})));
-            updateFilterButtons();
+            const button = document.querySelector(`[data-criteria="location"][data-value="${location}"]`);
+            toggleFilterButton(button);
+            
+            const visibleNodes = nodes.get().filter(node => {
+                const props = JSON.parse(node.title);
+                return props.location === location;
+            });
+            
+            updateNodesVisibility(visibleNodes);
         }
 
         function filterBySublocation(sublocation) {
-            const visibleNodes = nodes.get().filter(node => 
-                JSON.parse(node.title).sublocation === sublocation
-            );
-            nodes.update(visibleNodes.map(node => ({...node, hidden: false})));
-            nodes.update(nodes.get().filter(node => 
-                !visibleNodes.find(vn => vn.id === node.id)
-            ).map(node => ({...node, hidden: true})));
-            updateFilterButtons();
+            const button = document.querySelector(`[data-criteria="sublocation"][data-value="${sublocation}"]`);
+            toggleFilterButton(button);
+            
+            const visibleNodes = nodes.get().filter(node => {
+                const props = JSON.parse(node.title);
+                return props.sublocation === sublocation;
+            });
+            
+            updateNodesVisibility(visibleNodes);
         }
 
         function filterByRelationship(relType) {
+            const button = document.querySelector(`[data-criteria="relationship"][data-value="${relType}"]`);
+            toggleFilterButton(button);
+            
             fetch('/get_relationships', {
                 method: 'POST',
                 headers: {
@@ -235,22 +252,65 @@
             .then(newEdges => {
                 edges.clear();
                 edges.update(newEdges);
+                
                 const connectedNodeIds = new Set();
                 newEdges.forEach(edge => {
                     connectedNodeIds.add(edge.from);
                     connectedNodeIds.add(edge.to);
                 });
-                nodes.update(nodes.get().map(node => ({
-                    ...node,
-                    hidden: !connectedNodeIds.has(node.id)
-                })));
-                updateFilterButtons();
+                
+                const visibleNodes = nodes.get().filter(node => connectedNodeIds.has(node.id));
+                updateNodesVisibility(visibleNodes);
             });
+        }
+
+        function updateNodesVisibility(visibleNodes) {
+            const visibleNodeIds = new Set(visibleNodes.map(node => node.id));
+            
+            // Update nodes visibility
+            nodes.update(nodes.get().map(node => ({
+                ...node,
+                hidden: !visibleNodeIds.has(node.id)
+            })));
+            
+            // Update edges visibility
+            edges.update(edges.get().map(edge => ({
+                ...edge,
+                hidden: !(visibleNodeIds.has(edge.from) && visibleNodeIds.has(edge.to))
+            })));
+            
+            updateFilterButtons();
+        }
+
+        function toggleFilterButton(button) {
+            const filterId = `${button.dataset.criteria}-${button.dataset.value}`;
+            
+            if (activeFilters.has(filterId)) {
+                activeFilters.delete(filterId);
+                button.classList.remove('active-filter');
+            } else {
+                activeFilters.add(filterId);
+                button.classList.add('active-filter');
+            }
         }
 
         function clearNetwork() {
             nodes.clear();
             edges.clear();
+            activeFilters.clear();
+            updateFilterButtons();
+            document.querySelectorAll('.filter-button').forEach(button => {
+                button.classList.remove('active-filter');
+            });
+        }
+
+        function clearFilters() {
+            activeFilters.clear();
+            document.querySelectorAll('.filter-button').forEach(button => {
+                button.classList.remove('active-filter');
+            });
+            nodes.update(nodes.get().map(node => ({...node, hidden: false})));
+            edges.update(edges.get().map(edge => ({...edge, hidden: false})));
             updateFilterButtons();
         }
 
@@ -263,8 +323,14 @@
                     return props[criteria] === value && !node.hidden;
                 });
                 button.disabled = !hasNodes;
+                button.style.opacity = hasNodes ? '1' : '0.5';
             });
         }
+
+        // Initialize the network
+        network.on("stabilizationIterationsDone", function () {
+            network.setOptions( { physics: false } );
+        });
     </script>
 </body>
 </html>
