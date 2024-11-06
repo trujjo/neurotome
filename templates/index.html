@@ -4,110 +4,168 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Neo4j Network Visualization</title>
+    <script type="text/javascript" src="https://unpkg.com/vis-network/standalone/umd/vis-network.min.js"></script>
     <style>
         body {
             font-family: Arial, sans-serif;
-            margin: 20px;
+            margin: 0;
+            padding: 20px;
             background-color: #f5f5f5;
         }
-        .relationship-container {
+        
+        .container {
+            display: flex;
+            gap: 20px;
+        }
+        
+        .filters {
+            flex: 0 0 250px;
             background: white;
-            padding: 15px;
-            margin: 15px 0;
+            padding: 20px;
             border-radius: 8px;
             box-shadow: 0 2px 4px rgba(0,0,0,0.1);
         }
-        .node {
-            background: #e8f4f8;
-            padding: 10px;
-            margin: 10px 0;
-            border-radius: 5px;
+        
+        .visualization {
+            flex: 1;
+            background: white;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+            min-height: 800px;
         }
-        .relationship {
-            background: #f8e8e8;
-            padding: 5px 10px;
-            margin: 10px 0;
-            text-align: center;
-            font-weight: bold;
-            border-radius: 15px;
+        
+        #mynetwork {
+            width: 100%;
+            height: 800px;
+            border: none;
         }
-        .arrow {
-            color: #666;
-            font-size: 20px;
-            text-align: center;
-            margin: 5px 0;
+        
+        .filter-group {
+            margin-bottom: 15px;
         }
-        .labels {
-            color: #666;
-            font-style: italic;
+        
+        .filter-group label {
+            display: block;
             margin-bottom: 5px;
+            font-weight: bold;
         }
-        .properties {
-            margin-left: 10px;
+        
+        select[multiple] {
+            width: 100%;
+            padding: 5px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            height: 150px;
         }
-        .properties ul {
-            list-style-type: none;
-            padding-left: 0;
+        
+        button {
+            width: 100%;
+            padding: 10px;
+            background-color: #4CAF50;
+            color: white;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
         }
-        .properties li {
-            margin: 3px 0;
+        
+        button:hover {
+            background-color: #45a049;
         }
+        
         .error {
             color: red;
             padding: 10px;
-            border: 1px solid red;
             margin: 10px 0;
-            border-radius: 5px;
+            background-color: #ffe6e6;
+            border-radius: 4px;
         }
     </style>
 </head>
 <body>
-    <h1>Neo4j Network Visualization</h1>
-    
-    {% if error %}
-        <div class="error">
-            {{ error }}
+    <div class="container">
+        <div class="filters">
+            <h2>Filters</h2>
+            <form method="get">
+                <div class="filter-group">
+                    <label for="labels">Node Types:</label>
+                    <select name="labels" id="labels" multiple>
+                        {% for label in metadata.labels %}
+                            <option value="{{ label }}" 
+                                    {% if label in selected_labels %}selected{% endif %}>
+                                {{ label }}
+                            </option>
+                        {% endfor %}
+                    </select>
+                </div>
+                
+                <div class="filter-group">
+                    <label for="relationships">Relationships:</label>
+                    <select name="relationships" id="relationships" multiple>
+                        {% for rel_type in metadata.relationship_types %}
+                            <option value="{{ rel_type }}"
+                                    {% if rel_type in selected_relationships %}selected{% endif %}>
+                                {{ rel_type }}
+                            </option>
+                        {% endfor %}
+                    </select>
+                </div>
+                
+                <button type="submit">Apply Filters</button>
+            </form>
         </div>
-    {% endif %}
-    
-    {% if data %}
-        <h2>Network Relationships ({{ data|length }} connections)</h2>
-        {% for item in data %}
-            <div class="relationship-container">
-                <!-- Source Node -->
-                <div class="node">
-                    <div class="labels">Labels: {{ item.source.labels | join(', ') }}</div>
-                    <div class="properties">
-                        <ul>
-                        {% for key, value in item.source.properties.items() %}
-                            <li><strong>{{ key }}:</strong> {{ value }}</li>
-                        {% endfor %}
-                        </ul>
-                    </div>
-                </div>
-                
-                <!-- Relationship -->
-                <div class="arrow">↓</div>
-                <div class="relationship">
-                    {{ item.relationship }}
-                </div>
-                <div class="arrow">↓</div>
-                
-                <!-- Target Node -->
-                <div class="node">
-                    <div class="labels">Labels: {{ item.target.labels | join(', ') }}</div>
-                    <div class="properties">
-                        <ul>
-                        {% for key, value in item.target.properties.items() %}
-                            <li><strong>{{ key }}:</strong> {{ value }}</li>
-                        {% endfor %}
-                        </ul>
-                    </div>
-                </div>
-            </div>
-        {% endfor %}
-    {% elif not error %}
-        <p>No relationships found in the database.</p>
-    {% endif %}
+        
+        <div class="visualization">
+            {% if error %}
+                <div class="error">{{ error }}</div>
+            {% endif %}
+            <div id="mynetwork"></div>
+        </div>
+    </div>
+
+    <script type="text/javascript">
+        // Create a network visualization
+        var container = document.getElementById('mynetwork');
+        
+        var data = {
+            nodes: new vis.DataSet({{ graph_data.nodes | tojson | safe }}),
+            edges: new vis.DataSet({{ graph_data.edges | tojson | safe }})
+        };
+        
+        var options = {
+            nodes: {
+                shape: 'dot',
+                size: 30,
+                font: {
+                    size: 14
+                }
+            },
+            edges: {
+                font: {
+                    size: 14,
+                    align: 'middle'
+                },
+                color: {
+                    color: '#848484',
+                    highlight: '#848484',
+                    hover: '#848484'
+                },
+                width: 2
+            },
+            physics: {
+                stabilization: false,
+                barnesHut: {
+                    gravitationalConstant: -80000,
+                    springConstant: 0.001,
+                    springLength: 200
+                }
+            },
+            interaction: {
+                hover: true,
+                tooltipDelay: 200
+            }
+        };
+        
+        var network = new vis.Network(container, data, options);
+    </script>
 </body>
 </html>
