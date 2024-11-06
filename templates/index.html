@@ -5,33 +5,137 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Neo4j Data Visualization</title>
     <style>
-        .node {
-            margin: 10px;
-            padding: 10px;
-            border: 1px solid #ccc;
+        body {
+            font-family: Arial, sans-serif;
+            margin: 20px;
+            background-color: #f5f5f5;
+        }
+        .filters {
+            background-color: white;
+            padding: 20px;
             border-radius: 5px;
+            margin-bottom: 20px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        .filter-group {
+            margin-bottom: 10px;
+        }
+        .filter-group label {
+            display: inline-block;
+            width: 120px;
+            font-weight: bold;
+        }
+        select {
+            padding: 5px;
+            width: 200px;
+        }
+        .node {
+            background-color: white;
+            margin: 10px 0;
+            padding: 15px;
+            border-radius: 5px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
         }
         .labels {
             color: #666;
             font-style: italic;
+            margin-bottom: 10px;
         }
         .properties {
             margin-left: 20px;
+        }
+        .properties ul {
+            list-style-type: none;
+            padding: 0;
+        }
+        .properties li {
+            margin: 5px 0;
+        }
+        .error {
+            color: red;
+            padding: 10px;
+            border: 1px solid red;
+            margin: 10px 0;
+            border-radius: 5px;
+        }
+        button {
+            padding: 8px 15px;
+            background-color: #4CAF50;
+            color: white;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+        }
+        button:hover {
+            background-color: #45a049;
         }
     </style>
 </head>
 <body>
     <h1>Neo4j Data Visualization</h1>
     
+    <div class="filters">
+        <form method="GET">
+            <div class="filter-group">
+                <label for="label">Node Type:</label>
+                <select name="label" id="label">
+                    <option value="">All Types</option>
+                    {% for label in metadata.labels %}
+                        <option value="{{ label }}" {% if label == selected_label %}selected{% endif %}>
+                            {{ label }}
+                        </option>
+                    {% endfor %}
+                </select>
+            </div>
+            
+            <div class="filter-group">
+                <label for="location">Location:</label>
+                <select name="location" id="location">
+                    <option value="">All Locations</option>
+                    {% for location in metadata.locations %}
+                        <option value="{{ location }}" {% if location == selected_location %}selected{% endif %}>
+                            {{ location }}
+                        </option>
+                    {% endfor %}
+                </select>
+            </div>
+            
+            <div class="filter-group">
+                <label for="sublocation">Sublocation:</label>
+                <select name="sublocation" id="sublocation">
+                    <option value="">All Sublocations</option>
+                    {% for sublocation in metadata.sublocations %}
+                        <option value="{{ sublocation }}" {% if sublocation == selected_sublocation %}selected{% endif %}>
+                            {{ sublocation }}
+                        </option>
+                    {% endfor %}
+                </select>
+            </div>
+            
+            <div class="filter-group">
+                <label for="relationship_type">Relationship:</label>
+                <select name="relationship_type" id="relationship_type">
+                    <option value="">All Relationships</option>
+                    {% for rel_type in metadata.relationship_types %}
+                        <option value="{{ rel_type }}" {% if rel_type == selected_relationship_type %}selected{% endif %}>
+                            {{ rel_type }}
+                        </option>
+                    {% endfor %}
+                </select>
+            </div>
+            
+            <button type="submit">Apply Filters</button>
+        </form>
+    </div>
+    
     {% if error %}
-        <div style="color: red; padding: 10px; border: 1px solid red; margin: 10px 0;">
+        <div class="error">
             {{ error }}
         </div>
     {% endif %}
     
     {% if data %}
-        <h2>Connected Successfully!</h2>
-        <h3>Nodes Retrieved:</h3>
+        <h2>Nodes ({{ data|length }} results)</h2>
         {% for node in data %}
             <div class="node">
                 <div class="labels">Labels: {{ node.labels | join(', ') }}</div>
@@ -46,7 +150,7 @@
             </div>
         {% endfor %}
     {% elif not error %}
-        <p>No data available in the database.</p>
+        <p>No nodes found matching the selected filters.</p>
     {% endif %}
 </body>
 </html>
