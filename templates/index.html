@@ -3,125 +3,66 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Neo4j Data Visualization</title>
+    <title>Neo4j Network Visualization</title>
     <style>
         body {
             font-family: Arial, sans-serif;
             margin: 20px;
             background-color: #f5f5f5;
         }
-        .filters {
-            background-color: white;
-            padding: 20px;
-            border-radius: 5px;
-            margin-bottom: 20px;
+        .relationship-container {
+            background: white;
+            padding: 15px;
+            margin: 15px 0;
+            border-radius: 8px;
             box-shadow: 0 2px 4px rgba(0,0,0,0.1);
-        }
-        .filter-group {
-            margin-bottom: 15px;
-        }
-        .filter-group label {
-            display: block;
-            margin-bottom: 5px;
-            font-weight: bold;
-        }
-        select {
-            width: 100%;
-            padding: 8px;
-            border: 1px solid #ddd;
-            border-radius: 4px;
-        }
-        button {
-            background-color: #4CAF50;
-            color: white;
-            padding: 10px 20px;
-            border: none;
-            border-radius: 4px;
-            cursor: pointer;
-        }
-        button:hover {
-            background-color: #45a049;
         }
         .node {
-            background-color: white;
+            background: #e8f4f8;
+            padding: 10px;
             margin: 10px 0;
-            padding: 15px;
             border-radius: 5px;
-            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        .relationship {
+            background: #f8e8e8;
+            padding: 5px 10px;
+            margin: 10px 0;
+            text-align: center;
+            font-weight: bold;
+            border-radius: 15px;
+        }
+        .arrow {
+            color: #666;
+            font-size: 20px;
+            text-align: center;
+            margin: 5px 0;
         }
         .labels {
             color: #666;
             font-style: italic;
-            margin-bottom: 10px;
+            margin-bottom: 5px;
         }
         .properties {
-            margin-left: 15px;
+            margin-left: 10px;
+        }
+        .properties ul {
+            list-style-type: none;
+            padding-left: 0;
+        }
+        .properties li {
+            margin: 3px 0;
         }
         .error {
-            background-color: #ffebee;
-            color: #c62828;
-            padding: 15px;
-            border-radius: 4px;
-            margin-bottom: 20px;
+            color: red;
+            padding: 10px;
+            border: 1px solid red;
+            margin: 10px 0;
+            border-radius: 5px;
         }
     </style>
 </head>
 <body>
-    <h1>Neo4j Data Visualization</h1>
-    
-    <div class="filters">
-        <form method="get">
-            <div class="filter-group">
-                <label for="label">Node Type:</label>
-                <select name="label" id="label">
-                    <option value="">All Types</option>
-                    {% for label in metadata.labels %}
-                        <option value="{{ label }}" {% if label == selected_label %}selected{% endif %}>
-                            {{ label }}
-                        </option>
-                    {% endfor %}
-                </select>
-            </div>
-            
-            <div class="filter-group">
-                <label for="location">Location:</label>
-                <select name="location" id="location">
-                    <option value="">All Locations</option>
-                    {% for location in metadata.locations %}
-                        <option value="{{ location }}" {% if location == selected_location %}selected{% endif %}>
-                            {{ location }}
-                        </option>
-                    {% endfor %}
-                </select>
-            </div>
-            
-            <div class="filter-group">
-                <label for="sublocation">Sublocation:</label>
-                <select name="sublocation" id="sublocation">
-                    <option value="">All Sublocations</option>
-                    {% for sublocation in metadata.sublocations %}
-                        <option value="{{ sublocation }}" {% if sublocation == selected_sublocation %}selected{% endif %}>
-                            {{ sublocation }}
-                        </option>
-                    {% endfor %}
-                </select>
-            </div>
-            
-            <div class="filter-group">
-                <label for="relationship_type">Relationship:</label>
-                <select name="relationship_type" id="relationship_type">
-                    <option value="">All Relationships</option>
-                    {% for rel_type in metadata.relationship_types %}
-                        <option value="{{ rel_type }}" {% if rel_type == selected_relationship_type %}selected{% endif %}>
-                            {{ rel_type }}
-                        </option>
-                    {% endfor %}
-                </select>
-            </div>
-            
-            <button type="submit">Apply Filters</button>
-        </form>
-    </div>
+    <h1>Neo4j Network Visualization</h1>
     
     {% if error %}
         <div class="error">
@@ -130,22 +71,43 @@
     {% endif %}
     
     {% if data %}
-        <h2>Nodes ({{ data|length }} results)</h2>
-        {% for node in data %}
-            <div class="node">
-                <div class="labels">Labels: {{ node.labels | join(', ') }}</div>
-                <div class="properties">
-                    <h4>Properties:</h4>
-                    <ul>
-                    {% for key, value in node.properties.items() %}
-                        <li><strong>{{ key }}:</strong> {{ value }}</li>
-                    {% endfor %}
-                    </ul>
+        <h2>Network Relationships ({{ data|length }} connections)</h2>
+        {% for item in data %}
+            <div class="relationship-container">
+                <!-- Source Node -->
+                <div class="node">
+                    <div class="labels">Labels: {{ item.source.labels | join(', ') }}</div>
+                    <div class="properties">
+                        <ul>
+                        {% for key, value in item.source.properties.items() %}
+                            <li><strong>{{ key }}:</strong> {{ value }}</li>
+                        {% endfor %}
+                        </ul>
+                    </div>
+                </div>
+                
+                <!-- Relationship -->
+                <div class="arrow">↓</div>
+                <div class="relationship">
+                    {{ item.relationship }}
+                </div>
+                <div class="arrow">↓</div>
+                
+                <!-- Target Node -->
+                <div class="node">
+                    <div class="labels">Labels: {{ item.target.labels | join(', ') }}</div>
+                    <div class="properties">
+                        <ul>
+                        {% for key, value in item.target.properties.items() %}
+                            <li><strong>{{ key }}:</strong> {{ value }}</li>
+                        {% endfor %}
+                        </ul>
+                    </div>
                 </div>
             </div>
         {% endfor %}
     {% elif not error %}
-        <p>No nodes found matching the selected filters.</p>
+        <p>No relationships found in the database.</p>
     {% endif %}
 </body>
 </html>
