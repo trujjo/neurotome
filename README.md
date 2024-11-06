@@ -1,5 +1,5 @@
 
-# Neuronetwork Viewer
+# NeuroNetwork Viewer
 
 A web-based visualization tool for Neo4j graph database.
 
