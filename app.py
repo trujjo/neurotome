@@ -2,7 +2,6 @@ from flask import Flask, render_template, request, jsonify
 from neo4j import GraphDatabase
 import os
 import logging
-import json
 
 app = Flask(__name__)
 
@@ -64,58 +63,89 @@ def get_graph_metadata():
                 'node_types': sorted(list(node_types)),
                 'locations': sorted(list(locations)),
                 'sublocations': sorted(list(sublocations)),
-...
- addNodesBySublocation(sublocation) {
-            fetch('/get_nodes', {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                },
-                body: JSON.stringify({
-                    node_type: null,
-                    location: null,
-                    sublocation: sublocation
-                })
-            })
-            .then(response => response.json())
-            .then(newNodes => {
-                nodes.update(newNodes);
-                updateFilterButtons();
-            });
-        }
+                'relationship_types': sorted(relationship_types)
+            }
+    except Exception as e:
+        logger.error(f"Error fetching metadata: {str(e)}")
+        raise
+    finally:
+        if 'driver' in locals():
+            driver.close()
 
-        function addRelationships(relType) {
-            fetch('/get_relationships', {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                },
-                body: JSON.stringify({
-                    relationship_type: relType
-                })
-            })
-            .then(response => response.json())
-            .then(newEdges => {
-                edges.update(newEdges);
-                updateFilterButtons();
-            });
-        }
+@app.route('/')
+def index():
+    try:
+        metadata = get_graph_metadata()
+        return render_template('index.html', metadata=metadata)
+    except Exception as e:
+        error_msg = str(e)
+        logger.error(f"Error in index route: {error_msg}")
+        return render_template('index.html', error=error_msg)
 
-        function clearNetwork() {
-            nodes.clear();
-            edges.clear();
-            updateFilterButtons();
-        }
+@app.route('/get_nodes', methods=['POST'])
+def get_nodes():
+    try:
+        data = request.get_json()
+        node_type = data.get('node_type')
+        location = data.get('location')
+        sublocation = data.get('sublocation')
+        
+        driver = get_neo4j_driver()
+        with driver.session() as session:
+            query = """
+            MATCH (n)
+            WHERE 1=1
+            """
+            if node_type:
+                query += f" AND any(label IN labels(n) WHERE label = '{node_type}')"
+            if location:
+                query += f" AND n.location = '{location}'"
+            if sublocation:
+                query += f" AND n.sublocation = '{sublocation}'"
+            
+            query += " RETURN id(n) as id, labels(n) as labels, properties(n) as props"
+            
+            result = session.run(query)
+            nodes = []
+            for record in result:
+                node = {
+                    'id': str(record['id']),
+                    'label': ', '.join(record['labels']),
+                    'title': str(record['props']),
+                    'x': record['props'].get('x', 0),
+                    'y': record['props'].get('y', 0)
+                }
+                nodes.append(node)
+            return jsonify(nodes)
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
 
-        function updateFilterButtons() {
-            // Disable buttons if no nodes match the criteria
-            document.querySelectorAll('.filter-button').forEach(button => {
-                const criteria = button.getAttribute('data-criteria');
-                const value = button.getAttribute('data-value');
-                const hasNodes = nodes.get().some(node => node[criteria] === value);
-                button.disabled = !hasNodes;
-            });
-        }
-    </script>
-</body>
-</html>
+@app.route('/get_relationships', methods=['POST'])
+def get_relationships():
+    try:
+        data = request.get_json()
+        rel_type = data.get('relationship_type')
+        
+        driver = get_neo4j_driver()
+        with driver.session() as session:
+            query = """
+            MATCH (n)-[r]->(m)
+            WHERE type(r) = $rel_type
+            RETURN id(n) as source_id, id(m) as target_id, type(r) as type
+            """
+            result = session.run(query, rel_type=rel_type)
+            edges = []
+            for record in result:
+                edge = {
+                    'from': str(record['source_id']),
+                    'to': str(record['target_id']),
+                    'label': record['type']
+                }
+                edges.append(edge)
+            return jsonify(edges)
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+if __name__ == '__main__':
+    port = int(os.environ.get('PORT', 10000))
+    app.run(host='0.0.0.0', port=port)
