@@ -1,134 +1,104 @@
 <!DOCTYPE html>
-<html lang="en">
+<html>
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Neo4j Network Visualization</title>
+    <title>Neural Network Visualization</title>
     <script type="text/javascript" src="https://unpkg.com/vis-network/standalone/umd/vis-network.min.js"></script>
-    <style>
-        body {
-            font-family: Arial, sans-serif;
-            margin: 0;
-            padding: 20px;
-            background-color: #f5f5f5;
-        }
-        
-        .container {
+    <style type="text/css">
+        #container {
             display: flex;
-            gap: 20px;
+            height: 100vh;
+            margin: 0;
         }
-        
-        .filters {
-            flex: 0 0 250px;
-            background: white;
+        #controls {
+            width: 250px;
             padding: 20px;
-            border-radius: 8px;
-            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+            background: #f5f5f5;
+            overflow-y: auto;
         }
-        
-        .visualization {
-            flex: 1;
-            background: white;
-            border-radius: 8px;
-            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
-            min-height: 800px;
+        #visualization {
+            flex-grow: 1;
+            position: relative;
         }
-        
         #mynetwork {
             width: 100%;
-            height: 800px;
-            border: none;
+            height: 100%;
+            border: 1px solid lightgray;
         }
-        
-        .filter-group {
-            margin-bottom: 15px;
+        .control-group {
+            margin-bottom: 20px;
         }
-        
-        .filter-group label {
-            display: block;
-            margin-bottom: 5px;
-            font-weight: bold;
+        .control-group h3 {
+            margin-top: 0;
         }
-        
-        select[multiple] {
-            width: 100%;
-            padding: 5px;
-            border: 1px solid #ddd;
-            border-radius: 4px;
-            height: 150px;
-        }
-        
         button {
-            width: 100%;
-            padding: 10px;
-            background-color: #4CAF50;
+            margin: 5px;
+            padding: 8px;
+            background: #4CAF50;
             color: white;
             border: none;
             border-radius: 4px;
             cursor: pointer;
         }
-        
         button:hover {
-            background-color: #45a049;
+            background: #45a049;
         }
-        
         .error {
             color: red;
             padding: 10px;
             margin: 10px 0;
-            background-color: #ffe6e6;
-            border-radius: 4px;
         }
     </style>
 </head>
 <body>
-    <div class="container">
-        <div class="filters">
-            <h2>Filters</h2>
-            <form method="get">
-                <div class="filter-group">
-                    <label for="labels">Node Types:</label>
-                    <select name="labels" id="labels" multiple>
-                        {% for label in metadata.labels %}
-                            <option value="{{ label }}" 
-                                    {% if label in selected_labels %}selected{% endif %}>
-                                {{ label }}
-                            </option>
-                        {% endfor %}
-                    </select>
-                </div>
-                
-                <div class="filter-group">
-                    <label for="relationships">Relationships:</label>
-                    <select name="relationships" id="relationships" multiple>
-                        {% for rel_type in metadata.relationship_types %}
-                            <option value="{{ rel_type }}"
-                                    {% if rel_type in selected_relationships %}selected{% endif %}>
-                                {{ rel_type }}
-                            </option>
-                        {% endfor %}
-                    </select>
-                </div>
-                
-                <button type="submit">Apply Filters</button>
-            </form>
+    <div id="container">
+        <div id="controls">
+            <div class="control-group">
+                <h3>Node Types</h3>
+                {% for node_type in metadata.node_types %}
+                <button onclick="addNodesByType('{{ node_type }}')">{{ node_type }}</button>
+                {% endfor %}
+            </div>
+
+            <div class="control-group">
+                <h3>Locations</h3>
+                {% for location in metadata.locations %}
+                <button onclick="addNodesByLocation('{{ location }}')">{{ location }}</button>
+                {% endfor %}
+            </div>
+
+            <div class="control-group">
+                <h3>Sublocations</h3>
+                {% for sublocation in metadata.sublocations %}
+                <button onclick="addNodesBySublocation('{{ sublocation }}')">{{ sublocation }}</button>
+                {% endfor %}
+            </div>
+
+            <div class="control-group">
+                <h3>Relationships</h3>
+                {% for rel_type in metadata.relationship_types %}
+                <button onclick="addRelationships('{{ rel_type }}')">{{ rel_type }}</button>
+                {% endfor %}
+            </div>
+
+            <div class="control-group">
+                <button onclick="clearNetwork()" style="background: #f44336;">Clear All</button>
+            </div>
         </div>
         
-        <div class="visualization">
-            {% if error %}
-                <div class="error">{{ error }}</div>
-            {% endif %}
+        <div id="visualization">
             <div id="mynetwork"></div>
         </div>
     </div>
 
     <script type="text/javascript">
-        // Create a network visualization
-        var container = document.getElementById('mynetwork');
+        // Initialize empty network
+        var nodes = new vis.DataSet([]);
+        var edges = new vis.DataSet([]);
         
+        var container = document.getElementById('mynetwork');
         var data = {
-            nodes: new vis.DataSet({{ graph_data.nodes | tojson | safe }}),
-            edges: new vis.DataSet({{ graph_data.edges | tojson | safe }})
+            nodes: nodes,
+            edges: edges
         };
         
         var options = {
@@ -152,6 +122,7 @@
                 width: 2
             },
             physics: {
+                enabled: true,
                 stabilization: false,
                 barnesHut: {
                     gravitationalConstant: -80000,
@@ -166,6 +137,81 @@
         };
         
         var network = new vis.Network(container, data, options);
+
+        function addNodesByType(nodeType) {
+            fetch('/get_nodes', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({
+                    node_type: nodeType,
+                    location: null,
+                    sublocation: null
+                })
+            })
+            .then(response => response.json())
+            .then(newNodes => {
+                nodes.update(newNodes);
+            });
+        }
+
+        function addNodesByLocation(location) {
+            fetch('/get_nodes', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({
+                    node_type: null,
+                    location: location,
+                    sublocation: null
+                })
+            })
+            .then(response => response.json())
+            .then(newNodes => {
+                nodes.update(newNodes);
+            });
+        }
+
+        function addNodesBySublocation(sublocation) {
+            fetch('/get_nodes', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({
+                    node_type: null,
+                    location: null,
+                    sublocation: sublocation
+                })
+            })
+            .then(response => response.json())
+            .then(newNodes => {
+                nodes.update(newNodes);
+            });
+        }
+
+        function addRelationships(relType) {
+            fetch('/get_relationships', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({
+                    relationship_type: relType
+                })
+            })
+            .then(response => response.json())
+            .then(newEdges => {
+                edges.update(newEdges);
+            });
+        }
+
+        function clearNetwork() {
+            nodes.clear();
+            edges.clear();
+        }
     </script>
 </body>
 </html>
