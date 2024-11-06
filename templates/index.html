@@ -4,28 +4,49 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Neo4j Data Visualization</title>
+    <style>
+        .node {
+            margin: 10px;
+            padding: 10px;
+            border: 1px solid #ccc;
+            border-radius: 5px;
+        }
+        .labels {
+            color: #666;
+            font-style: italic;
+        }
+        .properties {
+            margin-left: 20px;
+        }
+    </style>
 </head>
 <body>
     <h1>Neo4j Data Visualization</h1>
+    
     {% if error %}
-        <div style="color: red;">
-            <p>Error: {{ error }}</p>
+        <div style="color: red; padding: 10px; border: 1px solid red; margin: 10px 0;">
+            {{ error }}
         </div>
     {% endif %}
+    
     {% if data %}
-        <ul>
-        {% for item in data %}
-            <li>
-                <strong>Node 1:</strong> {{ item.node1 | tojson }} <br>
-                <strong>Relationship:</strong> {{ item.relationship | tojson }} <br>
-                <strong>Node 2:</strong> {{ item.node2 | tojson }}
-            </li>
+        <h2>Connected Successfully!</h2>
+        <h3>Nodes Retrieved:</h3>
+        {% for node in data %}
+            <div class="node">
+                <div class="labels">Labels: {{ node.labels | join(', ') }}</div>
+                <div class="properties">
+                    <h4>Properties:</h4>
+                    <ul>
+                    {% for key, value in node.properties.items() %}
+                        <li><strong>{{ key }}:</strong> {{ value }}</li>
+                    {% endfor %}
+                    </ul>
+                </div>
+            </div>
         {% endfor %}
-        </ul>
-    {% else %}
-        {% if not error %}
-            <p>No data available</p>
-        {% endif %}
+    {% elif not error %}
+        <p>No data available in the database.</p>
     {% endif %}
 </body>
 </html>
