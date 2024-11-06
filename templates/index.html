@@ -18,16 +18,29 @@
             box-shadow: 0 2px 4px rgba(0,0,0,0.1);
         }
         .filter-group {
-            margin-bottom: 10px;
+            margin-bottom: 15px;
         }
         .filter-group label {
-            display: inline-block;
-            width: 120px;
+            display: block;
+            margin-bottom: 5px;
             font-weight: bold;
         }
         select {
-            padding: 5px;
-            width: 200px;
+            width: 100%;
+            padding: 8px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+        }
+        button {
+            background-color: #4CAF50;
+            color: white;
+            padding: 10px 20px;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+        }
+        button:hover {
+            background-color: #45a049;
         }
         .node {
             background-color: white;
@@ -42,32 +55,14 @@
             margin-bottom: 10px;
         }
         .properties {
-            margin-left: 20px;
-        }
-        .properties ul {
-            list-style-type: none;
-            padding: 0;
-        }
-        .properties li {
-            margin: 5px 0;
+            margin-left: 15px;
         }
         .error {
-            color: red;
-            padding: 10px;
-            border: 1px solid red;
-            margin: 10px 0;
-            border-radius: 5px;
-        }
-        button {
-            padding: 8px 15px;
-            background-color: #4CAF50;
-            color: white;
-            border: none;
+            background-color: #ffebee;
+            color: #c62828;
+            padding: 15px;
             border-radius: 4px;
-            cursor: pointer;
-        }
-        button:hover {
-            background-color: #45a049;
+            margin-bottom: 20px;
         }
     </style>
 </head>
@@ -75,7 +70,7 @@
     <h1>Neo4j Data Visualization</h1>
     
     <div class="filters">
-        <form method="GET">
+        <form method="get">
             <div class="filter-group">
                 <label for="label">Node Type:</label>
                 <select name="label" id="label">
