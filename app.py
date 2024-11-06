@@ -108,16 +108,19 @@ def get_nodes():
             result = session.run(query)
             nodes = []
             for record in result:
-                # Create a wrapped label from the name property
                 name = record['props'].get('name', record['labels'][0])
-                wrapped_name = '\n'.join([name[i:i+10] for i in range(0, len(name), 10)])
+                # Calculate font size based on name length
+                font_size = min(8, max(4, int(24 / len(name))))
                 
                 node = {
                     'id': str(record['id']),
-                    'label': wrapped_name,
+                    'label': name,
                     'title': str(record['props']),
-                    'x': record['props'].get('x', 0),
-                    'y': record['props'].get('y', 0)
+                    'x': float(record['props'].get('x', 0)) * 100,  # Scale coordinates
+                    'y': float(record['props'].get('y', 0)) * 100,  # Scale coordinates
+                    'font': {
+                        'size': font_size
+                    }
                 }
                 nodes.append(node)
             return jsonify(nodes)
