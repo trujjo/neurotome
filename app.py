@@ -1,41 +1,21 @@
 from flask import Flask, render_template, request
 from neo4j import GraphDatabase
+from neo4j.exceptions import ServiceUnavailable
 import os
 import logging
 import requests
-
-app = Flask(__name__)
-
-logging.basicConfig(level=logging.INFO)
-logger = logging.getLogger(__name__)
-
-@app.route('/')
-def index():
-    try:
-        # Print the IP address for debugging
-        response = requests.get('https://api.ipify.org?format=json')
-        ip = response.json()['ip']
-        logger.info(f"Current IP Address: {ip}")
-        
-        # Your existing code...
-        data = fetch_data()
-        return render_template('index.html', data=data)
-    except Exception as e:
-        logger.error(f"Error in index route: {str(e)}")
-        return f"An error occurred: {str(e)}", 500
-
-# ... rest of your existing code ...
-
-from neo4j import GraphDatabase
-from neo4j.exceptions import ServiceUnavailable
 import time
-import os
-import logging
 
 app = Flask(__name__)
 
+# Set up logging
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
+
+# Neo4j Configuration
+NEO4J_URI = os.getenv('NEO4J_URI', 'neo4j+s://4e5eeae5.databases.neo4j.io')
+NEO4J_USER = os.getenv('NEO4J_USER', 'neo4j')
+NEO4J_PASSWORD = os.getenv('NEO4J_PASSWORD', 'Poconoco16!')
 
 def get_driver(max_retries=3, retry_delay=5):
     for attempt in range(max_retries):
@@ -80,6 +60,11 @@ def fetch_data():
 @app.route('/')
 def index():
     try:
+        # Print the IP address for debugging
+        response = requests.get('https://api.ipify.org?format=json')
+        ip = response.json()['ip']
+        logger.info(f"Current IP Address: {ip}")
+        
         data = fetch_data()
         return render_template('index.html', data=data)
     except Exception as e:
