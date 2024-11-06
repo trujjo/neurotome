@@ -32,7 +32,6 @@ def get_graph_metadata():
     try:
         driver = get_neo4j_driver()
         with driver.session() as session:
-            # Get node types with their locations and sublocations
             query = """
             MATCH (n)
             WITH DISTINCT labels(n) as labels, n.location as location, n.sublocation as sublocation
@@ -51,7 +50,6 @@ def get_graph_metadata():
                 if record['sublocation']:
                     sublocations.add(record['sublocation'])
 
-            # Get relationship types
             rel_query = """
             MATCH ()-[r]->()
             RETURN DISTINCT type(r) as type
@@ -110,7 +108,7 @@ def get_nodes():
             for record in result:
                 node = {
                     'id': str(record['id']),
-                    'label': ', '.join(record['labels']),
+                    'label': record['props'].get('name', record['labels'][0]),
                     'title': str(record['props']),
                     'x': record['props'].get('x', 0),
                     'y': record['props'].get('y', 0)
