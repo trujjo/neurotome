@@ -7,14 +7,18 @@
 </head>
 <body>
     <h1>Neo4j Data Visualization</h1>
-    <ul>
+    {% if data %}
+        <ul>
         {% for item in data %}
             <li>
-                Node 1: {{ item.node1 }} <br>
-                Relationship: {{ item.relationship }} <br>
-                Node 2: {{ item.node2 }}
+                <strong>Node 1:</strong> {{ item.node1 | tojson }} <br>
+                <strong>Relationship:</strong> {{ item.relationship | tojson }} <br>
+                <strong>Node 2:</strong> {{ item.node2 | tojson }}
             </li>
         {% endfor %}
-    </ul>
+        </ul>
+    {% else %}
+        <p>No data available</p>
+    {% endif %}
 </body>
 </html>
