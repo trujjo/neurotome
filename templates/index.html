@@ -1,101 +1,115 @@
 <!DOCTYPE html>
-<html>
+<html lang="en">
 <head>
-    <title>Neural Network Visualization</title>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Neo4j Network Visualization</title>
     <script type="text/javascript" src="https://unpkg.com/vis-network/standalone/umd/vis-network.min.js"></script>
-    <style type="text/css">
-        #container {
-            display: flex;
-            height: 100vh;
+    <style>
+        body, html {
             margin: 0;
+            padding: 0;
+            height: 100%;
+            font-family: Arial, sans-serif;
         }
-        #controls {
+        .container {
+            display: flex;
+            height: 100%;
+        }
+        .sidebar {
             width: 250px;
             padding: 20px;
-            background: #f5f5f5;
+            background-color: #f5f5f5;
             overflow-y: auto;
         }
-        #visualization {
+        .visualization {
             flex-grow: 1;
             position: relative;
         }
         #mynetwork {
             width: 100%;
             height: 100%;
-            border: 1px solid lightgray;
+            position: absolute;
         }
-        .control-group {
+        .button-group {
             margin-bottom: 20px;
         }
-        .control-group h3 {
-            margin-top: 0;
+        .button-group h3 {
+            margin-bottom: 10px;
         }
         button {
-            margin: 5px;
-            padding: 8px;
-            background: #4CAF50;
+            background-color: #CC5500;  /* Burnt Orange */
             color: white;
             border: none;
+            padding: 8px 16px;
+            margin: 4px;
             border-radius: 4px;
             cursor: pointer;
+            transition: opacity 0.3s;
         }
-        button:hover {
-            background: #45a049;
+        button:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
         }
-        .error {
-            color: red;
-            padding: 10px;
-            margin: 10px 0;
+        button:hover:not(:disabled) {
+            opacity: 0.8;
+        }
+        .filter-button {
+            background-color: #CC5500;
+        }
+        .clear-button {
+            background-color: #ff3333;
         }
     </style>
 </head>
 <body>
-    <div id="container">
-        <div id="controls">
-            <div class="control-group">
+    <div class="container">
+        <div class="sidebar">
+            <div class="button-group">
                 <h3>Node Types</h3>
                 {% for node_type in metadata.node_types %}
                 <button onclick="addNodesByType('{{ node_type }}')">{{ node_type }}</button>
                 {% endfor %}
             </div>
 
-            <div class="control-group">
+            <div class="button-group">
                 <h3>Locations</h3>
                 {% for location in metadata.locations %}
-                <button onclick="addNodesByLocation('{{ location }}')">{{ location }}</button>
+                <button class="filter-button" data-criteria="location" data-value="{{ location }}" 
+                        onclick="filterByLocation('{{ location }}')">{{ location }}</button>
                 {% endfor %}
             </div>
 
-            <div class="control-group">
+            <div class="button-group">
                 <h3>Sublocations</h3>
                 {% for sublocation in metadata.sublocations %}
-                <button onclick="addNodesBySublocation('{{ sublocation }}')">{{ sublocation }}</button>
+                <button class="filter-button" data-criteria="sublocation" data-value="{{ sublocation }}"
+                        onclick="filterBySublocation('{{ sublocation }}')">{{ sublocation }}</button>
                 {% endfor %}
             </div>
 
-            <div class="control-group">
+            <div class="button-group">
                 <h3>Relationships</h3>
                 {% for rel_type in metadata.relationship_types %}
-                <button onclick="addRelationships('{{ rel_type }}')">{{ rel_type }}</button>
+                <button class="filter-button" data-criteria="relationship" data-value="{{ rel_type }}"
+                        onclick="filterByRelationship('{{ rel_type }}')">{{ rel_type }}</button>
                 {% endfor %}
             </div>
 
-            <div class="control-group">
-                <button onclick="clearNetwork()" style="background: #f44336;">Clear All</button>
-            </div>
+            <button class="clear-button" onclick="clearNetwork()">Clear All</button>
         </div>
         
-        <div id="visualization">
+        <div class="visualization">
             <div id="mynetwork"></div>
         </div>
     </div>
 
     <script type="text/javascript">
-        // Initialize empty network
+        // Create a network visualization
+        var container = document.getElementById('mynetwork');
         var nodes = new vis.DataSet([]);
         var edges = new vis.DataSet([]);
         
-        var container = document.getElementById('mynetwork');
         var data = {
             nodes: nodes,
             edges: edges
@@ -114,6 +128,7 @@
                     size: 14,
                     align: 'middle'
                 },
+                arrows: 'to',
                 color: {
                     color: '#848484',
                     highlight: '#848484',
@@ -122,22 +137,13 @@
                 width: 2
             },
             physics: {
-                enabled: true,
-                stabilization: false,
-                barnesHut: {
-                    gravitationalConstant: -80000,
-                    springConstant: 0.001,
-                    springLength: 200
-                }
-            },
-            interaction: {
-                hover: true,
-                tooltipDelay: 200
+                enabled: false
             }
         };
         
         var network = new vis.Network(container, data, options);
 
+        // Network manipulation functions
         function addNodesByType(nodeType) {
             fetch('/get_nodes', {
                 method: 'POST',
@@ -145,54 +151,39 @@
                     'Content-Type': 'application/json',
                 },
                 body: JSON.stringify({
-                    node_type: nodeType,
-                    location: null,
-                    sublocation: null
+                    node_type: nodeType
                 })
             })
             .then(response => response.json())
             .then(newNodes => {
                 nodes.update(newNodes);
+                updateFilterButtons();
             });
         }
 
-        function addNodesByLocation(location) {
-            fetch('/get_nodes', {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                },
-                body: JSON.stringify({
-                    node_type: null,
-                    location: location,
-                    sublocation: null
-                })
-            })
-            .then(response => response.json())
-            .then(newNodes => {
-                nodes.update(newNodes);
-            });
+        function filterByLocation(location) {
+            const visibleNodes = nodes.get().filter(node => 
+                JSON.parse(node.title).location === location
+            );
+            nodes.update(visibleNodes.map(node => ({...node, hidden: false})));
+            nodes.update(nodes.get().filter(node => 
+                !visibleNodes.find(vn => vn.id === node.id)
+            ).map(node => ({...node, hidden: true})));
+            updateFilterButtons();
         }
 
-        function addNodesBySublocation(sublocation) {
-            fetch('/get_nodes', {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                },
-                body: JSON.stringify({
-                    node_type: null,
-                    location: null,
-                    sublocation: sublocation
-                })
-            })
-            .then(response => response.json())
-            .then(newNodes => {
-                nodes.update(newNodes);
-            });
+        function filterBySublocation(sublocation) {
+            const visibleNodes = nodes.get().filter(node => 
+                JSON.parse(node.title).sublocation === sublocation
+            );
+            nodes.update(visibleNodes.map(node => ({...node, hidden: false})));
+            nodes.update(nodes.get().filter(node => 
+                !visibleNodes.find(vn => vn.id === node.id)
+            ).map(node => ({...node, hidden: true})));
+            updateFilterButtons();
         }
 
-        function addRelationships(relType) {
+        function filterByRelationship(relType) {
             fetch('/get_relationships', {
                 method: 'POST',
                 headers: {
@@ -204,13 +195,38 @@
             })
             .then(response => response.json())
             .then(newEdges => {
+                edges.clear();
                 edges.update(newEdges);
+                // Show only nodes that are part of these relationships
+                const connectedNodeIds = new Set();
+                newEdges.forEach(edge => {
+                    connectedNodeIds.add(edge.from);
+                    connectedNodeIds.add(edge.to);
+                });
+                nodes.update(nodes.get().map(node => ({
+                    ...node,
+                    hidden: !connectedNodeIds.has(node.id)
+                })));
+                updateFilterButtons();
             });
         }
 
         function clearNetwork() {
             nodes.clear();
             edges.clear();
+            updateFilterButtons();
+        }
+
+        function updateFilterButtons() {
+            document.querySelectorAll('.filter-button').forEach(button => {
+                const criteria = button.getAttribute('data-criteria');
+                const value = button.getAttribute('data-value');
+                const hasNodes = nodes.get().some(node => {
+                    const props = JSON.parse(node.title);
+                    return props[criteria] === value && !node.hidden;
+                });
+                button.disabled = !hasNodes;
+            });
         }
     </script>
 </body>
