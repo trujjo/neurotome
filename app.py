@@ -1,5 +1,3 @@
-# app.py
-
 from flask import Flask, render_template, request, jsonify
 from neo4j import GraphDatabase
 import os
@@ -109,15 +107,19 @@ def get_nodes():
             nodes = []
             for record in result:
                 name = record['props'].get('name', record['labels'][0])
-                # Calculate font size based on name length
                 font_size = min(8, max(4, int(24 / len(name))))
+                
+                # Get coordinates and flip y-axis
+                x_coord = float(record['props'].get('x', 0)) * 100
+                y_coord = float(record['props'].get('y', 0)) * 100
+                flipped_y = -y_coord  # Flip the y-coordinate
                 
                 node = {
                     'id': str(record['id']),
                     'label': name,
                     'title': str(record['props']),
-                    'x': float(record['props'].get('x', 0)) * 100,  # Scale coordinates
-                    'y': float(record['props'].get('y', 0)) * 100,  # Scale coordinates
+                    'x': x_coord,
+                    'y': flipped_y,
                     'font': {
                         'size': font_size
                     }
