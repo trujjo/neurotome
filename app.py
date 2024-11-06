@@ -1,3 +1,34 @@
+from flask import Flask, render_template, request
+from neo4j import GraphDatabase
+import os
+import logging
+import requests
+
+app = Flask(__name__)
+
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
+
+@app.route('/')
+def index():
+    try:
+        # Print the IP address for debugging
+        response = requests.get('https://api.ipify.org?format=json')
+        ip = response.json()['ip']
+        logger.info(f"Current IP Address: {ip}")
+        
+        # Your existing code...
+        data = fetch_data()
+        return render_template('index.html', data=data)
+    except Exception as e:
+        logger.error(f"Error in index route: {str(e)}")
+        return f"An error occurred: {str(e)}", 500
+
+# ... rest of your existing code ...
+
+
+
+
 from flask import Flask, render_template
 from neo4j import GraphDatabase
 import os
