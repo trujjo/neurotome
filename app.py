@@ -1,109 +1,121 @@
-from flask import Flask, render_template, render_template_string, jsonify, request
+from flask import Flask, render_template, request, jsonify
 from neo4j import GraphDatabase
+import os
 import logging
-import time
-from neo4j.exceptions import ServiceUnavailable, AuthError
+import json
 
 app = Flask(__name__)
+
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
-# Neo4j connection configuration
-NEO4J_URI = "bolt://4e5eeae5.databases.neo4j.io:7687"
-NEO4J_USER = "neo4j"
-NEO4J_PASSWORD = "Poconoco16!"
+uri = "bolt://4e5eeae5.databases.neo4j.io:7687"
+user = "neo4j"
+password = "Poconoco16!"
 
-class Neo4jConnection:
-    def __init__(self):
-        self._driver = None
-        self._retry_count = 3
-        self._retry_delay = 1  # seconds
-
-    def connect(self):
-        retry_count = 0
-        last_exception = None
-
-        while retry_count < self._retry_count:
-            try:
-                self._driver = GraphDatabase.driver(
-                    NEO4J_URI,
-                    auth=(NEO4J_USER, NEO4J_PASSWORD),
-                    max_connection_lifetime=300,  # 5 minutes
-                    max_connection_pool_size=50,
-                    connection_timeout=15,        # 15 seconds timeout
-                    max_retry_time=15            # 15 seconds retry
-                )
-                # Test the connection
-                with self._driver.session() as session:
-                    result = session.run("RETURN 1 as num").single()
-                    if result and result.get("num") == 1:
-                        logger.info("Successfully connected to Neo4j database")
-                        return True
-            except AuthError as ae:
-                logger.error(f"Authentication failed: {str(ae)}")
-                raise  # Don't retry auth failures
-            except Exception as e:
-                last_exception = e
-                retry_count += 1
-                logger.warning(f"Connection attempt {retry_count} failed: {str(e)}")
-                if retry_count < self._retry_count:
-                    time.sleep(self._retry_delay)
-                continue
-            
-        logger.error(f"Failed to connect after {self._retry_count} attempts. Last error: {str(last_exception)}")
-        raise last_exception
-
-    def close(self):
-        if self._driver is not None:
-            self._driver.close()
-            self._driver = None
-
-    def get_session(self):
-        if not self._driver:
-            self.connect()
-        return self._driver.session()
-
-def get_all_nodes():
+def get_neo4j_driver():
     try:
-        connection = Neo4jConnection()
-        connection.connect()  # Explicitly connect first
-        
-        with connection.get_session() as session:
-            # Modified query to be more specific and efficient
+        driver = GraphDatabase.driver(
+            uri,
+            auth=(user, password),
+            encrypted=True
+        )
+        with driver.session() as session:
+            result = session.run("RETURN 1")
+            result.single()
+            logger.info("Successfully connected to Neo4j")
+        return driver
+    except Exception as e:
+        logger.error(f"Failed to connect to Neo4j: {str(e)}")
+        raise
+
+def get_graph_metadata():
+    try:
+        driver = get_neo4j_driver()
+        with driver.session() as session:
+            # Get node types with their locations and sublocations
             query = """
             MATCH (n)
-            WHERE n.name IS NOT NULL
-            RETURN DISTINCT n.name as name
-            LIMIT 1000
+            WITH DISTINCT labels(n) as labels, n.location as location, n.sublocation as sublocation
+            RETURN labels, location, sublocation
             """
             result = session.run(query)
-            nodes = [record["name"] for record in result]
             
-        connection.close()
-        return nodes
-    except Exception as e:
-        logger.error(f"Error getting nodes: {str(e)}")
-        return []
+            node_types = set()
+            locations = set()
+            sublocations = set()
+            
+            for record in result:
+                node_types.update(record['labels'])
+                if record['location']:
+                    locations.add(record['location'])
+                if record['sublocation']:
+                    sublocations.add(record['sublocation'])
 
-@app.route('/')
-def index():
-    try:
-        nodes = get_all_nodes()
-        if not nodes:
-            logger.warning("No nodes returned from database")
-            return render_template_string(html_template, 
-                                       nodes=[], 
-                                       error="Unable to retrieve nodes from database")
-        return render_template_string(html_template, nodes=nodes)
-    except Exception as e:
-        logger.error(f"Error in index route: {str(e)}")
-        return render_template_string(html_template, 
-                                   nodes=[], 
-                                   error="Failed to connect to database")
+            # Get relationship types
+            rel_query = """
+            MATCH ()-[r]->()
+            RETURN DISTINCT type(r) as type
+            """
+            rel_result = session.run(rel_query)
+            relationship_types = [record['type'] for record in rel_result]
 
-# ... rest of your code remains the same ...
+            return {
+                'node_types': sorted(list(node_types)),
+                'locations': sorted(list(locations)),
+                'sublocations': sorted(list(sublocations)),
+...
+ addNodesBySublocation(sublocation) {
+            fetch('/get_nodes', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({
+                    node_type: null,
+                    location: null,
+                    sublocation: sublocation
+                })
+            })
+            .then(response => response.json())
+            .then(newNodes => {
+                nodes.update(newNodes);
+                updateFilterButtons();
+            });
+        }
 
-if __name__ == '__main__':
-    # For Render.com deployment
-    port = int(os.environ.get('PORT', 10000))
-    app.run(host='0.0.0.0', port=port)
+        function addRelationships(relType) {
+            fetch('/get_relationships', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({
+                    relationship_type: relType
+                })
+            })
+            .then(response => response.json())
+            .then(newEdges => {
+                edges.update(newEdges);
+                updateFilterButtons();
+            });
+        }
+
+        function clearNetwork() {
+            nodes.clear();
+            edges.clear();
+            updateFilterButtons();
+        }
+
+        function updateFilterButtons() {
+            // Disable buttons if no nodes match the criteria
+            document.querySelectorAll('.filter-button').forEach(button => {
+                const criteria = button.getAttribute('data-criteria');
+                const value = button.getAttribute('data-value');
+                const hasNodes = nodes.get().some(node => node[criteria] === value);
+                button.disabled = !hasNodes;
+            });
+        }
+    </script>
+</body>
+</html>
