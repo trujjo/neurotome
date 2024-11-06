@@ -1,3 +1,4 @@
+# app.py
 from flask import Flask, render_template, request, jsonify
 from neo4j import GraphDatabase
 import os
@@ -11,6 +12,16 @@ logger = logging.getLogger(__name__)
 uri = "bolt://4e5eeae5.databases.neo4j.io:7687"
 user = "neo4j"
 password = "Poconoco16!"
+
+# Add color mapping for node types
+NODE_COLORS = {
+    'Artery': '#FF6B6B',
+    'Nerve': '#4ECDC4',
+    'Muscle': '#45B7D1',
+    'Bone': '#96CEB4',
+    'Organ': '#FFEEAD',
+    # Add more colors for other node types
+}
 
 def get_neo4j_driver():
     try:
@@ -27,6 +38,75 @@ def get_neo4j_driver():
     except Exception as e:
         logger.error(f"Failed to connect to Neo4j: {str(e)}")
         raise
+
+# Add new route for node search/autocomplete
+@app.route('/search_nodes', methods=['POST'])
+def search_nodes():
+    try:
+        search_term = request.json.get('search_term', '')
+        driver = get_neo4j_driver()
+        with driver.session() as session:
+            query = """
+            MATCH (n)
+            WHERE n.name =~ $search_term
+            RETURN n.name as name
+            LIMIT 10
+            """
+            result = session.run(query, search_term=f"(?i).*{search_term}.*")
+            suggestions = [record["name"] for record in result]
+            return jsonify(suggestions)
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+# Add new route for finding shortest path
+@app.route('/find_shortest_path', methods=['POST'])
+def find_shortest_path():
+    try:
+        source = request.json.get('source')
+        target = request.json.get('target')
+        
+        driver = get_neo4j_driver()
+        with driver.session() as session:
+            # First, find the shortest path
+            path_query = """
+            MATCH path = shortestPath((source:Artery {name: $source})-[*]-(target:Artery {name: $target}))
+            RETURN path
+            """
+            result = session.run(path_query, source=source, target=target)
+            
+            path_data = []
+            for record in result:
+                path = record["path"]
+                nodes = []
+                relationships = []
+                
+                # Extract nodes
+                for node in path.nodes:
+                    node_data = {
+                        'id': str(node.id),
+                        'label': node.get('name', ''),
+                        'title': str(dict(node)),
+                        'color': NODE_COLORS.get(list(node.labels)[0], '#97C2FC')
+                    }
+                    nodes.append(node_data)
+                
+                # Extract relationships
+                for rel in path.relationships:
+                    rel_data = {
+                        'from': str(rel.start_node.id),
+                        'to': str(rel.end_node.id),
+                        'label': type(rel)
+                    }
+                    relationships.append(rel_data)
+                
+                path_data.append({
+                    'nodes': nodes,
+                    'relationships': relationships
+                })
+            
+            return jsonify(path_data)
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
 
 def get_graph_metadata():
     try:
@@ -61,7 +141,8 @@ def get_graph_metadata():
                 'node_types': sorted(list(node_types)),
                 'locations': sorted(list(locations)),
                 'sublocations': sorted(list(sublocations)),
-                'relationship_types': sorted(relationship_types)
+                'relationship_types': sorted(relationship_types),
+                'node_colors': NODE_COLORS  # Add colors to metadata
             }
     except Exception as e:
         logger.error(f"Error fetching metadata: {str(e)}")
@@ -114,12 +195,17 @@ def get_nodes():
                 y_coord = float(record['props'].get('y', 0)) * 100
                 flipped_y = -y_coord  # Flip the y-coordinate
                 
+                # Get color based on node type
+                node_type = record['labels'][0]
+                color = NODE_COLORS.get(node_type, '#97C2FC')
+                
                 node = {
                     'id': str(record['id']),
                     'label': name,
                     'title': str(record['props']),
                     'x': x_coord,
                     'y': flipped_y,
+                    'color': color,
                     'font': {
                         'size': font_size
                     }
