@@ -108,9 +108,13 @@ def get_nodes():
             result = session.run(query)
             nodes = []
             for record in result:
+                # Create a wrapped label from the name property
+                name = record['props'].get('name', record['labels'][0])
+                wrapped_name = '\n'.join([name[i:i+10] for i in range(0, len(name), 10)])
+                
                 node = {
                     'id': str(record['id']),
-                    'label': record['props'].get('name', record['labels'][0]),
+                    'label': wrapped_name,
                     'title': str(record['props']),
                     'x': record['props'].get('x', 0),
                     'y': record['props'].get('y', 0)
