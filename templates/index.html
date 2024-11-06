@@ -123,9 +123,8 @@
         var options = {
             nodes: {
                 shape: 'circle',
-                size: 8,
+                size: 15,
                 font: {
-                    size: 8,
                     color: '#000000',
                     face: 'arial',
                     vadjust: -8,
@@ -133,7 +132,7 @@
                     bold: true,
                     ital: true,
                     wordWrap: true,
-                    maxWidth: 100
+                    maxWidth: 15
                 },
                 color: {
                     background: '#97C2FC',
@@ -144,10 +143,14 @@
                     }
                 },
                 margin: {
-                    top: 5,
-                    bottom: 5,
-                    left: 5,
-                    right: 5
+                    top: 3,
+                    bottom: 3,
+                    left: 3,
+                    right: 3
+                },
+                fixed: {
+                    x: true,
+                    y: true
                 }
             },
             edges: {
@@ -167,19 +170,7 @@
                 }
             },
             physics: {
-                enabled: true,
-                solver: 'forceAtlas2Based',
-                forceAtlas2Based: {
-                    gravitationalConstant: -26,
-                    centralGravity: 0.005,
-                    springLength: 230,
-                    springConstant: 0.18
-                },
-                stabilization: {
-                    enabled: true,
-                    iterations: 1000,
-                    updateInterval: 25
-                }
+                enabled: false
             },
             interaction: {
                 hover: true,
@@ -194,6 +185,21 @@
         var network = new vis.Network(container, data, options);
         var activeFilters = new Set();
 
+        function adjustNodeAppearance(nodeData) {
+            const labelLength = nodeData.label.length;
+            const baseSize = 15;
+            const fontSize = Math.max(4, Math.min(8, Math.floor(baseSize * 2 / Math.sqrt(labelLength))));
+            
+            return {
+                ...nodeData,
+                size: baseSize,
+                font: {
+                    ...nodeData.font,
+                    size: fontSize
+                }
+            };
+        }
+
         function addNodesByType(nodeType) {
             fetch('/get_nodes', {
                 method: 'POST',
@@ -206,7 +212,8 @@
             })
             .then(response => response.json())
             .then(newNodes => {
-                nodes.update(newNodes);
+                const adjustedNodes = newNodes.map(adjustNodeAppearance);
+                nodes.update(adjustedNodes);
                 updateFilterButtons();
             });
         }
@@ -267,13 +274,11 @@
         function updateNodesVisibility(visibleNodes) {
             const visibleNodeIds = new Set(visibleNodes.map(node => node.id));
             
-            // Update nodes visibility
             nodes.update(nodes.get().map(node => ({
                 ...node,
                 hidden: !visibleNodeIds.has(node.id)
             })));
             
-            // Update edges visibility
             edges.update(edges.get().map(edge => ({
                 ...edge,
                 hidden: !(visibleNodeIds.has(edge.from) && visibleNodeIds.has(edge.to))
@@ -327,9 +332,29 @@
             });
         }
 
-        // Initialize the network
         network.on("stabilizationIterationsDone", function () {
-            network.setOptions( { physics: false } );
+            network.setOptions({ physics: false });
+        });
+
+        network.on("zoom", function() {
+            const scale = network.getScale();
+            nodes.get().forEach(node => {
+                if (!node.hidden) {
+                    const updatedNode = adjustNodeAppearance({
+                        ...node,
+                        size: 15 / scale,
+                        font: { size: Math.max(4, 8 / scale) }
+                    });
+                    nodes.update(updatedNode);
+                }
+            });
+        });
+
+        // Initialize network with proper scaling
+        network.once("afterDrawing", function() {
+            network.fit({
+                animation: true
+            });
         });
     </script>
 </body>
