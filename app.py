@@ -1,3 +1,4 @@
+# Create updated app.py
 from flask import Flask, render_template, jsonify, request
 from neo4j import GraphDatabase
 from dotenv import load_dotenv
@@ -17,52 +18,11 @@ password = os.getenv("NEO4J_PASSWORD")
 # Initialize Neo4j driver
 driver = GraphDatabase.driver(uri, auth=(username, password))
 
-def get_metadata():
+def get_graph_data():
     with driver.session() as session:
-        # Get unique locations
-        locations = session.run('''
+        # Get nodes
+        nodes_result = session.run('''
             MATCH (n)
-            WHERE exists(n.location)
-            RETURN DISTINCT n.location AS location
-            ORDER BY location
-        ''').values()
-        
-        # Get unique sublocations
-        sublocations = session.run('''
-            MATCH (n)
-            WHERE exists(n.sublocation)
-            RETURN DISTINCT n.sublocation AS sublocation
-            ORDER BY sublocation
-        ''').values()
-        
-        # Get relationship types
-        relationships = session.run('''
-            MATCH ()-[r]->()
-            RETURN DISTINCT type(r) AS relationship
-            ORDER BY relationship
-        ''').values()
-        
-        return {
-            "locations": [loc[0] for loc in locations if loc[0]],
-            "sublocations": [subloc[0] for subloc in sublocations if subloc[0]],
-            "relationships": [rel[0] for rel in relationships if rel[0]]
-        }
-
-def get_filtered_graph_data(location=None, sublocation=None, relationship_types=None):
-    with driver.session() as session:
-        # Build the node matching clause based on filters
-        node_filters = []
-        if location:
-            node_filters.append("n.location = $location")
-        if sublocation:
-            node_filters.append("n.sublocation = $sublocation")
-        
-        node_where_clause = " AND ".join(node_filters) if node_filters else "true"
-        
-        # Get nodes with filters
-        nodes_query = f'''
-            MATCH (n)
-            WHERE {node_where_clause}
             RETURN 
                 id(n) as id, 
                 labels(n) as labels, 
@@ -71,55 +31,47 @@ def get_filtered_graph_data(location=None, sublocation=None, relationship_types=
                     WHEN n.name IS NOT NULL THEN n.name
                     WHEN n.title IS NOT NULL THEN n.title
                     ELSE toString(id(n))
-                END as name
-        '''
-        
-        nodes_result = session.run(
-            nodes_query,
-            location=location,
-            sublocation=sublocation
-        )
+                END as name,
+                CASE
+                    WHEN n.location IS NOT NULL THEN n.location
+                    ELSE ''
+                END as location,
+                CASE
+                    WHEN n.sublocation IS NOT NULL THEN n.sublocation
+                    ELSE ''
+                END as sublocation
+        ''')
         
         nodes = []
-        node_ids = set()  # Keep track of node IDs for filtering edges
-        
         for record in nodes_result:
-            node_type = "hidden"  # default type
-            if any(label.lower() == "input" for label in record["labels"]):
-                node_type = "input"
-            elif any(label.lower() == "output" for label in record["labels"]):
-                node_type = "output"
+            # Get node type from labels
+            node_types = [label.lower() for label in record["labels"]]
+            node_type = next((t for t in [
+                'nerve', 'bone', 'neuro', 'region', 'viscera', 'muscle', 
+                'sense', 'vein', 'artery', 'cv', 'function', 'sensory',
+                'gland', 'lymph', 'head', 'organ', 'sensation', 'skin'
+            ] if t in node_types), 'other')
             
             nodes.append({
                 "id": record["id"],
                 "label": record["name"],
                 "labels": record["labels"],
                 "properties": record["properties"],
-                "type": node_type
+                "type": node_type,
+                "location": record["location"],
+                "sublocation": record["sublocation"]
             })
-            node_ids.add(record["id"])
-        
-        # Build relationship type filter
-        rel_type_filter = ""
-        if relationship_types:
-            rel_types = [f"type(r) = '{r}'" for r in relationship_types]
-            rel_type_filter = f"AND ({' OR '.join(rel_types)})"
-        
-        # Get relationships between filtered nodes
-        edges_query = f'''
-            MATCH (start)-[r]->(end)
-            WHERE id(start) IN $node_ids 
-            AND id(end) IN $node_ids
-            {rel_type_filter}
+
+        # Get relationships
+        edges_result = session.run('''
+            MATCH ()-[r]->()
             RETURN 
                 id(r) as id,
-                id(start) as from,
-                id(end) as to,
+                id(startNode(r)) as from,
+                id(endNode(r)) as to,
                 type(r) as type,
                 properties(r) as properties
-        '''
-        
-        edges_result = session.run(edges_query, node_ids=list(node_ids))
+        ''')
         
         edges = []
         for record in edges_result:
@@ -133,81 +85,73 @@ def get_filtered_graph_data(location=None, sublocation=None, relationship_types=
 
         return {"nodes": nodes, "edges": edges}
 
-def search_nodes(search_term):
+def get_locations():
     with driver.session() as session:
         result = session.run('''
             MATCH (n)
-            WHERE any(label IN labels(n) WHERE toLower(label) CONTAINS toLower($term))
-            OR any(key IN keys(n) WHERE toLower(toString(n[key])) CONTAINS toLower($term))
-            RETURN 
-                id(n) as id,
-                labels(n) as labels,
-                properties(n) as properties,
-                CASE
-                    WHEN n.name IS NOT NULL THEN n.name
-                    WHEN n.title IS NOT NULL THEN n.title
-                    ELSE toString(id(n))
-                END as name
-            LIMIT 10
-        ''', term=search_term)
-        
-        nodes = []
+            WHERE n.location IS NOT NULL
+            RETURN DISTINCT n.location as location, 
+                   collect(DISTINCT n.sublocation) as sublocations
+            ORDER BY location
+        ''')
+        locations = {}
         for record in result:
-            node_type = "hidden"
-            if any(label.lower() == "input" for label in record["labels"]):
-                node_type = "input"
-            elif any(label.lower() == "output" for label in record["labels"]):
-                node_type = "output"
-            
-            nodes.append({
-                "id": record["id"],
-                "label": record["name"],
-                "labels": record["labels"],
-                "properties": record["properties"],
-                "type": node_type
-            })
-        
-        return nodes
+            locations[record["location"]] = sorted([s for s in record["sublocations"] if s])
+        return locations
 
 @app.route('/')
 def index():
     return render_template('index.html')
 
-@app.route('/api/metadata')
-def get_meta():
-    try:
-        return jsonify(get_metadata())
-    except Exception as e:
-        return jsonify({"error": str(e)}), 500
-
 @app.route('/api/graph')
 def get_graph():
     try:
-        # Get filter parameters
-        location = request.args.get('location')
-        sublocation = request.args.get('sublocation')
-        relationship_types = request.args.getlist('relationships[]')
-        
-        data = get_filtered_graph_data(
-            location=location,
-            sublocation=sublocation,
-            relationship_types=relationship_types if relationship_types else None
-        )
+        data = get_graph_data()
         return jsonify(data)
     except Exception as e:
         return jsonify({"error": str(e)}), 500
 
-@app.route('/api/search')
-def search():
-    search_term = request.args.get('term', '')
-    if not search_term:
-        return jsonify([])
+@app.route('/api/locations')
+def locations():
+    try:
+        data = get_locations()
+        return jsonify(data)
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+@app.route('/api/filter')
+def filter_nodes():
+    node_type = request.args.get('type', '')
+    location = request.args.get('location', '')
+    sublocation = request.args.get('sublocation', '')
     
     try:
-        results = search_nodes(search_term)
-        return jsonify(results)
+        data = get_graph_data()
+        
+        if node_type and node_type != 'all':
+            data['nodes'] = [node for node in data['nodes'] if node['type'] == node_type]
+        
+        if location:
+            data['nodes'] = [node for node in data['nodes'] 
+                           if node.get('location') == location]
+        
+        if sublocation:
+            data['nodes'] = [node for node in data['nodes'] 
+                           if node.get('sublocation') == sublocation]
+        
+        # Filter edges to only include connections between visible nodes
+        visible_node_ids = {node['id'] for node in data['nodes']}
+        data['edges'] = [edge for edge in data['edges'] 
+                       if edge['from'] in visible_node_ids 
+                       and edge['to'] in visible_node_ids]
+        
+        return jsonify(data)
     except Exception as e:
         return jsonify({"error": str(e)}), 500
 
 if __name__ == '__main__':
     app.run(debug=True)
+
+with open('app.py', 'w') as f:
+    f.write(app_content)
+print("Created app.py with updated endpoints")
