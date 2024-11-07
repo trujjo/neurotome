@@ -2,21 +2,30 @@
 <html>
 <head>
     <title>Neo4j Test Connection</title>
-    <script src="https://cdn.neo4jlabs.com/neovis.js/v1.5.0/neovis.js"></script>
+    <script src="https://unpkg.com/neo4j-driver"></script>
+    <script src="https://d3js.org/d3.v5.min.js"></script>
     <style>
         body { 
             margin: 0;
+            padding: 20px;
             background-color: #1a1a1a;
             color: white;
+            font-family: Arial, sans-serif;
         }
-        #viz {
-            width: 100%;
-            height: 100vh;
+        #results {
+            margin-top: 20px;
+            padding: 20px;
+            background-color: #2d2d2d;
+            border-radius: 4px;
+        }
+        .node {
+            margin: 10px 0;
+            padding: 10px;
+            background-color: #404040;
+            border-left: 4px solid #cc5500;
+            border-radius: 2px;
         }
         .button {
-            position: absolute;
-            top: 20px;
-            left: 20px;
             padding: 10px 20px;
             background-color: #cc5500;
             color: white;
@@ -27,64 +36,67 @@
         .button:hover {
             background-color: #ff6a00;
         }
+        .property {
+            margin-left: 20px;
+            color: #cccccc;
+        }
     </style>
 </head>
 <body>
     <button class="button" onclick="showRandomNodes()">Show 10 Random Nodes</button>
-    <div id="viz"></div>
+    <div id="results"></div>
 
     <script>
-        let viz;
+        const driver = neo4j.driver(
+            "neo4j+s://4e5eeae5.databases.neo4j.io:7687",
+            neo4j.auth.basic("neo4j", "Poconoco16!")
+        );
 
-        function initViz() {
-            const config = {
-                container_id: "viz",
-                server_url: "neo4j+s://4e5eeae5.databases.neo4j.io:7687",
-                server_user: "neo4j",
-                server_password: "Poconoco16!",
-                labels: {
-                    "*": {
-                        caption: ["name"],
-                        size: 3,
-                        community: "community",
-                        title_properties: ["name", "type"],
-                        color: "#cc5500",
-                    }
-                },
-                relationships: {
-                    "*": {
-                        thickness: 2,
-                        caption: true,
-                        color: "#808080"
-                    }
-                },
-                initial_cypher: "MATCH (n) RETURN n LIMIT 1",
-                backgroundColor: "#1a1a1a"
-            };
-
-            viz = new NeoVis.default(config);
-            viz.render();
-        }
-
-        function showRandomNodes() {
-            // This query will:
-            // 1. Match all nodes
-            // 2. Return a random sample of 10 nodes and their immediate relationships
-            const randomNodesQuery = `
-                MATCH (n)
-                WITH n, rand() as r
-                ORDER BY r
-                LIMIT 10
-                OPTIONAL MATCH (n)-[rel]-(connected)
-                RETURN n, rel, connected
-            `;
+        async function showRandomNodes() {
+            const session = driver.session();
+            const resultsDiv = document.getElementById('results');
+            resultsDiv.innerHTML = 'Loading...';
             
-            viz.renderWithCypher(randomNodesQuery);
+            try {
+                const result = await session.run(`
+                    MATCH (n)
+                    WITH n, rand() as r
+                    ORDER BY r
+                    LIMIT 10
+                    RETURN labels(n) as labels, properties(n) as props
+                `);
+                
+                let html = '<h2>Random Nodes from Database:</h2>';
+                
+                result.records.forEach((record, i) => {
+                    const labels = record.get('labels');
+                    const props = record.get('props');
+                    
+                    html += `
+                        <div class="node">
+                            <strong>Node ${i + 1}</strong> [${labels.join(', ')}]
+                            <div class="property">
+                                ${Object.entries(props)
+                                    .map(([key, value]) => `${key}: ${value}`)
+                                    .join('<br>')}
+                            </div>
+                        </div>
+                    `;
+                });
+                
+                resultsDiv.innerHTML = html;
+                
+            } catch (error) {
+                resultsDiv.innerHTML = `Error: ${error.message}`;
+            } finally {
+                await session.close();
+            }
         }
 
-        document.addEventListener('DOMContentLoaded', () => {
-            initViz();
-        });
+        // Clean up when the page is closed
+        window.onbeforeunload = () => {
+            driver.close();
+        };
     </script>
 </body>
 </html>
