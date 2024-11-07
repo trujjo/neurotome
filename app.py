@@ -1,9 +1,10 @@
-# app.py
 from flask import Flask, render_template, jsonify, request
 from neo4j import GraphDatabase
-import os
 from dotenv import load_dotenv
+import os
+import json
 
+# Load environment variables
 load_dotenv()
 
 app = Flask(__name__)
@@ -13,53 +14,102 @@ uri = os.getenv("NEO4J_URI")
 username = os.getenv("NEO4J_USER")
 password = os.getenv("NEO4J_PASSWORD")
 
+# Initialize Neo4j driver
 driver = GraphDatabase.driver(uri, auth=(username, password))
 
 def get_graph_data():
     with driver.session() as session:
-        # Get all nodes with their properties
-        nodes_query = """
-        MATCH (n)
-        RETURN 
-            id(n) as id, 
-            labels(n) as labels, 
-            properties(n) as properties,
-            COALESCE(n.name, '') as name
-        """
-        
-        # Get all relationships
-        rels_query = """
-        MATCH (a)-[r]->(b)
-        RETURN 
-            id(r) as id, 
-            id(a) as source, 
-            id(b) as target, 
-            type(r) as type, 
-            properties(r) as properties
-        """
+        # Get nodes
+        nodes_result = session.run('''
+            MATCH (n)
+            RETURN 
+                id(n) as id, 
+                labels(n) as labels, 
+                properties(n) as properties,
+                CASE
+                    WHEN n.name IS NOT NULL THEN n.name
+                    WHEN n.title IS NOT NULL THEN n.title
+                    ELSE toString(id(n))
+                END as name
+        ''')
         
         nodes = []
-        for record in session.run(nodes_query):
-            node = {
-                'id': record['id'],
-                'label': record['name'],  # Use name as label
-                'labels': record['labels'],
-                'properties': record['properties']
-            }
-            nodes.append(node)
+        for record in nodes_result:
+            # Determine node type based on labels
+            node_type = "hidden"  # default type
+            if any(label.lower() == "input" for label in record["labels"]):
+                node_type = "input"
+            elif any(label.lower() == "output" for label in record["labels"]):
+                node_type = "output"
+            
+            nodes.append({
+                "id": record["id"],
+                "label": record["name"],
+                "labels": record["labels"],
+                "properties": record["properties"],
+                "type": node_type
+            })
+
+        # Get relationships
+        edges_result = session.run('''
+            MATCH ()-[r]->()
+            RETURN 
+                id(r) as id,
+                id(startNode(r)) as from,
+                id(endNode(r)) as to,
+                type(r) as type,
+                properties(r) as properties
+        ''')
         
         edges = []
-        for record in session.run(rels_query):
-            edge = {
-                'id': record['id'],
-                'from': record['source'],
-                'to': record['target'],
-                'type': record['type'],
-                'properties': record['properties']
-            }
-            edges.append(edge)
+        for record in edges_result:
+            edges.append({
+                "id": record["id"],
+                "from": record["from"],
+                "to": record["to"],
+                "type": record["type"],
+                "properties": record["properties"]
+            })
+
+        return {"nodes": nodes, "edges": edges}
+
+def search_nodes(search_term):
+    with driver.session() as session:
+        # Search in node properties and labels
+        result = session.run('''
+            MATCH (n)
+            WHERE any(label IN labels(n) WHERE toLower(label) CONTAINS toLower($term))
+            OR any(key IN keys(n) WHERE toLower(toString(n[key])) CONTAINS toLower($term))
+            RETURN 
+                id(n) as id,
+                labels(n) as labels,
+                properties(n) as properties,
+                CASE
+                    WHEN n.name IS NOT NULL THEN n.name
+                    WHEN n.title IS NOT NULL THEN n.title
+                    ELSE toString(id(n))
+                END as name
+            LIMIT 10
+        ''', term=search_term)
         
-        return {'nodes': nodes, 'edges': edges}
+        nodes = []
+        for record in result:
+            # Determine node type based on labels
+            node_type = "hidden"  # default type
+            if any(label.lower() == "input" for label in record["labels"]):
+                node_type = "input"
+            elif any(label.lower() == "output" for label in record["labels"]):
+                node_type = "output"
+            
+            nodes.append({
+                "id": record["id"],
+                "label": record["name"],
+                "labels": record["labels"],
+                "properties": record["properties"],
+                "type": node_type
+            })
+        
+        return nodes
 
 @app.route('/')
 def index():
@@ -68,58 +118,43 @@ def index():
 @app.route('/api/graph')
 def get_graph():
     try:
-        return jsonify(get_graph_data())
+        data = get_graph_data()
+        return jsonify(data)
     except Exception as e:
-        return jsonify({'error': str(e)}), 500
+        return jsonify({"error": str(e)}), 500
 
 @app.route('/api/search')
 def search():
-    search_term = request.args.get('term', '').lower()
+    search_term = request.args.get('term', '')
     if not search_term:
         return jsonify([])
     
-    with driver.session() as session:
-        # Search nodes by name and properties
-        query = """
-        MATCH (n)
-        WHERE toLower(toString(n.name)) CONTAINS $term 
-           OR ANY(prop IN keys(n) WHERE toLower(toString(n[prop])) CONTAINS $term)
-        RETURN DISTINCT id(n) as id, n.name as name, properties(n) as properties
-        LIMIT 10
-        """
-        
-        result = session.run(query, term=search_term)
-        matches = [{"id": record["id"], 
-                   "name": record["name"],
-                   "properties": record["properties"]} 
-                  for record in result]
-        return jsonify(matches)
+    try:
+        results = search_nodes(search_term)
+        return jsonify(results)
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
 
-@app.route('/api/locations')
-def get_locations():
-    with driver.session() as session:
-        query = """
-        MATCH (n)
-        WHERE exists(n.location)
-        RETURN DISTINCT n.location AS location
-        ORDER BY location
-        """
-        result = session.run(query)
-        locations = [record["location"] for record in result]
-        return jsonify(locations)
-
-@app.route('/api/sublocations')
-def get_sublocations():
-    with driver.session() as session:
-        query = """
-        MATCH (n)
-        WHERE exists(n.sublocation)
-        RETURN DISTINCT n.sublocation AS sublocation
-        ORDER BY sublocation
-        """
-        result = session.run(query)
-        sublocations = [record["sublocation"] for record in result]
-        return jsonify(sublocations)
+@app.route('/api/filter')
+def filter_nodes():
+    node_type = request.args.get('type', '')
+    try:
+        data = get_graph_data()
+        if node_type and node_type != 'all':
+            data['nodes'] = [node for node in data['nodes'] if node['type'] == node_type]
+            # Filter edges to only include connections between visible nodes
+            visible_node_ids = {node['id'] for node in data['nodes']}
+            data['edges'] = [edge for edge in data['edges'] 
+                           if edge['from'] in visible_node_ids 
+                           and edge['to'] in visible_node_ids]
+        return jsonify(data)
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
 
 if __name__ == '__main__':
     app.run(debug=True)
+
+# Save the updated code to a file
+with open('updated_app.py', 'w') as f:
+    f.write(updated_code)
+print("Updated Flask application code has been saved to 'updated_app.py'")
