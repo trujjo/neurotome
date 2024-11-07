@@ -1,4 +1,4 @@
-"from flask import Flask, render_template, jsonify, request
+from flask import Flask, render_template, jsonify, request
 from neo4j import GraphDatabase
 import os
 
@@ -111,4 +111,4 @@ def quick_search():
     return jsonify(nodes)
 
 if __name__ == '__main__':
-    app.run(debug=True)"
+    app.run(debug=True)
