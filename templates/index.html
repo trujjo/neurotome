@@ -3,14 +3,15 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Neural Network Visualization</title>
+    <title>Neo4j Network Visualization</title>
+    <script type="text/javascript" src="https://unpkg.com/vis-network/standalone/umd/vis-network.min.js"></script>
     <style>
         :root {
-            --burnt-orange: #CC5500;
             --dark-bg: #1a1a1a;
             --darker-gray: #2d2d2d;
             --medium-gray: #404040;
             --light-gray: #606060;
+            --burnt-orange: #CC5500;
             --text-color: #e0e0e0;
         }
 
@@ -19,7 +20,7 @@
             padding: 0;
             background-color: var(--dark-bg);
             color: var(--text-color);
-            font-family: 'Arial', sans-serif;
+            font-family: Arial, sans-serif;
         }
 
         #container {
@@ -35,198 +36,159 @@
             border-bottom: 2px solid var(--medium-gray);
         }
 
-        .search-container {
+        .filter-section {
             display: flex;
-            gap: 10px;
+            gap: 20px;
             margin-bottom: 15px;
-        }
-
-        #searchInput {
-            flex: 1;
-            padding: 8px 12px;
-            border: none;
-            border-radius: 4px;
-            background-color: var(--medium-gray);
-            color: var(--text-color);
-        }
-
-        #searchInput::placeholder {
-            color: #888;
-        }
-
-        .filter-buttons {
-            display: flex;
-            gap: 10px;
             flex-wrap: wrap;
         }
 
-        .filter-btn {
-            padding: 8px 16px;
-            border: none;
-            border-radius: 4px;
+        .filter-group {
+            display: flex;
+            flex-direction: column;
+            gap: 5px;
+        }
+
+        select, input {
+            padding: 8px;
             background-color: var(--medium-gray);
+            border: 1px solid var(--light-gray);
             color: var(--text-color);
-            cursor: pointer;
-            transition: background-color 0.3s;
+            border-radius: 4px;
         }
 
-        .filter-btn:hover {
-            background-color: var(--burnt-orange);
+        select:focus, input:focus {
+            outline: 2px solid var(--burnt-orange);
         }
 
-        .filter-btn.active {
-            background-color: var(--burnt-orange);
+        #search-container {
+            flex: 1;
+            min-width: 200px;
         }
 
-        #network-container {
+        #searchInput {
+            width: 100%;
+            box-sizing: border-box;
+        }
+
+        #network {
             flex: 1;
             background-color: var(--dark-bg);
         }
 
-        .node {
-            stroke: var(--medium-gray);
-            stroke-width: 2px;
+        .filter-label {
+            font-size: 14px;
+            color: var(--text-color);
         }
 
-        .link {
-            stroke: var(--light-gray);
-            stroke-opacity: 0.6;
-        }
-
-        .node text {
-            fill: var(--text-color);
-            font-size: 12px;
+        #relationshipSelect {
+            min-width: 150px;
         }
     </style>
-    <script src="https://d3js.org/d3.v7.min.js"></script>
 </head>
 <body>
     <div id="container">
         <div id="controls">
-            <div class="search-container">
-                <input type="text" id="searchInput" placeholder="Quick find nodes...">
-            </div>
-            <div class="filter-buttons">
-                <button class="filter-btn" data-type="all">All Nodes</button>
-                <button class="filter-btn" data-type="input">Input Nodes</button>
-                <button class="filter-btn" data-type="hidden">Hidden Nodes</button>
-                <button class="filter-btn" data-type="output">Output Nodes</button>
+            <div class="filter-section">
+                <div class="filter-group">
+                    <label class="filter-label" for="locationSelect">Location</label>
+                    <select id="locationSelect">
+                        <option value="">All Locations</option>
+                    </select>
+                </div>
+                <div class="filter-group">
+                    <label class="filter-label" for="sublocationSelect">Sublocation</label>
+                    <select id="sublocationSelect">
+                        <option value="">All Sublocations</option>
+                    </select>
+                </div>
+                <div class="filter-group">
+                    <label class="filter-label" for="relationshipSelect">Relationship Types</label>
+                    <select id="relationshipSelect" multiple>
+                    </select>
+                </div>
+                <div class="filter-group" id="search-container">
+                    <label class="filter-label" for="searchInput">Search Nodes</label>
+                    <input type="text" id="searchInput" placeholder="Search nodes...">
+                </div>
             </div>
         </div>
-        <div id="network-container"></div>
+        <div id="network"></div>
     </div>
 
     <script>
-        // Force page refresh on load
-        if (performance.navigation.type === 1) {
-            location.reload(true);
-        }
+        let network = null;
+        let allNodes = new vis.DataSet();
+        let allEdges = new vis.DataSet();
 
-        // Sample data structure (replace with your actual data)
-        const data = {
-            nodes: [
-                { id: 1, type: "input", x: 100, y: 200 },
-                { id: 2, type: "hidden", x: 300, y: 150 },
-                { id: 3, type: "hidden", x: 300, y: 250 },
-                { id: 4, type: "output", x: 500, y: 200 }
-            ],
-            links: [
-                { source: 1, target: 2 },
-                { source: 1, target: 3 },
-                { source: 2, target: 4 },
-                { source: 3, target: 4 }
-            ]
+        // Network configuration
+        const options = {
+            nodes: {
+                shape: 'dot',
+                size: 20,
+                font: {
+                    color: '#e0e0e0'
+                },
+                borderWidth: 2,
+                shadow: true
+            },
+            edges: {
+                width: 2,
+                color: { color: '#606060', highlight: '#CC5500' },
+                smooth: {
+                    type: 'continuous'
+                }
+            },
+            physics: {
+                stabilization: false,
+                barnesHut: {
+                    gravitationalConstant: -80000,
+                    springConstant: 0.001,
+                    springLength: 200
+                }
+            },
+            interaction: {
+                hover: true,
+                tooltipDelay: 200
+            }
         };
 
-        // Color scale for different node types
-        const colorScale = d3.scaleOrdinal()
-            .domain(["input", "hidden", "output"])
-            .range([
-                "#CC5500", // burnt orange
-                "#A44200", // darker burnt orange
-                "#803300"  // even darker burnt orange
-            ]);
-
-        // Set up the SVG
-        const width = window.innerWidth;
-        const height = window.innerHeight - document.getElementById('controls').offsetHeight;
-        
-        const svg = d3.select("#network-container")
-            .append("svg")
-            .attr("width", width)
-            .attr("height", height);
-
-        // Create the visualization
-        function updateNetwork(filteredNodes = data.nodes) {
-            // Clear previous elements
-            svg.selectAll("*").remove();
-
-            // Draw links
-            const links = svg.selectAll(".link")
-                .data(data.links.filter(link => 
-                    filteredNodes.find(n => n.id === link.source) &&
-                    filteredNodes.find(n => n.id === link.target)
-                ))
-                .enter()
-                .append("line")
-                .attr("class", "link")
-                .attr("x1", d => data.nodes.find(n => n.id === d.source).x)
-                .attr("y1", d => data.nodes.find(n => n.id === d.source).y)
-                .attr("x2", d => data.nodes.find(n => n.id === d.target).x)
-                .attr("y2", d => data.nodes.find(n => n.id === d.target).y);
-
-            // Draw nodes
-            const nodes = svg.selectAll(".node")
-                .data(filteredNodes)
-                .enter()
-                .append("g")
-                .attr("class", "node")
-                .attr("transform", d => `translate(${d.x},${d.y})`);
-
-            nodes.append("circle")
-                .attr("r", 20)
-                .style("fill", d => colorScale(d.type));
-
-            nodes.append("text")
-                .attr("dy", ".35em")
-                .attr("text-anchor", "middle")
-                .text(d => d.id);
+        // Initialize the network
+        function initNetwork() {
+            const container = document.getElementById('network');
+            const data = {
+                nodes: allNodes,
+                edges: allEdges
+            };
+            network = new vis.Network(container, data, options);
         }
 
-        // Initial render
-        updateNetwork();
+        // Load metadata and populate filters
+        async function loadMetadata() {
+            try {
+                const response = await fetch('/api/metadata');
+                const metadata = await response.json();
+                
+                const locationSelect = document.getElementById('locationSelect');
+                const sublocationSelect = document.getElementById('sublocationSelect');
+                const relationshipSelect = document.getElementById('relationshipSelect');
 
-        // Filter buttons functionality
-        document.querySelectorAll('.filter-btn').forEach(button => {
-            button.addEventListener('click', function() {
-                const type = this.dataset.type;
-                const filteredNodes = type === 'all' 
-                    ? data.nodes 
-                    : data.nodes.filter(node => node.type === type);
-                updateNetwork(filteredNodes);
-            });
-        });
+                metadata.locations.forEach(location => {
+                    const option = document.createElement('option');
+                    option.value = location;
+                    option.textContent = location;
+                    locationSelect.appendChild(option);
+                });
 
-        // Search functionality
-        document.getElementById('searchInput').addEventListener('input', function(e) {
-            const searchTerm = e.target.value.toLowerCase();
-            const filteredNodes = data.nodes.filter(node => 
-                node.id.toString().includes(searchTerm) ||
-                node.type.toLowerCase().includes(searchTerm)
-            );
-            updateNetwork(filteredNodes);
-        });
+                metadata.sublocations.forEach(sublocation => {
+                    const option = document.createElement('option');
+                    option.value = sublocation;
+                    option.textContent = sublocation;
+                    sublocationSelect.appendChild(option);
+                });
 
-        // Resize handler
-        window.addEventListener('resize', function() {
-            const newWidth = window.innerWidth;
-            const newHeight = window.innerHeight - document.getElementById('controls').offsetHeight;
-            
-            svg.attr("width", newWidth)
-               .attr("height", newHeight);
-            
-            updateNetwork();
-        });
-    </script>
-</body>
-</html>
+                metadata.relationships.forEach(relationship => {
+                    const option = document.createElement('option');
+                    option.value = relationship;
+                    option.textContent = relationship;
+                    relationshipSelect.appendChild(option
