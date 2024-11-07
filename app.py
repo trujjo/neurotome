@@ -1,3 +1,9 @@
+# app.py
+from flask import Flask
+app = Flask(__name__)
+
+# Your routes and other code here
+
 # Let's try a simpler approach to write the file
 with open('app.py', 'w') as f:
     f.write("""
