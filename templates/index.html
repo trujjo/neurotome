@@ -1,6 +1,8 @@
 <!DOCTYPE html>
 <html>
 <head>
+    <title>Neo4j Graph Visualization</title>
+    <script src="https://unpkg.com/vis-network/standalone/umd/vis-network.min.js"></script>
     <style>
         body {
             background-color: #1a1a1a;
@@ -46,39 +48,142 @@
             background-color: #1e1e1e;
             border: 1px solid #333;
             border-radius: 8px;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            font-size: 18px;
-            color: #888;
         }
     </style>
 </head>
 <body>
-    <div class="button-container">
-        <button class="node-button">nerve</button>
-        <button class="node-button">bone</button>
-        <button class="node-button active">neuro</button>
-        <button class="node-button">region</button>
-        <button class="node-button">viscera</button>
-        <button class="node-button">muscle</button>
-        <button class="node-button">sense</button>
-        <button class="node-button">vein</button>
-        <button class="node-button">artery</button>
-        <button class="node-button">cv</button>
-        <button class="node-button">function</button>
-        <button class="node-button">sensory</button>
-        <button class="node-button">gland</button>
-        <button class="node-button">lymph</button>
-        <button class="node-button">head</button>
-        <button class="node-button">organ</button>
-        <button class="node-button">sensation</button>
-        <button class="node-button">skin</button>
-    </div>
-    <div id="viz">
-        [Neo4j Graph Visualization Area]
-        <br>
-        (Dark mode network visualization will appear here)
-    </div>
+    <div class="button-container" id="nodeTypeButtons"></div>
+    <div id="viz"></div>
+
+    <script>
+        let network = null;
+        const container = document.getElementById('viz');
+        
+        // Create buttons dynamically
+        fetch('/api/node-types')
+            .then(response => response.json())
+            .then(data => {
+                const buttonContainer = document.getElementById('nodeTypeButtons');
+                data.node_types.forEach(type => {
+                    const button = document.createElement('button');
+                    button.className = 'node-button';
+                    button.textContent = type;
+                    button.onclick = () => loadGraphData(type);
+                    buttonContainer.appendChild(button);
+                });
+            });
+
+        function loadGraphData(nodeType) {
+            // Update active button
+            document.querySelectorAll('.node-button').forEach(btn => {
+                btn.classList.remove('active');
+                if (btn.textContent === nodeType) {
+                    btn.classList.add('active');
+                }
+            });
+
+            // Fetch graph data
+            fetch(`/api/nodes/${nodeType}`)
+                .then(response => response.json())
+                .then(data => {
+                    if (data.success) {
+                        visualizeGraph(data.data);
+                    }
+                });
+        }
+
+        function visualizeGraph(graphData) {
+            // Process the graph data
+            const nodes = new Set();
+            const edges = [];
+            const nodesArray = [];
+
+            graphData.forEach(record => {
+                const source = record.n;
+                const target = record.m;
+                const relationship = record.r;
+
+                if (!nodes.has(source.id)) {
+                    nodes.add(source.id);
+                    nodesArray.push({
+                        id: source.id,
+                        label: source.properties.name || source.id,
+                        color: getNodeColor(source.labels[0])
+                    });
+                }
+
+                if (!nodes.has(target.id)) {
+                    nodes.add(target.id);
+                    nodesArray.push({
+                        id: target.id,
+                        label: target.properties.name || target.id,
+                        color: getNodeColor(target.labels[0])
+                    });
+                }
+
+                edges.push({
+                    from: source.id,
+                    to: target.id,
+                    label: relationship.type,
+                    arrows: 'to'
+                });
+            });
+
+            const data = {
+                nodes: new vis.DataSet(nodesArray),
+                edges: new vis.DataSet(edges)
+            };
+
+            const options = {
+                nodes: {
+                    shape: 'dot',
+                    size: 16,
+                    font: {
+                        color: '#ffffff'
+                    }
+                },
+                edges: {
+                    color: '#ffffff',
+                    font: {
+                        color: '#ffffff'
+                    }
+                },
+                physics: {
+                    stabilization: false,
+                    barnesHut: {
+                        gravitationalConstant: -80000,
+                        springConstant: 0.001,
+                        springLength: 200
+                    }
+                }
+            };
+
+            // Destroy existing network if it exists
+            if (network !== null) {
+                network.destroy();
+            }
+
+            network = new vis.Network(container, data, options);
+        }
+
+        function getNodeColor(label) {
+            const colors = {
+                'nerve': '#ff0000',
+                'bone': '#00ff00',
+                'neuro': '#0000ff',
+                // Add more colors for other node types
+            };
+            return colors[label] || '#cccccc';
+        }
+
+        // Load initial graph data
+        fetch('/api/graph')
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    visualizeGraph(data.data);
+                }
+            });
+    </script>
 </body>
 </html>
