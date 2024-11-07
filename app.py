@@ -1,85 +1,34 @@
-from flask import Flask, render_template, jsonify
+# Example code to connect to Neo4j and query data
 from neo4j import GraphDatabase
-import os
-from contextlib import contextmanager
 
-app = Flask(__name__)
+# Connection details
+uri = "neo4j+s://4e5eeae5.databases.neo4j.io:7687"
+user = "neo4j"
+password = "Poconoco16!"
 
-# Configuration
-URI = "neo4j+s://4e5eeae5.databases.neo4j.io:7687"
-AUTH = ("neo4j", "Poconoco16!")
+# Create a driver instance
+driver = GraphDatabase.driver(uri, auth=(user, password))
 
-NODE_TYPES = [
-    'nerve', 'bone', 'neuro', 'region', 'viscera', 'muscle', 'sense',
-    'vein', 'artery', 'cv', 'function', 'sensory', 'gland', 'lymph',
-    'head', 'organ', 'sensation', 'skin'
-]
+# Function to execute queries
+def run_query(tx, query):
+    result = tx.run(query)
+    return [record for record in result]
 
-@contextmanager
-def get_db_connection():
-    driver = GraphDatabase.driver(URI, auth=AUTH)
-    try:
-        yield driver
-    finally:
-        driver.close()
+# Test connection and get some basic info
+with driver.session() as session:
+    # Example query to get node labels
+    query = "CALL db.labels()"
+    result = session.execute_write(run_query, query)
+    print("Available node labels:")
+    for record in result:
+        print(record[0])
+        
+    # Example query to get relationship types
+    query = "CALL db.relationshipTypes()"
+    result = session.execute_write(run_query, query)
+    print("\
+Available relationship types:")
+    for record in result:
+        print(record[0])
 
-@app.route('/')
-def index():
-    return render_template('visualization.html', node_types=NODE_TYPES)
-
-@app.route('/nodes/<node_type>')
-def get_nodes_by_type(node_type):
-    try:
-        with get_db_connection() as driver:
-            with driver.session() as session:
-                # Enhanced query to get nodes with their relationships
-                query = """
-                MATCH (n:%s)
-                OPTIONAL MATCH (n)-[r]-(m)
-                RETURN DISTINCT n, 
-                       collect(DISTINCT {
-                           relationship: type(r),
-                           node: m
-                       }) as connections
-                """ % node_type
-                
-                result = session.run(query)
-                nodes_data = []
-                for record in result:
-                    node = record['n']
-                    connections = record['connections']
-                    nodes_data.append({
-                        'id': node.id,
-                        'properties': dict(node),
-                        'connections': [
-                            {
-                                'type': conn['relationship'],
-                                'connected_node': dict(conn['node'])
-                            } for conn in connections if conn['node'] is not None
-                        ]
-                    })
-                return jsonify(nodes_data)
-    except Exception as e:
-        return jsonify({'error': str(e)}), 500
-
-@app.route('/graph/relationships/<node_type>')
-def get_relationships(node_type):
-    try:
-        with get_db_connection() as driver:
-            with driver.session() as session:
-                query = """
-                MATCH (n:%s)-[r]-(m)
-                RETURN DISTINCT type(r) as relationship_type,
-                       count(r) as count
-                """ % node_type
-                
-                result = session.run(query)
-                relationships = [dict(record) for record in result]
-                return jsonify(relationships)
-    except Exception as e:
-        return jsonify({'error': str(e)}), 500
-
-if __name__ == '__main__':
-    port = int(os.environ.get('PORT', 5000))
-    debug = os.environ.get('FLASK_ENV') == 'development'
-    app.run(host='0.0.0.0', port=port, debug=debug)
+driver.close()
