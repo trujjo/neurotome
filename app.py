@@ -96,3 +96,42 @@ def refresh_data():
 
 if __name__ == '__main__':
     app.run(host='0.0.0.0', port=10000, debug=False)
+
+
+# Add this JavaScript after the existing script
+<script>
+    let network;
+    
+    function initializeNetwork(data) {
+        const container = document.getElementById('visualization-area');
+        const options = {
+            nodes: {
+                shape: 'dot',
+                size: 30
+            },
+            physics: {
+                enabled: true
+            }
+        };
+        
+        network = new vis.Network(container, data, options);
+    }
+
+    document.getElementById('refreshButton').addEventListener('click', function() {
+        fetch('/refresh-data')
+            .then(response => response.json())
+            .then(data => {
+                document.getElementById('lastUpdated').textContent = data.timestamp;
+                if (data.success) {
+                    initializeNetwork({
+                        nodes: new vis.DataSet(data.graph_data.nodes),
+                        edges: new vis.DataSet(data.graph_data.edges)
+                    });
+                }
+            })
+            .catch(error => {
+                console.error('Error:', error);
+                alert('Error refreshing data. Please try again.');
+            });
+    });
+</script>
