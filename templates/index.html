@@ -1,95 +1,239 @@
+"<!DOCTYPE html>
+<html lang=""en"">
+<head>
+    <meta charset=""UTF-8"">
+    <meta name=""viewport"" content=""width=device-width, initial-scale=1.0"">
+    <title>NeuroNetwork Explorer</title>
+    <link href=""https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600&display=swap"" rel=""stylesheet"">
+    <script src=""https://cdn.jsdelivr.net/npm/vis-network@9.1.2/dist/vis-network.min.js""></script>
+    <style>
+        :root {
+            --primary-bg: #1a1a1a;
+            --secondary-bg: #2d2d2d;
+            --burnt-orange: #CC5500;
+            --text-primary: #e0e0e0;
+            --text-secondary: #a0a0a0;
+            --border-color: #404040;
+        }
+        
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: var(--primary-bg);
+            color: var(--text-primary);
+            margin: 0;
+            padding: 0;
+        }
+        
+        .navbar {
+            background-color: var(--secondary-bg);
+            padding: 1rem;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.2);
+            margin-bottom: 2rem;
+        }
+
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 0 1rem;
+        }
+
+        .quick-search {
+            background-color: var(--secondary-bg);
+            padding: 1rem;
+            border-radius: 8px;
+            margin-bottom: 1rem;
+            border: 1px solid var(--border-color);
+        }
+
+        .quick-search input {
+            width: 100%;
+            padding: 0.75rem;
+            border-radius: 4px;
+            background-color: var(--primary-bg);
+            color: var(--text-primary);
+            border: 1px solid var(--border-color);
+            font-size: 1rem;
+        }
+
+        .node-type-buttons {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 0.5rem;
+            margin-bottom: 1rem;
+            background-color: var(--secondary-bg);
+            padding: 1rem;
+            border-radius: 8px;
+            border: 1px solid var(--border-color);
+        }
+
+        .node-type-button {
+            background-color: var(--primary-bg);
+            color: var(--text-primary);
+            padding: 0.5rem 1rem;
+            border-radius: 4px;
+            border: 1px solid var(--border-color);
+            cursor: pointer;
+            transition: all 0.2s ease;
+        }
+
+        .node-type-button:hover {
+            border-color: var(--burnt-orange);
+        }
+
+        .node-type-button.active {
+            background-color: var(--burnt-orange);
+            border-color: var(--burnt-orange);
+        }
+
+        #network-container {
+            background-color: var(--secondary-bg);
+            border-radius: 8px;
+            border: 1px solid var(--border-color);
+            height: 600px;
+            width: 100%;
+        }
+    </style>
 </head>
 <body>
-<div class="container">
-        <div class="sidebar">
-            <div class="search-container">
-                <h3>Path Finder</h3>
-                <input type="text" id="sourceNode" class="search-input" placeholder="Source Node">
-                <input type="text" id="targetNode" class="search-input" placeholder="Target Node">
-                <button id="connectButton" class="connect-button">Find Path</button>
-            </div>
-
-            <div class="button-group">
-                <h3>Node Types</h3>
-                {% for node_type in metadata.node_types %}
-                <button onclick="addNodesByType('{{ node_type }}')" style="background-color: {{ metadata.node_colors.get(node_type, '#CC5500') }}">
-                    {{ node_type }}
-                </button>
-                {% endfor %}
-            </div>
-
-            <script type="text/javascript">
-            <div class="button-group">
-                <h3>Locations</h3>
-                {% for location in metadata.locations %}
-                <button class="filter-button" data-criteria="location" data-value="{{ location }}" 
-                        onclick="filterByLocation('{{ location }}')">{{ location }}</button>
-                {% endfor %}
-            </div>
-
-            <div class="button-group">
-                <h3>Sublocations</h3>
-                {% for sublocation in metadata.sublocations %}
-                <button class="filter-button" data-criteria="sublocation" data-value="{{ sublocation }}"
-                        onclick="filterBySublocation('{{ sublocation }}')">{{ sublocation }}</button>
-                {% endfor %}
-            </div>
-
-            <div class="button-group">
-                <h3>Relationships</h3>
-                {% for rel_type in metadata.relationship_types %}
-                <button class="filter-button" data-criteria="relationship" data-value="{{ rel_type }}"
-                        onclick="filterByRelationship('{{ rel_type }}')">{{ rel_type }}</button>
-                {% endfor %}
-            </div>
-
-            <button class="clear-button" onclick="clearNetwork()">Clear All</button>
-            <button class="clear-button" onclick="clearFilters()">Clear Filters</button>
+    <nav class=""navbar"">
+        <div class=""container"">
+            <h1 style=""margin: 0; text-align: center;"">NeuroNetwork Explorer</h1>
         </div>
-        
-        <div class="visualization">
-            <div id="mynetwork"></div>
-            <div class="legend">
-                <h4>Node Types</h4>
-                {% for node_type in metadata.node_types %}
-                <div class="legend-item">
-                    <div class="legend-color" style="background-color: {{ metadata.node_colors.get(node_type, '#CC5500') }}"></div>
-                    <span>{{ node_type }}</span>
-                </div>
-                {% endfor %}
-            </div>
+    </nav>
+
+    <div class=""container"">
+        <!-- Quick Search -->
+        <div class=""quick-search"">
+            <input type=""text"" id=""quickSearch"" placeholder=""Quick search nodes... (e.g., 'neuron', 'synapse', 'ID:123')"">
         </div>
+
+        <!-- Node Type Buttons -->
+        <div class=""node-type-buttons"" id=""nodeTypeButtons"">
+            <!-- Dynamically populated -->
+        </div>
+
+        <!-- Network Visualization -->
+        <div id=""network-container""></div>
     </div>
 
-    <script type="text/javascript">
-var container = document.getElementById('mynetwork');
-var nodes = new vis.DataSet([]);
-var edges = new vis.DataSet([]);
-@@ -405,26 +462,4 @@
-network.setOptions({ physics: false });
-});
-
-        network.on("zoom", function() {
-            const scale = network.getScale();
-            nodes.get().forEach(node => {
-                if (!node.hidden) {
-                    const updatedNode = adjustNodeAppearance({
-                        ...node,
-                        size: 15 / scale,
-                        font: { size: Math.max(4, 8 / scale) }
-                    });
-                    nodes.update(updatedNode);
+    <script>
+        // Initialize network visualization
+        const container = document.getElementById('network-container');
+        const data = {
+            nodes: new vis.DataSet([]),
+            edges: new vis.DataSet([])
+        };
+        
+        const options = {
+            nodes: {
+                shape: 'dot',
+                size: 16,
+                font: {
+                    size: 14,
+                    color: '#e0e0e0'
+                },
+                borderWidth: 2,
+                shadow: true
+            },
+            edges: {
+                width: 2,
+                color: {
+                    color: '#404040',
+                    highlight: '#CC5500'
+                },
+                smooth: {
+                    type: 'continuous'
                 }
-            });
-        });
+            },
+            physics: {
+                stabilization: false,
+                barnesHut: {
+                    gravitationalConstant: -80000,
+                    springConstant: 0.001,
+                    springLength: 200
+                }
+            },
+            interaction: {
+                hover: true,
+                tooltipDelay: 200
+            }
+        };
+        
+        const network = new vis.Network(container, data, options);
 
-        // Initialize network with proper scaling
-        network.once("afterDrawing", function() {
-            network.fit({
-                animation: true
+        // Generate color for node types
+        function generateColor(index, total) {
+            const hue = (index / total) * 360;
+            return `hsl(${hue}, 70%, 50%)`;
+        }
+
+        // Load initial graph data
+        fetch('/api/graph')
+            .then(response => response.json())
+            .then(graphData => {
+                data.nodes.add(graphData.nodes);
+                data.edges.add(graphData.edges);
             });
+
+        // Create node type buttons
+        fetch('/api/node_types')
+            .then(response => response.json())
+            .then(nodeTypes => {
+                const container = document.getElementById('nodeTypeButtons');
+                nodeTypes.forEach((type, index) => {
+                    const button = document.createElement('button');
+                    button.className = 'node-type-button';
+                    button.textContent = type;
+                    button.style.setProperty('--button-color', generateColor(index, nodeTypes.length));
+                    
+                    button.addEventListener('click', () => {
+                        button.classList.toggle('active');
+                        fetch(`/api/nodes_by_type/${encodeURIComponent(type)}`)
+                            .then(response => response.json())
+                            .then(nodes => {
+                                const nodeColor = generateColor(index, nodeTypes.length);
+                                nodes.forEach(node => {
+                                    node.color = nodeColor;
+                                    data.nodes.update(node);
+                                });
+                            });
+                    });
+                    
+                    container.appendChild(button);
+                });
+            });
+
+        // Quick search functionality
+        const quickSearch = document.getElementById('quickSearch');
+        let searchTimeout = null;
+
+        quickSearch.addEventListener('input', () => {
+            clearTimeout(searchTimeout);
+            searchTimeout = setTimeout(() => {
+                const searchTerm = quickSearch.value;
+                if (searchTerm.length >= 2) {
+                    fetch(`/api/quick_search?term=${encodeURIComponent(searchTerm)}`)
+                        .then(response => response.json())
+                        .then(nodes => {
+                            // Reset all nodes
+                            data.nodes.forEach(node => {
+                                node.borderWidth = 1;
+                                node.borderColor = '#404040';
+                                data.nodes.update(node);
+                            });
+                            
+                            // Highlight found nodes
+                            nodes.forEach(node => {
+                                data.nodes.update({
+                                    id: node.id,
+                                    borderWidth: 3,
+                                    borderColor: '#CC5500'
+                                });
+                            });
+                        });
+                }
+            }, 300);
         });
     </script>
 </body>
-</html>
-        network.on("zoom", function
+</html>"
