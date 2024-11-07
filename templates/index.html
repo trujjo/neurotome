@@ -1,70 +1,84 @@
 <!DOCTYPE html>
 <html>
 <head>
-    <title>Neo4j Network Visualization</title>
-    <script type="text/javascript" src="https://unpkg.com/vis-network/standalone/umd/vis-network.min.js"></script>
     <style>
-        #mynetwork {
-            width: 100%;
-            height: 90vh;
-            border: 1px solid lightgray;
+        body {
+            background-color: #1a1a1a;
+            color: #ffffff;
+            margin: 0;
+            padding: 15px;
+            font-family: 'Arial', sans-serif;
         }
-        .filter-button {
-            margin: 5px;
-            padding: 5px 10px;
+        .button-container {
+            padding: 15px;
+            display: flex;
+            flex-wrap: wrap;
+            gap: 6px;
+            background-color: #232323;
+            border-radius: 8px;
+            margin-bottom: 20px;
+        }
+        .node-button {
+            background-color: #cc5500;
+            color: white;
+            border: none;
+            padding: 6px 12px;
+            border-radius: 4px;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            font-size: 12px;
+            text-transform: uppercase;
+            letter-spacing: 0.3px;
+            min-width: 60px;
+        }
+        .node-button:hover {
+            background-color: #ff6600;
+            transform: translateY(-1px);
+            box-shadow: 0 2px 8px rgba(204, 85, 0, 0.3);
+        }
+        .active {
+            background-color: #ff8533;
+            box-shadow: 0 0 10px rgba(255, 133, 51, 0.5);
+        }
+        #viz {
+            width: 100%;
+            height: 700px;
+            background-color: #1e1e1e;
+            border: 1px solid #333;
+            border-radius: 8px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 18px;
+            color: #888;
         }
     </style>
 </head>
 <body>
-    <div id="filters">
-        <button class="filter-button" onclick="showAll()">Show All</button>
-        <button class="filter-button" onclick="filterByType('nerve')">Nerves</button>
-        <button class="filter-button" onclick="filterByType('bone')">Bones</button>
-        <button class="filter-button" onclick="filterByType('muscle')">Muscles</button>
+    <div class="button-container">
+        <button class="node-button">nerve</button>
+        <button class="node-button">bone</button>
+        <button class="node-button active">neuro</button>
+        <button class="node-button">region</button>
+        <button class="node-button">viscera</button>
+        <button class="node-button">muscle</button>
+        <button class="node-button">sense</button>
+        <button class="node-button">vein</button>
+        <button class="node-button">artery</button>
+        <button class="node-button">cv</button>
+        <button class="node-button">function</button>
+        <button class="node-button">sensory</button>
+        <button class="node-button">gland</button>
+        <button class="node-button">lymph</button>
+        <button class="node-button">head</button>
+        <button class="node-button">organ</button>
+        <button class="node-button">sensation</button>
+        <button class="node-button">skin</button>
     </div>
-    <div id="mynetwork"></div>
-
-    <script>
-        let network = null;
-
-        function initNetwork(data) {
-            const container = document.getElementById('mynetwork');
-            const options = {
-                nodes: {
-                    shape: 'dot',
-                    size: 16
-                },
-                physics: {
-                    stabilization: false,
-                    barnesHut: {
-                        gravitationalConstant: -80000,
-                        springConstant: 0.001,
-                        springLength: 200
-                    }
-                }
-            };
-
-            network = new vis.Network(container, data, options);
-        }
-
-        function showAll() {
-            fetch('/api/graph')
-                .then(response => response.json())
-                .then(data => {
-                    initNetwork(data);
-                });
-        }
-
-        function filterByType(type) {
-            fetch('/api/filter?type=' + type)
-                .then(response => response.json())
-                .then(data => {
-                    initNetwork(data);
-                });
-        }
-
-        // Load initial graph
-        showAll();
-    </script>
+    <div id="viz">
+        [Neo4j Graph Visualization Area]
+        <br>
+        (Dark mode network visualization will appear here)
+    </div>
 </body>
 </html>
