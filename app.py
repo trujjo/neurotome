@@ -1,65 +1,66 @@
-
-from flask import Flask, render_template_string, jsonify
-from datetime import datetime
-import os
-import logging
+# Complete Neo4j connection and query code
+from neo4j import GraphDatabase
 import json
 
-app = Flask(__name__)
-
-@app.route('/')
-def home():
-    return render_template_string(html_template)
-
-@app.route('/refresh-data')
-def refresh_data():
-    # Example data - in a real application, this would pull from your database
-    # without any limit
-    nodes = []
-    edges = []
-    
-    # Generate more test data
-    for i in range(1, 501):  # Increased to 500 nodes for testing
-        nodes.append({
-            'id': str(i),
-            'label': 'Node ' + str(i),
-            'properties': {
-                'location': 'Location ' + str((i % 5) + 1),  # 5 different locations
-                'type': 'Type ' + str((i % 3) + 1)  # 3 different types
-            }
-        })
+class Neo4jConnection:
+    def __init__(self, uri, user, password):
+        self.driver = GraphDatabase.driver(uri, auth=(user, password))
         
-        # Create edges (connecting each node to several others)
-        if i > 1:
-            # Connect to previous node
-            edges.append({
-                'from': str(i),
-                'to': str(i-1),
-                'label': 'CONNECTS_TO'
-            })
-            # Connect to a random earlier node
-            if i > 10:
-                import random
-                random_target = random.randint(1, i-2)
-                edges.append({
-                    'from': str(i),
-                    'to': str(random_target),
-                    'label': 'CONNECTS_TO'
-                })
+    def close(self):
+        self.driver.close()
+        
+    def query(self, query, parameters=None):
+        with self.driver.session() as session:
+            result = session.run(query, parameters or {})
+            return [record.data() for record in result]
+            
+    def get_all_nodes(self):
+        query = """
+        MATCH (n)
+        RETURN n
+        LIMIT 100
+        """
+        return self.query(query)
     
-    # Return the response with properly formatted JSON
-    return jsonify({
-        'success': True,
-        'timestamp': datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
-        'graph_data': {
-            'nodes': nodes,
-            'edges': edges
-        },
-        'filters': {
-            'locations': ['Location ' + str(i) for i in range(1, 6)],
-            'types': ['Type ' + str(i) for i in range(1, 4)]
-        }
-    })
+    def get_all_relationships(self):
+        query = """
+        MATCH ()-[r]->()
+        RETURN type(r) as type, count(r) as count
+        """
+        return self.query(query)
+    
+    def get_nodes_with_relationships(self):
+        query = """
+        MATCH (n1)-[r]->(n2)
+        RETURN n1, type(r) as relationship_type, n2
+        LIMIT 100
+        """
+        return self.query(query)
 
-if __name__ == '__main__':
-    app.run(debug=True)
+# Connection details
+uri = "neo4j+s://4e5eeae5.databases.neo4j.io:7687"
+user = "neo4j"
+password = "Poconoco16!"
+
+# Create connection instance
+conn = Neo4jConnection(uri, user, password)
+
+# Example usage
+print("Getting nodes...")
+nodes = conn.get_all_nodes()
+print(json.dumps(nodes[:5], indent=2))  # Print first 5 nodes
+
+print("\
+Getting relationship types...")
+relationships = conn.get_all_relationships()
+print(json.dumps(relationships, indent=2))
+
+print("\
+Getting nodes with their relationships...")
+connected_nodes = conn.get_nodes_with_relationships()
+print(json.dumps(connected_nodes[:5], indent=2))  # Print first 5 relationships
+
+# Close the connection
+conn.close()
+print("\
+Connection closed")
