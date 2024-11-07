@@ -1,4 +1,4 @@
-Flask==2.2.2
+flask==2.2.2
+werkzeug==2.2.2
+neo4j==4.4.3
 gunicorn==20.1.0
-Werkzeug==2.2.2
-neo4j==5.11.0
