@@ -92,13 +92,14 @@
             document.getElementById('status').innerHTML = 'Fetching data...';
             
             try {
+                // Fixed query with different variable name for random
                 const result = await session.run(`
                     MATCH (n)
-                    WITH n, rand() as r
-                    ORDER BY r
+                    WITH n, rand() as random
+                    ORDER BY random
                     LIMIT 5
-                    MATCH (n)-[r]-(m)
-                    RETURN DISTINCT n, r, m
+                    MATCH (n)-[rel]-(m)
+                    RETURN DISTINCT n, rel, m
                     LIMIT 15
                 `);
                 
@@ -111,7 +112,7 @@
                 result.records.forEach(record => {
                     const source = record.get('n');
                     const target = record.get('m');
-                    const relationship = record.get('r');
+                    const relationship = record.get('rel');
                     
                     // Add nodes if they don't exist
                     if (!nodes.has(source.identity.toString())) {
