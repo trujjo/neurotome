@@ -1,5 +1,5 @@
 # Create app.py content
-app_code = ""
+app_code = """
 from flask import Flask, render_template, jsonify
 from neo4j import GraphDatabase
 import os
@@ -91,7 +91,7 @@ def internal_error(error):
 if __name__ == '__main__':
     port = int(os.environ.get('PORT', 5000))
     app.run(host='0.0.0.0', port=port, debug=True)
-""
+"""
 
 # Save the app code to a file
 with open('app.py', 'w') as f:
