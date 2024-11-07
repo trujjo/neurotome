@@ -1,7 +1,7 @@
-# Create app.py content
 app_code = """
-from flask import Flask, render_template, jsonify
+from flask import Flask, render_template, jsonify, g
 from neo4j import GraphDatabase
+from neo4j.exceptions import ResultFailedError
 import os
 from dotenv import load_dotenv
 
@@ -11,21 +11,30 @@ load_dotenv()
 app = Flask(__name__)
 
 # Neo4j Configuration
-NEO4J_URI = os.getenv('NEO4J_URI', 'neo4j+s://4e5eeae5.databases.neo4j.io')
+NEO4J_URI = os.getenv('NEO4J_URI', 'neo4j+s://4e5eeae5.databases.neo4j.io:7687')
 NEO4J_USER = os.getenv('NEO4J_USER', 'neo4j')
 NEO4J_PASSWORD = os.getenv('NEO4J_PASSWORD', 'Poconoco16!')
 
 # Initialize Neo4j driver
 driver = GraphDatabase.driver(NEO4J_URI, auth=(NEO4J_USER, NEO4J_PASSWORD))
 
+# Verify Neo4j connectivity
+try:
+    driver.verify_connectivity()
+except Exception as e:
+    print(f"Failed to connect to Neo4j: {str(e)}")
+    raise
+
 def get_nodes_by_type(tx, node_type):
-    query = f'''
-    MATCH (n:{node_type})-[r]-(m)
-    RETURN n, r, m
-    LIMIT 100
-    '''
-    result = tx.run(query)
-    return [dict(record) for record in result]
+    try:
+        query = f'''
+        MATCH (n:{node_type})-[r]-(m)
+        RETURN n, r, m
+        '''
+        result = tx.run(query)
+        return [dict(record) for record in result]
+    except Exception as e:
+        raise ResultFailedError(f"Failed to execute query: {str(e)}")
 
 @app.route('/')
 def index():
@@ -62,56 +71,4 @@ def get_node_types():
         'sensation',
         'skin'
     ]
-    return jsonify({'success': True, 'node_types': node_types})
-
-@app.route('/api/graph')
-def get_full_graph():
-    with driver.session() as session:
-        try:
-            query = '''
-            MATCH (n)-[r]-(m)
-            RETURN n, r, m
-            LIMIT 100
-            '''
-            result = session.run(query)
-            nodes = [dict(record) for record in result]
-            return jsonify({'success': True, 'data': nodes})
-        except Exception as e:
-            return jsonify({'success': False, 'error': str(e)})
-
-def get_nodes_by_type(tx, node_type):
-    try:
-        query = f'''
-        MATCH (n:{node_type})-[r]-(m)
-        RETURN n, r, m
-        LIMIT 100
-        '''
-        result = tx.run(query)
-        return [dict(record) for record in result]
-    except Exception as e:
-        raise ResultFailedError(f"Failed to execute query: {str(e)}")
-
-# Error handling
-@app.errorhandler(404)
-def not_found_error(error):
-    return jsonify({'success': False, 'error': 'Not found'}), 404
-
-@app.errorhandler(500)
-def internal_error(error):
-    return jsonify({'success': False, 'error': 'Internal server error'}), 500
-
-if __name__ == '__main__':
-    port = int(os.environ.get('PORT', 5000))
-    app.run(host='0.0.0.0', port=port, debug=True)
-"""
-
-# Save the app code to a file
-with open('app.py', 'w') as f:
-    f.write(app_code)
-
-print("Created app.py with the following features:")
-print("- Neo4j connection configuration")
-print("- API endpoints for node types and graph data")
-print("- Error handling")
-print("- Environment variable support")
-print("- Development server configuration")
+    return jsonify({'success': True, 'node_types': node_types
