@@ -44,7 +44,7 @@ html_template = '''
         </div>
     </div>
 
-    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/js/bootstrap.bundle.min.js"></script>
+    <script src="https://unpkg.com/vis-network/standalone/umd/vis-network.min.js"></script>
     <script>
         document.getElementById('refreshButton').addEventListener('click', function() {
             fetch('/refresh-data')
