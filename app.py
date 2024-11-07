@@ -38,7 +38,7 @@ html_template = '''
                 </div>
                 <div id="graph-container">
                     <h3>Graph Visualization</h3>
-                    <div id="visualization-area"></div>
+                    <div id="visualization-area" style="height: 600px; border: 1px solid #ddd;"></div>
                 </div>
             </div>
         </div>
