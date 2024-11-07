@@ -1,18 +1,25 @@
-from flask import Flask, render_template_string, jsonify
+from flask import Flask, render_template, jsonify
 from datetime import datetime
 import logging
-from neo4j import GraphDatabase  # Add this import
+from neo4j import GraphDatabase
 
 app = Flask(__name__)
 logging.basicConfig(level=logging.INFO)
 
 # Neo4j connection configuration
-NEO4J_URI = "neo4j+s://4e5eeae5.databases.neo4j.io:7687"  # e.g., "neo4j+s://xxx.databases.neo4j.io"
+NEO4J_URI = "neo4j+s://4e5eeae5.databases.neo4j.io:7687"
 NEO4J_USER = "neo4j"
 NEO4J_PASSWORD = "Poconoco16!"
 
 # Initialize Neo4j driver
 driver = GraphDatabase.driver(NEO4J_URI, auth=(NEO4J_USER, NEO4J_PASSWORD))
+
+# Define node types
+NODE_TYPES = [
+    'nerve', 'bone', 'neuro', 'region', 'viscera', 'muscle', 'sense',
+    'vein', 'artery', 'cv', 'function', 'sensory', 'gland', 'lymph',
+    'head', 'organ', 'sensation', 'skin'
+]
 
 def get_graph_data():
     with driver.session() as session:
@@ -52,37 +59,52 @@ def get_graph_data():
 
         return nodes, edges
 
+@app.route('/')
+def index():
+    """Main visualization page"""
+    return render_template('visualization.html', node_types=NODE_TYPES)
+
 @app.route('/refresh-data')
 def refresh_data():
     try:
         nodes, edges = get_graph_data()
-        
-        # Get unique locations and types from nodes
-        locations = list(set(
-            node['properties'].get('location') 
-            for node in nodes 
-            if 'location' in node['properties']
-        ))
-        types = list(set(
-            node['properties'].get('type') 
-            for node in nodes 
-            if 'type' in node['properties']
-        ))
-        
         return jsonify({
             'success': True,
             'timestamp': datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
-            'graph_data': {'nodes': nodes, 'edges': edges},
-            'filters': {
-                'locations': locations,
-                'types': types
-            }
+            'graph_data': {'nodes': nodes, 'edges': edges}
         })
     except Exception as e:
         logging.error(f"Error in refresh_data: {str(e)}")
         return jsonify({'success': False, 'error': str(e)}), 500
 
-# The rest of your code (html_template and other routes) remains the same
+@app.route('/nodes/<node_type>')
+def get_nodes_by_type(node_type):
+    try:
+        with driver.session() as session:
+            query = """
+            MATCH (n:%s)
+            OPTIONAL MATCH (n)-[r]-(m)
+            RETURN n, collect(DISTINCT {relationship: type(r), node: m}) as connections
+            """ % node_type
+            
+            result = session.run(query)
+            nodes_data = []
+            for record in result:
+                node = record['n']
+                connections = record['connections']
+                nodes_data.append({
+                    'id': node.id,
+                    'properties': dict(node),
+                    'connections': [
+                        {
+                            'type': conn['relationship'],
+                            'connected_node': dict(conn['node'])
+                        } for conn in connections if conn['node'] is not None
+                    ]
+                })
+            return jsonify(nodes_data)
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
 
 if __name__ == '__main__':
     try:
@@ -90,7 +112,7 @@ if __name__ == '__main__':
         with driver.session() as session:
             session.run("MATCH (n) RETURN count(n) LIMIT 1")
         logging.info("Successfully connected to Neo4j database")
-        app.run(host='0.0.0.0', port=10000, debug=False)
+        app.run(host='0.0.0.0', port=10000, debug=True)
     except Exception as e:
         logging.error(f"Failed to connect to Neo4j: {str(e)}")
     finally:
