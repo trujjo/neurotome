@@ -9,7 +9,6 @@ app = Flask(__name__)
 URI = "neo4j+s://4e5eeae5.databases.neo4j.io:7687"
 AUTH = ("neo4j", "Poconoco16!")
 
-# Predefined node types
 NODE_TYPES = [
     'nerve', 'bone', 'neuro', 'region', 'viscera', 'muscle', 'sense',
     'vein', 'artery', 'cv', 'function', 'sensory', 'gland', 'lymph',
@@ -26,42 +25,57 @@ def get_db_connection():
 
 @app.route('/')
 def index():
-    """Main visualization page with node type buttons"""
     return render_template('visualization.html', node_types=NODE_TYPES)
 
 @app.route('/nodes/<node_type>')
 def get_nodes_by_type(node_type):
-    """API endpoint to fetch nodes by type with their coordinates"""
+    try:
+        with get_db_connection() as driver:
+            with driver.session() as session:
+                # Enhanced query to get nodes with their relationships
+                query = """
+                MATCH (n:%s)
+                OPTIONAL MATCH (n)-[r]-(m)
+                RETURN DISTINCT n, 
+                       collect(DISTINCT {
+                           relationship: type(r),
+                           node: m
+                       }) as connections
+                """ % node_type
+                
+                result = session.run(query)
+                nodes_data = []
+                for record in result:
+                    node = record['n']
+                    connections = record['connections']
+                    nodes_data.append({
+                        'id': node.id,
+                        'properties': dict(node),
+                        'connections': [
+                            {
+                                'type': conn['relationship'],
+                                'connected_node': dict(conn['node'])
+                            } for conn in connections if conn['node'] is not None
+                        ]
+                    })
+                return jsonify(nodes_data)
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+@app.route('/graph/relationships/<node_type>')
+def get_relationships(node_type):
     try:
         with get_db_connection() as driver:
             with driver.session() as session:
                 query = """
-                MATCH (n:%s)
-                RETURN n.name as name, 
-                       n.x as x, 
-                       n.y as y, 
-                       n.z as z,
-                       labels(n) as labels,
-                       properties(n) as properties
+                MATCH (n:%s)-[r]-(m)
+                RETURN DISTINCT type(r) as relationship_type,
+                       count(r) as count
                 """ % node_type
                 
                 result = session.run(query)
-                nodes = [dict(record) for record in result]
-                return jsonify(nodes)
-    except Exception as e:
-        return jsonify({'error': str(e)}), 500
-
-@app.route('/graph/labels')
-def get_available_labels():
-    """API endpoint to fetch all available labels in the database"""
-    try:
-        with get_db_connection() as driver:
-            with driver.session() as session:
-                # Using the built-in Neo4j procedure to get all labels
-                query = "CALL db.labels()"
-                result = session.run(query)
-                labels = [record["label"] for record in result]
-                return jsonify(labels)
+                relationships = [dict(record) for record in result]
+                return jsonify(relationships)
     except Exception as e:
         return jsonify({'error': str(e)}), 500
 
