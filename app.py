@@ -1,189 +1,126 @@
-<!DOCTYPE html>
-<html>
-<head>
-    <title>Neo4j Graph Visualization</title>
-    <script src="https://unpkg.com/vis-network/standalone/umd/vis-network.min.js"></script>
-    <style>
-        body {
-            background-color: #1a1a1a;
-            color: #ffffff;
-            margin: 0;
-            padding: 15px;
-            font-family: 'Arial', sans-serif;
-        }
-        .button-container {
-            padding: 15px;
-            display: flex;
-            flex-wrap: wrap;
-            gap: 6px;
-            background-color: #232323;
-            border-radius: 8px;
-            margin-bottom: 20px;
-        }
-        .node-button {
-            background-color: #cc5500;
-            color: white;
-            border: none;
-            padding: 6px 12px;
-            border-radius: 4px;
-            cursor: pointer;
-            transition: all 0.3s ease;
-            font-size: 12px;
-            text-transform: uppercase;
-            letter-spacing: 0.3px;
-            min-width: 60px;
-        }
-        .node-button:hover {
-            background-color: #ff6600;
-            transform: translateY(-1px);
-            box-shadow: 0 2px 8px rgba(204, 85, 0, 0.3);
-        }
-        .active {
-            background-color: #ff8533;
-            box-shadow: 0 0 10px rgba(255, 133, 51, 0.5);
-        }
-        #viz {
-            width: 100%;
-            height: 700px;
-            background-color: #1e1e1e;
-            border: 1px solid #333;
-            border-radius: 8px;
-        }
-    </style>
-</head>
-<body>
-    <div class="button-container" id="nodeTypeButtons"></div>
-    <div id="viz"></div>
+from flask import Flask, render_template, jsonify, g
+from neo4j import GraphDatabase
+from neo4j.exceptions import ServiceUnavailable, DatabaseError
+import os
+import time
+import logging
+from dotenv import load_dotenv
 
-    <script>
-        let network = null;
-        const container = document.getElementById('viz');
-        
-        // Create buttons dynamically
-        fetch('/api/node-types')
-            .then(response => response.json())
-            .then(data => {
-                const buttonContainer = document.getElementById('nodeTypeButtons');
-                data.node_types.forEach(type => {
-                    const button = document.createElement('button');
-                    button.className = 'node-button';
-                    button.textContent = type;
-                    button.onclick = () => loadGraphData(type);
-                    buttonContainer.appendChild(button);
-                });
-            });
+# Configure logging
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
 
-        function loadGraphData(nodeType) {
-            // Update active button
-            document.querySelectorAll('.node-button').forEach(btn => {
-                btn.classList.remove('active');
-                if (btn.textContent === nodeType) {
-                    btn.classList.add('active');
-                }
-            });
+# Load environment variables
+load_dotenv()
 
-            // Fetch graph data
-            fetch(`/api/nodes/${nodeType}`)
-                .then(response => response.json())
-                .then(data => {
-                    if (data.success) {
-                        visualizeGraph(data.data);
-                    }
-                });
-        }
+# Create Flask app instance
+app = Flask(__name__)
 
-        function visualizeGraph(graphData) {
-            // Process the graph data
-            const nodes = new Set();
-            const edges = [];
-            const nodesArray = [];
+# Neo4j Configuration
+NEO4J_URI = os.getenv('NEO4J_URI', 'bolt://4e5eeae5.databases.neo4j.io:7687')
+NEO4J_USER = os.getenv('NEO4J_USER', 'neo4j')
+NEO4J_PASSWORD = os.getenv('NEO4J_PASSWORD', 'Poconoco16!')
 
-            graphData.forEach(record => {
-                const source = record.n;
-                const target = record.m;
-                const relationship = record.r;
+# Initialize Neo4j driver with retry logic
+def init_driver(max_retries=3, retry_delay=5):
+    for attempt in range(max_retries):
+        try:
+            logger.info(f"Attempting to connect to Neo4j (attempt {attempt + 1}/{max_retries})")
+            driver = GraphDatabase.driver(
+                NEO4J_URI,
+                auth=(NEO4J_USER, NEO4J_PASSWORD),
+                max_connection_lifetime=3600,
+                max_connection_pool_size=50,
+                connection_timeout=60
+            )
+            # Verify connectivity
+            driver.verify_connectivity()
+            logger.info("Successfully connected to Neo4j")
+            return driver
+        except Exception as e:
+            logger.error(f"Connection attempt {attempt + 1} failed: {str(e)}")
+            if attempt == max_retries - 1:
+                raise
+            time.sleep(retry_delay)
 
-                if (!nodes.has(source.id)) {
-                    nodes.add(source.id);
-                    nodesArray.push({
-                        id: source.id,
-                        label: source.properties.name || source.id,
-                        color: getNodeColor(source.labels[0])
-                    });
-                }
+# Initialize driver
+try:
+    driver = init_driver()
+except Exception as e:
+    logger.error(f"Failed to initialize Neo4j driver: {str(e)}")
+    driver = None
 
-                if (!nodes.has(target.id)) {
-                    nodes.add(target.id);
-                    nodesArray.push({
-                        id: target.id,
-                        label: target.properties.name || target.id,
-                        color: getNodeColor(target.labels[0])
-                    });
-                }
+def get_nodes_by_type(tx, node_type):
+    try:
+        query = f'''
+        MATCH (n:{node_type})-[r]-(m)
+        RETURN n, r, m
+        '''
+        result = tx.run(query)
+        return [dict(record) for record in result]
+    except Exception as e:
+        logger.error(f"Database error in get_nodes_by_type: {str(e)}")
+        raise
 
-                edges.push({
-                    from: source.id,
-                    to: target.id,
-                    label: relationship.type,
-                    arrows: 'to'
-                });
-            });
+@app.route('/')
+def index():
+    return render_template('index.html')
 
-            const data = {
-                nodes: new vis.DataSet(nodesArray),
-                edges: new vis.DataSet(edges)
-            };
+@app.route('/api/nodes/<node_type>')
+def get_nodes(node_type):
+    if not driver:
+        return jsonify({'success': False, 'error': 'Database connection not available'}), 503
+    
+    try:
+        with driver.session(connection_timeout=60) as session:
+            nodes = session.read_transaction(get_nodes_by_type, node_type)
+            return jsonify({'success': True, 'data': nodes})
+    except Exception as e:
+        logger.error(f"Error in get_nodes: {str(e)}")
+        return jsonify({'success': False, 'error': str(e)}), 500
 
-            const options = {
-                nodes: {
-                    shape: 'dot',
-                    size: 16,
-                    font: {
-                        color: '#ffffff'
-                    }
-                },
-                edges: {
-                    color: '#ffffff',
-                    font: {
-                        color: '#ffffff'
-                    }
-                },
-                physics: {
-                    stabilization: false,
-                    barnesHut: {
-                        gravitationalConstant: -80000,
-                        springConstant: 0.001,
-                        springLength: 200
-                    }
-                }
-            };
+@app.route('/api/node-types')
+def get_node_types():
+    node_types = [
+        'nerve', 'bone', 'neuro', 'region', 'viscera', 'muscle', 'sense',
+        'vein', 'artery', 'cv', 'function', 'sensory', 'gland', 'lymph',
+        'head', 'organ', 'sensation', 'skin'
+    ]
+    return jsonify({'success': True, 'node_types': node_types})
 
-            // Destroy existing network if it exists
-            if (network !== null) {
-                network.destroy();
-            }
+@app.route('/api/graph')
+def get_full_graph():
+    if not driver:
+        return jsonify({'success': False, 'error': 'Database connection not available'}), 503
+    
+    try:
+        with driver.session(connection_timeout=60) as session:
+            query = '''
+            MATCH (n)-[r]-(m)
+            RETURN n, r, m
+            '''
+            result = session.run(query)
+            nodes = [dict(record) for record in result]
+            return jsonify({'success': True, 'data': nodes})
+    except Exception as e:
+        logger.error(f"Error in get_full_graph: {str(e)}")
+        return jsonify({'success': False, 'error': str(e)}), 500
 
-            network = new vis.Network(container, data, options);
-        }
+# Error handling
+@app.errorhandler(404)
+def not_found_error(error):
+    return jsonify({'success': False, 'error': 'Not found'}), 404
 
-        function getNodeColor(label) {
-            const colors = {
-                'nerve': '#ff0000',
-                'bone': '#00ff00',
-                'neuro': '#0000ff',
-                // Add more colors for other node types
-            };
-            return colors[label] || '#cccccc';
-        }
+@app.errorhandler(500)
+def internal_error(error):
+    return jsonify({'success': False, 'error': 'Internal server error'}), 500
 
-        // Load initial graph data
-        fetch('/api/graph')
-            .then(response => response.json())
-            .then(data => {
-                if (data.success) {
-                    visualizeGraph(data.data);
-                }
-            });
-    </script>
-</body>
-</html>
+# Cleanup
+@app.teardown_appcontext
+def close_db(error):
+    if hasattr(g, 'neo4j_driver'):
+        g.neo4j_driver.close()
+
+if __name__ == '__main__':
+    port = int(os.environ.get('PORT', 5000))
+    app.run(host='0.0.0.0', port=port, debug=True)
