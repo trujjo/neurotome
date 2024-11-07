@@ -71,4 +71,49 @@ def get_node_types():
         'sensation',
         'skin'
     ]
-    return jsonify({'success': True, 'node_types': node_types
+    return jsonify({'success': True, 'node_types': node_types})
+
+@app.route('/api/graph')
+def get_full_graph():
+    with driver.session() as session:
+        try:
+            query = '''
+            MATCH (n)-[r]-(m)
+            RETURN n, r, m
+            '''
+            result = session.run(query)
+            nodes = [dict(record) for record in result]
+            return jsonify({'success': True, 'data': nodes})
+        except Exception as e:
+            return jsonify({'success': False, 'error': str(e)})
+
+# Error handling
+@app.errorhandler(404)
+def not_found_error(error):
+    return jsonify({'success': False, 'error': 'Not found'}), 404
+
+@app.errorhandler(500)
+def internal_error(error):
+    return jsonify({'success': False, 'error': 'Internal server error'}), 500
+
+# Cleanup
+@app.teardown_appcontext
+def close_db(error):
+    if hasattr(g, 'neo4j_driver'):
+        g.neo4j_driver.close()
+
+if __name__ == '__main__':
+    port = int(os.environ.get('PORT', 5000))
+    app.run(host='0.0.0.0', port=port, debug=True)
+"""  # <-- Add closing triple quotes here
+
+# Save the app code to a file
+with open('app.py', 'w') as f:
+    f.write(app_code)
+
+print("Created app.py with the following features:")
+print("- Neo4j connection configuration")
+print("- API endpoints for node types and graph data")
+print("- Error handling")
+print("- Environment variable support")
+print("- Development server configuration")
