@@ -1,34 +1,65 @@
-# Example code to connect to Neo4j and query data
-from neo4j import GraphDatabase
 
-# Connection details
-uri = "neo4j+s://4e5eeae5.databases.neo4j.io:7687"
-user = "neo4j"
-password = "Poconoco16!"
+from flask import Flask, render_template_string, jsonify
+from datetime import datetime
+import os
+import logging
+import json
 
-# Create a driver instance
-driver = GraphDatabase.driver(uri, auth=(user, password))
+app = Flask(__name__)
 
-# Function to execute queries
-def run_query(tx, query):
-    result = tx.run(query)
-    return [record for record in result]
+@app.route('/')
+def home():
+    return render_template_string(html_template)
 
-# Test connection and get some basic info
-with driver.session() as session:
-    # Example query to get node labels
-    query = "CALL db.labels()"
-    result = session.execute_write(run_query, query)
-    print("Available node labels:")
-    for record in result:
-        print(record[0])
+@app.route('/refresh-data')
+def refresh_data():
+    # Example data - in a real application, this would pull from your database
+    # without any limit
+    nodes = []
+    edges = []
+    
+    # Generate more test data
+    for i in range(1, 501):  # Increased to 500 nodes for testing
+        nodes.append({
+            'id': str(i),
+            'label': 'Node ' + str(i),
+            'properties': {
+                'location': 'Location ' + str((i % 5) + 1),  # 5 different locations
+                'type': 'Type ' + str((i % 3) + 1)  # 3 different types
+            }
+        })
         
-    # Example query to get relationship types
-    query = "CALL db.relationshipTypes()"
-    result = session.execute_write(run_query, query)
-    print("\
-Available relationship types:")
-    for record in result:
-        print(record[0])
+        # Create edges (connecting each node to several others)
+        if i > 1:
+            # Connect to previous node
+            edges.append({
+                'from': str(i),
+                'to': str(i-1),
+                'label': 'CONNECTS_TO'
+            })
+            # Connect to a random earlier node
+            if i > 10:
+                import random
+                random_target = random.randint(1, i-2)
+                edges.append({
+                    'from': str(i),
+                    'to': str(random_target),
+                    'label': 'CONNECTS_TO'
+                })
+    
+    # Return the response with properly formatted JSON
+    return jsonify({
+        'success': True,
+        'timestamp': datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+        'graph_data': {
+            'nodes': nodes,
+            'edges': edges
+        },
+        'filters': {
+            'locations': ['Location ' + str(i) for i in range(1, 6)],
+            'types': ['Type ' + str(i) for i in range(1, 4)]
+        }
+    })
 
-driver.close()
+if __name__ == '__main__':
+    app.run(debug=True)
