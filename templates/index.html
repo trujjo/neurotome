@@ -74,7 +74,6 @@
 
         select:focus {
             border-color: var(--burnt-orange);
-            outline: none;
         }
 
         .search-container {
@@ -85,7 +84,7 @@
             border: 1px solid var(--border-color);
         }
 
-        #searchInput {
+        #quickSearch {
             width: 100%;
             padding: 0.75rem;
             border-radius: 4px;
@@ -102,6 +101,13 @@
             height: 600px;
             width: 100%;
         }
+
+        .relationship-checkbox {
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            margin-bottom: 0.5rem;
+        }
     </style>
 </head>
 <body>
@@ -112,7 +118,6 @@
     </nav>
 
     <div class="main-container">
-        <!-- Sidebar -->
         <div class="sidebar">
             <!-- Location Filter -->
             <div class="filter-section">
@@ -133,17 +138,18 @@
             <!-- Relationship Types Filter -->
             <div class="filter-section">
                 <h3>Relationship Types</h3>
-                <div id="relationshipFilters" class="filter-list"></div>
+                <div id="relationshipFilters">
+                    <!-- Dynamically populated -->
+                </div>
             </div>
         </div>
 
-        <!-- Main Content -->
         <div class="content">
             <!-- Search Box -->
             <div class="search-container">
                 <input type="text" 
-                       id="searchInput" 
-                       placeholder="Search nodes... (minimum 2 characters)">
+                       id="quickSearch" 
+                       placeholder="Search nodes... (min. 2 characters)">
             </div>
 
             <!-- Network Visualization -->
@@ -152,13 +158,8 @@
     </div>
 
     <script>
+        // Initialize network visualization
         const container = document.getElementById('network-container');
-        const searchInput = document.getElementById('searchInput');
-        const locationSelect = document.getElementById('locationSelect');
-        const sublocationSelect = document.getElementById('sublocationSelect');
-        let searchTimeout = null;
-
-        // Initialize network
         const data = {
             nodes: new vis.DataSet([]),
             edges: new vis.DataSet([])
@@ -192,44 +193,56 @@
                     springConstant: 0.001,
                     springLength: 200
                 }
+            },
+            interaction: {
+                hover: true,
+                tooltipDelay: 200
             }
         };
         
         const network = new vis.Network(container, data, options);
 
         // Search functionality
+        const searchInput = document.getElementById('quickSearch');
+        let searchTimeout = null;
+
         function performSearch(searchTerm) {
-            if (searchTerm.length < 2) {
-                // Reset all nodes to original state
+            if (!searchTerm || searchTerm.length < 2) {
+                // Reset all nodes
                 data.nodes.forEach(node => {
-                    node.color = undefined;
+                    node.color = node.originalColor || undefined;
+                    node.borderWidth = 1;
                     data.nodes.update(node);
                 });
                 return;
             }
 
-            fetch(`/api/quick_search?term=${encodeURIComponent(searchTerm)}`)
+            fetch(`/api/search?term=${encodeURIComponent(searchTerm)}`)
                 .then(response => response.json())
-                .then(matchingNodes => {
-                    // Reset all nodes
+                .then(matchedNodes => {
+                    // Reset all nodes first
                     data.nodes.forEach(node => {
-                        node.color = undefined;
+                        node.color = node.originalColor || undefined;
+                        node.borderWidth = 1;
                         data.nodes.update(node);
                     });
 
-                    // Highlight matching nodes
-                    matchingNodes.forEach(node => {
-                        data.nodes.update({
-                            id: node.id,
-                            color: {
-                                background: '#CC5500',
-                                border: '#CC5500'
+                    // Highlight matched nodes
+                    matchedNodes.forEach(matchedNode => {
+                        const node = data.nodes.get(matchedNode.id);
+                        if (node) {
+                            if (!node.originalColor) {
+                                node.originalColor = node.color || undefined;
                             }
-                        });
+                            node.color = '#CC5500';
+                            node.borderWidth = 3;
+                            data.nodes.update(node);
+                        }
                     });
 
-                    if (matchingNodes.length > 0) {
-                        network.focus(matchingNodes[0].id, {
+                    // Focus on first match if any
+                    if (matchedNodes.length > 0) {
+                        network.focus(matchedNodes[0].id, {
                             scale: 1.5,
                             animation: true
                         });
@@ -237,101 +250,33 @@
                 });
         }
 
-        searchInput.addEventListener('input', (e) => {
+        searchInput.addEventListener('input', (event) => {
             clearTimeout(searchTimeout);
+            const searchTerm = event.target.value.trim();
+            
             searchTimeout = setTimeout(() => {
-                performSearch(e.target.value.trim());
+                performSearch(searchTerm);
             }, 300);
         });
 
-        // Load and populate filters
-        function populateFilters(graphData) {
-            // Get unique locations and sublocations
-            const locations = new Set();
-            const sublocations = new Set();
-            const relationshipTypes = new Set();
+        // Populate filters
+        function populateFilters() {
+            // Populate locations
+            fetch('/api/locations')
+                .then(response => response.json())
+                .then(locations => {
+                    const locationSelect = document.getElementById('locationSelect');
+                    locations.forEach(location => {
+                        const option = document.createElement('option');
+                        option.value = location;
+                        option.textContent = location;
+                        locationSelect.appendChild(option);
+                    });
+                });
 
-            graphData.nodes.forEach(node => {
-                if (node.properties && node.properties.location) {
-                    locations.add(node.properties.location);
-                }
-                if (node.properties && node.properties.sublocation) {
-                    sublocations.add(node.properties.sublocation);
-                }
-            });
-
-            graphData.edges.forEach(edge => {
-                relationshipTypes.add(edge.type);
-            });
-
-            // Populate location dropdown
-            locations.forEach(location => {
-                const option = document.createElement('option');
-                option.value = location;
-                option.textContent = location;
-                locationSelect.appendChild(option);
-            });
-
-            // Populate sublocation dropdown
-            sublocations.forEach(sublocation => {
-                const option = document.createElement('option');
-                option.value = sublocation;
-                option.textContent = sublocation;
-                sublocationSelect.appendChild(option);
-            });
-
-            // Populate relationship checkboxes
-            const relationshipFilters = document.getElementById('relationshipFilters');
-            relationshipTypes.forEach(type => {
-                const div = document.createElement('div');
-                div.innerHTML = `
-                    <label>
-                        <input type="checkbox" value="${type}" checked>
-                        ${type}
-                    </label>
-                `;
-                relationshipFilters.appendChild(div);
-            });
-        }
-
-        // Filter handling
-        function applyFilters() {
-            const selectedLocation = locationSelect.value;
-            const selectedSublocation = sublocationSelect.value;
-            const selectedRelationships = Array.from(document.querySelectorAll('#relationshipFilters input:checked'))
-                .map(cb => cb.value);
-
-            // Filter nodes
-            data.nodes.forEach(node => {
-                const locationMatch = !selectedLocation || 
-                    (node.properties && node.properties.location === selectedLocation);
-                const sublocationMatch = !selectedSublocation || 
-                    (node.properties && node.properties.sublocation === selectedSublocation);
-                
-                node.hidden = !(locationMatch && sublocationMatch);
-                data.nodes.update(node);
-            });
-
-            // Filter edges
-            data.edges.forEach(edge => {
-                edge.hidden = !selectedRelationships.includes(edge.type);
-                data.edges.update(edge);
-            });
-        }
-
-        // Add filter change listeners
-        locationSelect.addEventListener('change', applyFilters);
-        sublocationSelect.addEventListener('change', applyFilters);
-        document.getElementById('relationshipFilters').addEventListener('change', applyFilters);
-
-        // Load initial graph data
-        fetch('/api/graph')
-            .then(response => response.json())
-            .then(graphData => {
-                data.nodes.add(graphData.nodes);
-                data.edges.add(graphData.edges);
-                populateFilters(graphData);
-            });
-    </script>
-</body>
-</html>
+            // Populate sublocations
+            fetch('/api/sublocations')
+                .then(response => response.json())
+                .then(sublocations => {
+                    const sublocationSelect = document.getElementById('sublocationSelect');
+                    
