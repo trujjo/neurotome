@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <html>
 <head>
-    <title>NeuroNetwork Visualization</title>
+    <title>Neo4j Database Visualizer</title>
     <script src="https://cdn.neo4jlabs.com/neovis.js/v1.5.0/neovis.js"></script>
     <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
     <style>
@@ -22,15 +22,27 @@
         }
 
         .container {
+            display: grid;
+            grid-template-columns: 300px 1fr;
+            height: 100vh;
+        }
+
+        .sidebar {
+            background-color: var(--medium-gray);
+            padding: 1rem;
+            border-right: 2px solid var(--light-gray);
+            overflow-y: auto;
+        }
+
+        .main-content {
             display: flex;
             flex-direction: column;
-            height: 100vh;
         }
 
         .header {
             background-color: var(--medium-gray);
-            padding: 0.8rem;
-            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
+            padding: 1rem;
+            border-bottom: 2px solid var(--light-gray);
         }
 
         .title {
@@ -39,78 +51,133 @@
             color: var(--burnt-orange);
         }
 
-        .controls {
-            padding: 0.5rem;
+        .query-section {
             background-color: var(--medium-gray);
-            display: flex;
-            flex-wrap: wrap;
-            justify-content: center;
-            gap: 0.3rem;
+            padding: 1rem;
+            border-bottom: 2px solid var(--light-gray);
         }
 
-        .node-button {
-            background-color: var(--light-gray);
-            color: #ffffff;
+        .query-input {
+            width: 100%;
+            height: 100px;
+            background-color: var(--dark-gray);
+            color: white;
+            border: 1px solid var(--light-gray);
+            border-radius: 4px;
+            padding: 0.5rem;
+            font-family: monospace;
+            margin-bottom: 0.5rem;
+        }
+
+        .button {
+            background-color: var(--burnt-orange);
+            color: white;
             border: none;
-            padding: 0.4rem 0.6rem;
-            border-radius: 3px;
+            padding: 0.5rem 1rem;
+            border-radius: 4px;
             cursor: pointer;
-            transition: all 0.3s ease;
-            font-size: 0.8rem;
-            min-width: 60px;
-            text-transform: capitalize;
+            transition: background-color 0.3s;
         }
 
-        .node-button:hover {
-            background-color: var(--burnt-orange);
-            transform: translateY(-1px);
-        }
-
-        .node-button.active {
-            background-color: var(--burnt-orange);
-            box-shadow: 0 1px 3px rgba(204, 85, 0, 0.4);
+        .button:hover {
+            background-color: var(--burnt-orange-hover);
         }
 
         #viz {
             flex-grow: 1;
             background-color: var(--dark-gray);
-            border-top: 2px solid var(--light-gray);
         }
 
-        /* Responsive design */
-        @media (max-width: 768px) {
-            .title {
-                font-size: 1.2rem;
-            }
+        .sidebar-section {
+            margin-bottom: 1.5rem;
+        }
 
-            .node-button {
-                padding: 0.3rem 0.5rem;
-                font-size: 0.7rem;
-                min-width: 50px;
-            }
+        .sidebar-title {
+            color: var(--burnt-orange);
+            margin-bottom: 0.5rem;
+            font-size: 1.1rem;
+        }
+
+        .preset-query {
+            background-color: var(--light-gray);
+            color: white;
+            border: none;
+            padding: 0.5rem;
+            margin-bottom: 0.5rem;
+            border-radius: 4px;
+            cursor: pointer;
+            width: 100%;
+            text-align: left;
+            transition: background-color 0.3s;
+        }
+
+        .preset-query:hover {
+            background-color: var(--burnt-orange);
+        }
+
+        .stats {
+            background-color: var(--light-gray);
+            padding: 0.5rem;
+            border-radius: 4px;
+            margin-bottom: 0.5rem;
+        }
+
+        .stat-item {
+            display: flex;
+            justify-content: space-between;
+            margin-bottom: 0.3rem;
         }
     </style>
 </head>
 <body>
     <div class="container">
-        <div class="header">
-            <h1 class="title">NeuroNetwork Visualization</h1>
+        <div class="sidebar">
+            <div class="sidebar-section">
+                <div class="sidebar-title">Database Statistics</div>
+                <div class="stats">
+                    <div class="stat-item">
+                        <span>Total Nodes:</span>
+                        <span id="totalNodes">Loading...</span>
+                    </div>
+                    <div class="stat-item">
+                        <span>Total Relationships:</span>
+                        <span id="totalRels">Loading...</span>
+                    </div>
+                    <div class="stat-item">
+                        <span>Node Labels:</span>
+                        <span id="nodeLabels">Loading...</span>
+                    </div>
+                </div>
+            </div>
+            <div class="sidebar-section">
+                <div class="sidebar-title">Preset Queries</div>
+                <button class="preset-query" onclick="runPresetQuery('MATCH (n) RETURN n LIMIT 25')">
+                    Show Sample Nodes (25)
+                </button>
+                <button class="preset-query" onclick="runPresetQuery('MATCH (n)-[r]->(m) RETURN n, r, m LIMIT 50')">
+                    Show Relationships Sample
+                </button>
+                <button class="preset-query" onclick="runPresetQuery('MATCH (n) RETURN n, size((n)--()) as degree ORDER BY degree DESC LIMIT 10')">
+                    Most Connected Nodes
+                </button>
+                <button class="preset-query" onclick="runPresetQuery('MATCH (n:nerve) RETURN n')">
+                    Show All Nerves
+                </button>
+                <button class="preset-query" onclick="runPresetQuery('MATCH p=shortestPath((a)-[*]-(b)) WHERE a<>b RETURN p LIMIT 1')">
+                    Sample Shortest Path
+                </button>
+            </div>
         </div>
-        <div class="controls">
-            <script>
-                // Generate buttons for each node type
-                const NODE_TYPES = [
-                    'nerve', 'bone', 'neuro', 'region', 'viscera', 'muscle', 'sense',
-                    'vein', 'artery', 'cv', 'function', 'sensory', 'gland', 'lymph',
-                    'head', 'organ', 'sensation', 'skin'
-                ];
-                
-                document.write(NODE_TYPES.map(type => 
-                    `<button class="node-button" onclick="visualizeNodeType('${type}')">${type}</button>`
-                ).join(''));
-            </script>
+        <div class="main-content">
+            <div class="header">
+                <h1 class="title">Neo4j Database Visualizer</h1>
+            </div>
+            <div class="query-section">
+                <textarea class="query-input" id="cypher-query" placeholder="Enter your Cypher query here...">MATCH (n) RETURN n LIMIT 10</textarea>
+                <button class="button" onclick="executeQuery()">Execute Query</button>
+            </div>
+            <div id="viz"></div>
         </div>
-        <div id="viz"></div>
     </div>
 
     <script>
@@ -131,46 +198,68 @@
                             "name",
                             "type"
                         ],
-                        color: "#cc5500", // Burnt orange for nodes
+                        color: "#cc5500",
                     }
                 },
                 relationships: {
                     "*": {
                         thickness: 2,
                         caption: true,
-                        color: "#808080" // Gray for relationships
+                        color: "#808080"
                     }
                 },
                 initial_cypher: "MATCH (n) RETURN n LIMIT 10",
-                backgroundColor: "#1a1a1a" // Dark gray background
+                backgroundColor: "#1a1a1a"
             };
 
             viz = new NeoVis.default(config);
             viz.render();
+            
+            // Load database statistics
+            updateDatabaseStats();
         }
 
-        function visualizeNodeType(nodeType) {
-            // Update active button
-            document.querySelectorAll('.node-button').forEach(btn => {
-                btn.classList.remove('active');
-                if (btn.textContent === nodeType) {
-                    btn.classList.add('active');
-                }
-            });
-
-            // Construct Cypher query for the specific node type
-            const cypher = `
-                MATCH (n:${nodeType})
-                OPTIONAL MATCH (n)-[r]-(m)
-                RETURN n, r, m
-            `;
-
-            // Clear existing visualization and render new one
-            viz.clearNetwork();
-            viz.renderWithCypher(cypher);
+        function executeQuery() {
+            const query = document.getElementById('cypher-query').value;
+            viz.renderWithCypher(query);
         }
 
-        // Add event listener for network stabilization
+        function runPresetQuery(query) {
+            document.getElementById('cypher-query').value = query;
+            executeQuery();
+        }
+
+        async function updateDatabaseStats() {
+            // Using jQuery for the AJAX calls
+            const driver = neo4j.driver(
+                "neo4j+s://4e5eeae5.databases.neo4j.io:7687",
+                neo4j.auth.basic("neo4j", "Poconoco16!")
+            );
+            
+            const session = driver.session();
+            
+            try {
+                // Get total nodes
+                const nodesResult = await session.run("MATCH (n) RETURN count(n) as count");
+                document.getElementById('totalNodes').textContent = nodesResult.records[0].get('count').toLocaleString();
+                
+                // Get total relationships
+                const relsResult = await session.run("MATCH ()-[r]->() RETURN count(r) as count");
+                document.getElementById('totalRels').textContent = relsResult.records[0].get('count').toLocaleString();
+                
+                // Get node labels
+                const labelsResult = await session.run("CALL db.labels()");
+                const labels = labelsResult.records.map(record => record.get(0));
+                document.getElementById('nodeLabels').textContent = labels.length.toString();
+                
+            } catch (error) {
+                console.error('Error fetching database stats:', error);
+            } finally {
+                await session.close();
+                await driver.close();
+            }
+        }
+
         document.addEventListener('DOMContentLoaded', () => {
             initViz();
         });
