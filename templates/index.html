@@ -3,240 +3,230 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Network Explorer</title>
-    <script src="https://cdn.jsdelivr.net/npm/vis-network@9.1.2/dist/vis-network.min.js"></script>
+    <title>Neural Network Visualization</title>
     <style>
         :root {
             --burnt-orange: #CC5500;
             --dark-bg: #1a1a1a;
-            --light-text: #ffffff;
+            --darker-gray: #2d2d2d;
+            --medium-gray: #404040;
+            --light-gray: #606060;
+            --text-color: #e0e0e0;
         }
-        
+
         body {
             margin: 0;
-            padding: 20px;
-            font-family: Arial, sans-serif;
+            padding: 0;
             background-color: var(--dark-bg);
-            color: var(--light-text);
+            color: var(--text-color);
+            font-family: 'Arial', sans-serif;
         }
 
-        .container {
+        #container {
+            width: 100vw;
+            height: 100vh;
             display: flex;
-            gap: 20px;
+            flex-direction: column;
         }
 
-        .sidebar {
-            width: 250px;
+        #controls {
+            padding: 20px;
+            background-color: var(--darker-gray);
+            border-bottom: 2px solid var(--medium-gray);
         }
 
-        .main-content {
-            flex-grow: 1;
+        .search-container {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 15px;
         }
 
-        #network {
-            height: 600px;
-            border: 1px solid #444;
-            background-color: #2d2d2d;
+        #searchInput {
+            flex: 1;
+            padding: 8px 12px;
+            border: none;
+            border-radius: 4px;
+            background-color: var(--medium-gray);
+            color: var(--text-color);
         }
 
-        .search-box {
-            margin-bottom: 20px;
-        }
-
-        input {
-            width: 100%;
-            padding: 8px;
-            background-color: #2d2d2d;
-            border: 1px solid #444;
-            color: white;
+        #searchInput::placeholder {
+            color: #888;
         }
 
         .filter-buttons {
             display: flex;
-            flex-wrap: wrap;
             gap: 10px;
-            margin-bottom: 20px;
+            flex-wrap: wrap;
         }
 
-        .filter-button {
-            background-color: #2d2d2d;
-            color: white;
-            border: 1px solid #444;
+        .filter-btn {
             padding: 8px 16px;
-            cursor: pointer;
+            border: none;
             border-radius: 4px;
+            background-color: var(--medium-gray);
+            color: var(--text-color);
+            cursor: pointer;
+            transition: background-color 0.3s;
         }
 
-        .filter-button.active {
+        .filter-btn:hover {
             background-color: var(--burnt-orange);
-            border-color: var(--burnt-orange);
+        }
+
+        .filter-btn.active {
+            background-color: var(--burnt-orange);
+        }
+
+        #network-container {
+            flex: 1;
+            background-color: var(--dark-bg);
+        }
+
+        .node {
+            stroke: var(--medium-gray);
+            stroke-width: 2px;
+        }
+
+        .link {
+            stroke: var(--light-gray);
+            stroke-opacity: 0.6;
+        }
+
+        .node text {
+            fill: var(--text-color);
+            font-size: 12px;
         }
     </style>
+    <script src="https://d3js.org/d3.v7.min.js"></script>
 </head>
 <body>
-    <div class="container">
-        <div class="sidebar">
-            <div class="search-box">
-                <input type="text" id="searchInput" placeholder="Search nodes...">
+    <div id="container">
+        <div id="controls">
+            <div class="search-container">
+                <input type="text" id="searchInput" placeholder="Quick find nodes...">
             </div>
-            
-            <h3>Node Types</h3>
-            <div id="nodeTypeButtons" class="filter-buttons"></div>
-            
-            <h3>Locations</h3>
-            <div id="locationButtons" class="filter-buttons"></div>
+            <div class="filter-buttons">
+                <button class="filter-btn" data-type="all">All Nodes</button>
+                <button class="filter-btn" data-type="input">Input Nodes</button>
+                <button class="filter-btn" data-type="hidden">Hidden Nodes</button>
+                <button class="filter-btn" data-type="output">Output Nodes</button>
+            </div>
         </div>
-        
-        <div class="main-content">
-            <div id="network"></div>
-        </div>
+        <div id="network-container"></div>
     </div>
 
     <script>
-        // Initialize network
-        const container = document.getElementById('network');
+        // Force page refresh on load
+        if (performance.navigation.type === 1) {
+            location.reload(true);
+        }
+
+        // Sample data structure (replace with your actual data)
         const data = {
-            nodes: new vis.DataSet([]),
-            edges: new vis.DataSet([])
+            nodes: [
+                { id: 1, type: "input", x: 100, y: 200 },
+                { id: 2, type: "hidden", x: 300, y: 150 },
+                { id: 3, type: "hidden", x: 300, y: 250 },
+                { id: 4, type: "output", x: 500, y: 200 }
+            ],
+            links: [
+                { source: 1, target: 2 },
+                { source: 1, target: 3 },
+                { source: 2, target: 4 },
+                { source: 3, target: 4 }
+            ]
         };
+
+        // Color scale for different node types
+        const colorScale = d3.scaleOrdinal()
+            .domain(["input", "hidden", "output"])
+            .range([
+                "#CC5500", // burnt orange
+                "#A44200", // darker burnt orange
+                "#803300"  // even darker burnt orange
+            ]);
+
+        // Set up the SVG
+        const width = window.innerWidth;
+        const height = window.innerHeight - document.getElementById('controls').offsetHeight;
         
-        const options = {
-            nodes: {
-                shape: 'dot',
-                size: 16,
-                font: {
-                    color: '#ffffff'
-                }
-            },
-            edges: {
-                color: {
-                    color: '#ffffff',
-                    highlight: '#CC5500'
-                }
-            },
-            physics: {
-                stabilization: false,
-                barnesHut: {
-                    gravitationalConstant: -80000,
-                    springConstant: 0.001,
-                    springLength: 200
-                }
-            }
-        };
-        
-        const network = new vis.Network(container, data, options);
+        const svg = d3.select("#network-container")
+            .append("svg")
+            .attr("width", width)
+            .attr("height", height);
 
-        // Search functionality
-        const searchInput = document.getElementById('searchInput');
-        let searchTimeout;
+        // Create the visualization
+        function updateNetwork(filteredNodes = data.nodes) {
+            // Clear previous elements
+            svg.selectAll("*").remove();
 
-        searchInput.addEventListener('input', function(e) {
-            clearTimeout(searchTimeout);
-            const searchTerm = e.target.value.trim();
-            
-            if (searchTerm.length < 2) {
-                resetHighlights();
-                return;
-            }
+            // Draw links
+            const links = svg.selectAll(".link")
+                .data(data.links.filter(link => 
+                    filteredNodes.find(n => n.id === link.source) &&
+                    filteredNodes.find(n => n.id === link.target)
+                ))
+                .enter()
+                .append("line")
+                .attr("class", "link")
+                .attr("x1", d => data.nodes.find(n => n.id === d.source).x)
+                .attr("y1", d => data.nodes.find(n => n.id === d.source).y)
+                .attr("x2", d => data.nodes.find(n => n.id === d.target).x)
+                .attr("y2", d => data.nodes.find(n => n.id === d.target).y);
 
-            searchTimeout = setTimeout(() => {
-                fetch(`/api/search?term=${encodeURIComponent(searchTerm)}`)
-                    .then(response => response.json())
-                    .then(matchedIds => {
-                        highlightNodes(matchedIds);
-                    });
-            }, 300);
+            // Draw nodes
+            const nodes = svg.selectAll(".node")
+                .data(filteredNodes)
+                .enter()
+                .append("g")
+                .attr("class", "node")
+                .attr("transform", d => `translate(${d.x},${d.y})`);
+
+            nodes.append("circle")
+                .attr("r", 20)
+                .style("fill", d => colorScale(d.type));
+
+            nodes.append("text")
+                .attr("dy", ".35em")
+                .attr("text-anchor", "middle")
+                .text(d => d.id);
+        }
+
+        // Initial render
+        updateNetwork();
+
+        // Filter buttons functionality
+        document.querySelectorAll('.filter-btn').forEach(button => {
+            button.addEventListener('click', function() {
+                const type = this.dataset.type;
+                const filteredNodes = type === 'all' 
+                    ? data.nodes 
+                    : data.nodes.filter(node => node.type === type);
+                updateNetwork(filteredNodes);
+            });
         });
 
-        function highlightNodes(nodeIds) {
-            data.nodes.forEach(node => {
-                if (nodeIds.includes(node.id)) {
-                    node.color = {
-                        background: '#CC5500',
-                        border: '#CC5500'
-                    };
-                } else {
-                    delete node.color;
-                }
-                data.nodes.update(node);
-            });
+        // Search functionality
+        document.getElementById('searchInput').addEventListener('input', function(e) {
+            const searchTerm = e.target.value.toLowerCase();
+            const filteredNodes = data.nodes.filter(node => 
+                node.id.toString().includes(searchTerm) ||
+                node.type.toLowerCase().includes(searchTerm)
+            );
+            updateNetwork(filteredNodes);
+        });
 
-            if (nodeIds.length > 0) {
-                network.focus(nodeIds[0], {
-                    scale: 1.5,
-                    animation: true
-                });
-            }
-        }
-
-        function resetHighlights() {
-            data.nodes.forEach(node => {
-                delete node.color;
-                data.nodes.update(node);
-            });
-        }
-
-        // Load and create filter buttons
-        function createFilterButtons() {
-            // Load node types
-            fetch('/api/node_types')
-                .then(response => response.json())
-                .then(types => {
-                    const container = document.getElementById('nodeTypeButtons');
-                    types.forEach(type => {
-                        const button = document.createElement('button');
-                        button.className = 'filter-button';
-                        button.textContent = type;
-                        button.onclick = () => toggleNodeType(type, button);
-                        container.appendChild(button);
-                    });
-                });
-
-            // Load locations
-            fetch('/api/locations')
-                .then(response => response.json())
-                .then(locations => {
-                    const container = document.getElementById('locationButtons');
-                    locations.forEach(location => {
-                        const button = document.createElement('button');
-                        button.className = 'filter-button';
-                        button.textContent = location;
-                        button.onclick = () => toggleLocation(location, button);
-                        container.appendChild(button);
-                    });
-                });
-        }
-
-        function toggleNodeType(type, button) {
-            button.classList.toggle('active');
-            const activeTypes = Array.from(document.querySelectorAll('#nodeTypeButtons .active'))
-                .map(btn => btn.textContent);
+        // Resize handler
+        window.addEventListener('resize', function() {
+            const newWidth = window.innerWidth;
+            const newHeight = window.innerHeight - document.getElementById('controls').offsetHeight;
             
-            data.nodes.forEach(node => {
-                node.hidden = activeTypes.length > 0 && !node.labels.includes(type);
-                data.nodes.update(node);
-            });
-        }
-
-        function toggleLocation(location, button) {
-            button.classList.toggle('active');
-            const activeLocations = Array.from(document.querySelectorAll('#locationButtons .active'))
-                .map(btn => btn.textContent);
+            svg.attr("width", newWidth)
+               .attr("height", newHeight);
             
-            data.nodes.forEach(node => {
-                node.hidden = activeLocations.length > 0 && node.location !== location;
-                data.nodes.update(node);
-            });
-        }
-
-        // Load initial graph data
-        fetch('/api/graph')
-            .then(response => response.json())
-            .then(graphData => {
-                data.nodes.add(graphData.nodes);
-                data.edges.add(graphData.edges);
-                createFilterButtons();
-            });
+            updateNetwork();
+        });
     </script>
 </body>
 </html>
