@@ -1,13 +1,13 @@
-from flask import Flask, render_template, jsonify, request
+"from flask import Flask, render_template, jsonify, request
 from neo4j import GraphDatabase
 import os
 
 app = Flask(__name__)
 
 # Neo4j connection configuration
-uri = "bolt://4e5eeae5.databases.neo4j.io:7687"
-user = "neo4j"
-password = "Poconoco16!"
+uri = ""bolt://4e5eeae5.databases.neo4j.io:7687""
+user = ""neo4j""
+password = ""Poconoco16!""
 
 driver = GraphDatabase.driver(uri, auth=(user, password))
 
@@ -111,4 +111,4 @@ def quick_search():
     return jsonify(nodes)
 
 if __name__ == '__main__':
-    app.run(debug=True)
+    app.run(debug=True)"
