@@ -4,11 +4,7 @@ import os
 
 app = Flask(__name__)
 
-# Neo4j Configuration
-URI = "neo4j+s://4e5eeae5.databases.neo4j.io:7687"
-AUTH = ("neo4j", "Poconoco16!")
-
-driver = GraphDatabase.driver(uri, auth=(username, password))
+driver = GraphDatabase.driver("neo4j+s://4e5eeae5.databases.neo4j.io:7687", auth=("neo4j", "Poconoco16!"))
 
 @app.route('/')
 def home():
