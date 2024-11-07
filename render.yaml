@@ -3,13 +3,11 @@ services:
     name: neuronetwork
     env: python
     buildCommand: pip install -r requirements.txt
-    startCommand: gunicorn app:app --workers 4
+    startCommand: gunicorn wsgi:app
     envVars:
-      - key: PYTHON_VERSION
-        value: 3.11.0
       - key: NEO4J_URI
         value: neo4j+s://4e5eeae5.databases.neo4j.io:7687
       - key: NEO4J_USER
         value: neo4j
       - key: NEO4J_PASSWORD
-        sync: false
+        value: Poconoco16!
