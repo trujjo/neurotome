@@ -1,56 +1,114 @@
 <!DOCTYPE html>
 <html>
 <head>
-    <title>Neural Network Visualization</title>
+    <title>NeuroNetwork Visualization</title>
+    <script src="https://cdn.neo4jlabs.com/neovis.js/v1.5.0/neovis.js"></script>
+    <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
     <style>
+        :root {
+            --dark-gray: #1a1a1a;
+            --medium-gray: #2d2d2d;
+            --light-gray: #404040;
+            --burnt-orange: #cc5500;
+            --burnt-orange-hover: #ff6a00;
+        }
+
         body {
             margin: 0;
-            padding: 20px;
-            font-family: Arial, sans-serif;
+            padding: 0;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background-color: var(--dark-gray);
+            color: #ffffff;
         }
+
         .container {
             display: flex;
             flex-direction: column;
-            gap: 20px;
+            height: 100vh;
         }
-        .button-container {
+
+        .header {
+            background-color: var(--medium-gray);
+            padding: 0.8rem;
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
+        }
+
+        .title {
+            margin: 0;
+            font-size: 1.6rem;
+            color: var(--burnt-orange);
+        }
+
+        .controls {
+            padding: 0.5rem;
+            background-color: var(--medium-gray);
             display: flex;
             flex-wrap: wrap;
-            gap: 10px;
-            padding: 10px;
-            background: #f5f5f5;
-            border-radius: 5px;
+            justify-content: center;
+            gap: 0.3rem;
         }
+
         .node-button {
-            padding: 8px 16px;
-            background-color: #2196F3;
-            color: white;
+            background-color: var(--light-gray);
+            color: #ffffff;
             border: none;
-            border-radius: 4px;
+            padding: 0.4rem 0.6rem;
+            border-radius: 3px;
             cursor: pointer;
             transition: all 0.3s ease;
+            font-size: 0.8rem;
+            min-width: 60px;
+            text-transform: capitalize;
         }
+
         .node-button:hover {
-            background-color: #1976D2;
+            background-color: var(--burnt-orange);
+            transform: translateY(-1px);
         }
+
         .node-button.active {
-            background-color: #1565C0;
+            background-color: var(--burnt-orange);
+            box-shadow: 0 1px 3px rgba(204, 85, 0, 0.4);
         }
+
         #viz {
-            width: 100%;
-            height: 800px;
-            border: 1px solid #ddd;
-            border-radius: 5px;
+            flex-grow: 1;
+            background-color: var(--dark-gray);
+            border-top: 2px solid var(--light-gray);
+        }
+
+        /* Responsive design */
+        @media (max-width: 768px) {
+            .title {
+                font-size: 1.2rem;
+            }
+
+            .node-button {
+                padding: 0.3rem 0.5rem;
+                font-size: 0.7rem;
+                min-width: 50px;
+            }
         }
     </style>
-    <script src="https://unpkg.com/neovis.js@2.0.2"></script>
 </head>
 <body>
     <div class="container">
-        <div class="button-container">
-            {% for node_type in node_types %}
-            <button class="node-button" onclick="visualizeNodeType('{{ node_type }}')">{{ node_type }}</button>
-            {% endfor %}
+        <div class="header">
+            <h1 class="title">NeuroNetwork Visualization</h1>
+        </div>
+        <div class="controls">
+            <script>
+                // Generate buttons for each node type
+                const NODE_TYPES = [
+                    'nerve', 'bone', 'neuro', 'region', 'viscera', 'muscle', 'sense',
+                    'vein', 'artery', 'cv', 'function', 'sensory', 'gland', 'lymph',
+                    'head', 'organ', 'sensation', 'skin'
+                ];
+                
+                document.write(NODE_TYPES.map(type => 
+                    `<button class="node-button" onclick="visualizeNodeType('${type}')">${type}</button>`
+                ).join(''));
+            </script>
         </div>
         <div id="viz"></div>
     </div>
@@ -73,15 +131,18 @@
                             "name",
                             "type"
                         ],
+                        color: "#cc5500", // Burnt orange for nodes
                     }
                 },
                 relationships: {
                     "*": {
                         thickness: 2,
-                        caption: true
+                        caption: true,
+                        color: "#808080" // Gray for relationships
                     }
                 },
-                initial_cypher: "MATCH (n) RETURN n LIMIT 10"
+                initial_cypher: "MATCH (n) RETURN n LIMIT 10",
+                backgroundColor: "#1a1a1a" // Dark gray background
             };
 
             viz = new NeoVis.default(config);
