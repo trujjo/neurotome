@@ -1,6 +1,8 @@
-import os
-from flask import Flask, render_template, jsonify, request
+# Create app.py content
+app_code = """
+from flask import Flask, render_template, jsonify
 from neo4j import GraphDatabase
+import os
 from dotenv import load_dotenv
 
 # Load environment variables
@@ -8,129 +10,96 @@ load_dotenv()
 
 app = Flask(__name__)
 
-# Neo4j connection details
-uri = os.getenv("NEO4J_URI")
-username = os.getenv("NEO4J_USER")
-password = os.getenv("NEO4J_PASSWORD")
+# Neo4j Configuration
+NEO4J_URI = os.getenv('NEO4J_URI', 'neo4j+s://4e5eeae5.databases.neo4j.io')
+NEO4J_USER = os.getenv('NEO4J_USER', 'neo4j')
+NEO4J_PASSWORD = os.getenv('NEO4J_PASSWORD', 'Poconoco16!')
 
 # Initialize Neo4j driver
-driver = GraphDatabase.driver(uri, auth=(username, password))
+driver = GraphDatabase.driver(NEO4J_URI, auth=(NEO4J_USER, NEO4J_PASSWORD))
+
+def get_nodes_by_type(tx, node_type):
+    query = f'''
+    MATCH (n:{node_type})-[r]-(m)
+    RETURN n, r, m
+    LIMIT 100
+    '''
+    result = tx.run(query)
+    return [dict(record) for record in result]
 
 @app.route('/')
 def index():
     return render_template('index.html')
 
+@app.route('/api/nodes/<node_type>')
+def get_nodes(node_type):
+    with driver.session() as session:
+        try:
+            nodes = session.read_transaction(get_nodes_by_type, node_type)
+            return jsonify({'success': True, 'data': nodes})
+        except Exception as e:
+            return jsonify({'success': False, 'error': str(e)})
+
+@app.route('/api/node-types')
+def get_node_types():
+    node_types = [
+        'nerve',
+        'bone',
+        'neuro',
+        'region',
+        'viscera',
+        'muscle',
+        'sense',
+        'vein',
+        'artery',
+        'cv',
+        'function',
+        'sensory',
+        'gland',
+        'lymph',
+        'head',
+        'organ',
+        'sensation',
+        'skin'
+    ]
+    return jsonify({'success': True, 'node_types': node_types})
+
 @app.route('/api/graph')
-def get_graph():
-    try:
-        with driver.session() as session:
-            # Get nodes
-            nodes_result = session.run('''
-                MATCH (n)
-                RETURN 
-                    id(n) as id, 
-                    labels(n) as labels, 
-                    properties(n) as properties,
-                    CASE
-                        WHEN n.name IS NOT NULL THEN n.name
-                        WHEN n.title IS NOT NULL THEN n.title
-                        ELSE toString(id(n))
-                    END as name
-            ''')
-            
-            nodes = []
-            for record in nodes_result:
-                node_types = [label.lower() for label in record["labels"]]
-                node_type = next((t for t in [
-                    'nerve', 'bone', 'neuro', 'region', 'viscera', 'muscle', 
-                    'sense', 'vein', 'artery', 'cv', 'function', 'sensory',
-                    'gland', 'lymph', 'head', 'organ', 'sensation', 'skin'
-                ] if t in node_types), 'other')
-                
-                nodes.append({
-                    "id": record["id"],
-                    "label": record["name"],
-                    "type": node_type
-                })
-
-            # Get relationships
-            edges_result = session.run('''
-                MATCH ()-[r]->()
-                RETURN 
-                    id(r) as id,
-                    id(startNode(r)) as from,
-                    id(endNode(r)) as to,
-                    type(r) as type
-            ''')
-            
-            edges = []
-            for record in edges_result:
-                edges.append({
-                    "id": record["id"],
-                    "from": record["from"],
-                    "to": record["to"],
-                    "type": record["type"]
-                })
-
-            return jsonify({"nodes": nodes, "edges": edges})
-    except Exception as e:
-        return jsonify({"error": str(e)}), 500
-
-@app.route('/api/filter')
-def filter_nodes():
-    node_type = request.args.get('type', '')
-    
-    try:
-        with driver.session() as session:
-            # Get filtered nodes
+def get_full_graph():
+    with driver.session() as session:
+        try:
             query = '''
-                MATCH (n)
-                WHERE $node_type = '' OR any(label IN labels(n) WHERE toLower(label) = $node_type)
-                RETURN 
-                    id(n) as id, 
-                    labels(n) as labels,
-                    CASE
-                        WHEN n.name IS NOT NULL THEN n.name
-                        WHEN n.title IS NOT NULL THEN n.title
-                        ELSE toString(id(n))
-                    END as name
+            MATCH (n)-[r]-(m)
+            RETURN n, r, m
+            LIMIT 100
             '''
-            
-            nodes_result = session.run(query, node_type=node_type.lower())
-            
-            nodes = []
-            node_ids = set()
-            for record in nodes_result:
-                node_ids.add(record["id"])
-                nodes.append({
-                    "id": record["id"],
-                    "label": record["name"],
-                    "type": node_type if node_type else 'other'
-                })
+            result = session.run(query)
+            nodes = [dict(record) for record in result]
+            return jsonify({'success': True, 'data': nodes})
+        except Exception as e:
+            return jsonify({'success': False, 'error': str(e)})
 
-            # Get relationships between filtered nodes
-            edges_result = session.run('''
-                MATCH (n1)-[r]->(n2)
-                WHERE id(n1) IN $node_ids AND id(n2) IN $node_ids
-                RETURN 
-                    id(r) as id,
-                    id(n1) as from,
-                    id(n2) as to,
-                    type(r) as type
-            ''', node_ids=list(node_ids))
-            
-            edges = []
-            for record in edges_result:
-                edges.append({
-                    "id": record["id"],
-                    "from": record["from"],
-                    "to": record["to"],
-                    "type": record["type"]
-                })
+# Error handling
+@app.errorhandler(404)
+def not_found_error(error):
+    return jsonify({'success': False, 'error': 'Not found'}), 404
 
-            return jsonify({"nodes": nodes, "edges": edges})
-    except Exception as e:
-        return jsonify({"error": str(e)}), 500
+@app.errorhandler(500)
+def internal_error(error):
+    return jsonify({'success': False, 'error': 'Internal server error'}), 500
 
 if __name__ == '__main__':
-    app.run(debug=True)
+    port = int(os.environ.get('PORT', 5000))
+    app.run(host='0.0.0.0', port=port, debug=True)
+"""
+
+# Save the app code to a file
+with open('app.py', 'w') as f:
+    f.write(app_code)
+
+print("Created app.py with the following features:")
+print("- Neo4j connection configuration")
+print("- API endpoints for node types and graph data")
+print("- Error handling")
+print("- Environment variable support")
+print("- Development server configuration")
