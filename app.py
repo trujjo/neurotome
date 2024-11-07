@@ -1,3 +1,4 @@
+# Create the actual app.py content
 from flask import Flask, render_template, jsonify, request
 from neo4j import GraphDatabase
 from dotenv import load_dotenv
@@ -154,7 +155,7 @@ def filter_nodes():
 if __name__ == '__main__':
     app.run(debug=True)
 
-# Save the updated code to a file
-with open('updated_app.py', 'w') as f:
-    f.write(updated_code)
-print("Updated Flask application code has been saved to 'updated_app.py'")
+# Save the app code directly to app.py
+with open('app.py', 'w') as f:
+    f.write(app_code)
+print("New app.py has been created with the updated code")
