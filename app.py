@@ -1,4 +1,3 @@
-app_code = """
 from flask import Flask, render_template, jsonify, g
 from neo4j import GraphDatabase
 from neo4j.exceptions import ResultFailedError
@@ -8,6 +7,7 @@ from dotenv import load_dotenv
 # Load environment variables
 load_dotenv()
 
+# Create Flask app instance
 app = Flask(__name__)
 
 # Neo4j Configuration
@@ -105,15 +105,3 @@ def close_db(error):
 if __name__ == '__main__':
     port = int(os.environ.get('PORT', 5000))
     app.run(host='0.0.0.0', port=port, debug=True)
-"""  # <-- Add closing triple quotes here
-
-# Save the app code to a file
-with open('app.py', 'w') as f:
-    f.write(app_code)
-
-print("Created app.py with the following features:")
-print("- Neo4j connection configuration")
-print("- API endpoints for node types and graph data")
-print("- Error handling")
-print("- Environment variable support")
-print("- Development server configuration")
