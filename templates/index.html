@@ -1,20 +1,6 @@
-<!DOCTYPE html>
-<html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Neo4j Network Visualization</title>
-    <script type="text/javascript" src="https://unpkg.com/vis-network/standalone/umd/vis-network.min.js"></script>
-    <link rel="stylesheet" href="https://code.jquery.com/ui/1.12.1/themes/base/jquery-ui.css">
-    <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
-    <script src="https://code.jquery.com/ui/1.12.1/jquery-ui.js"></script>
-    <!-- Your existing CSS styles here -->
-    <style>
-        /* Your existing styles remain the same */
-    </style>
 </head>
 <body>
-    <div class="container">
+<div class="container">
         <div class="sidebar">
             <div class="search-container">
                 <h3>Path Finder</h3>
@@ -32,6 +18,7 @@
                 {% endfor %}
             </div>
 
+            <script type="text/javascript">
             <div class="button-group">
                 <h3>Locations</h3>
                 {% for location in metadata.locations %}
@@ -75,17 +62,34 @@
     </div>
 
     <script type="text/javascript">
-        // Your existing JavaScript code here
-        var container = document.getElementById('mynetwork');
-        var nodes = new vis.DataSet([]);
-        var edges = new vis.DataSet([]);
-        
-        var data = {
-            nodes: nodes,
-            edges: edges
-        };
-        
-        // Rest of your JavaScript code remains the same
+var container = document.getElementById('mynetwork');
+var nodes = new vis.DataSet([]);
+var edges = new vis.DataSet([]);
+@@ -405,26 +462,4 @@
+network.setOptions({ physics: false });
+});
+
+        network.on("zoom", function() {
+            const scale = network.getScale();
+            nodes.get().forEach(node => {
+                if (!node.hidden) {
+                    const updatedNode = adjustNodeAppearance({
+                        ...node,
+                        size: 15 / scale,
+                        font: { size: Math.max(4, 8 / scale) }
+                    });
+                    nodes.update(updatedNode);
+                }
+            });
+        });
+
+        // Initialize network with proper scaling
+        network.once("afterDrawing", function() {
+            network.fit({
+                animation: true
+            });
+        });
     </script>
 </body>
 </html>
+        network.on("zoom", function
