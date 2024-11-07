@@ -66,18 +66,22 @@
                 server_password: "Poconoco16!",
                 labels: {
                     "*": {
-                        caption: "name",
-                        size: 1.5,
-                        community: "community"
+                        caption: ["name"],
+                        size: 3,
+                        community: "community",
+                        title_properties: [
+                            "name",
+                            "type"
+                        ],
                     }
                 },
                 relationships: {
                     "*": {
-                        thickness: 1,
+                        thickness: 2,
                         caption: true
                     }
                 },
-                initial_cypher: "MATCH (n) RETURN n LIMIT 25"
+                initial_cypher: "MATCH (n) RETURN n LIMIT 10"
             };
 
             viz = new NeoVis.default(config);
@@ -85,17 +89,30 @@
         }
 
         function visualizeNodeType(nodeType) {
+            // Update active button
+            document.querySelectorAll('.node-button').forEach(btn => {
+                btn.classList.remove('active');
+                if (btn.textContent === nodeType) {
+                    btn.classList.add('active');
+                }
+            });
+
+            // Construct Cypher query for the specific node type
             const cypher = `
                 MATCH (n:${nodeType})
                 OPTIONAL MATCH (n)-[r]-(m)
                 RETURN n, r, m
             `;
-            
+
+            // Clear existing visualization and render new one
+            viz.clearNetwork();
             viz.renderWithCypher(cypher);
         }
 
-        // Initialize visualization when the page loads
-        document.addEventListener('DOMContentLoaded', initViz);
+        // Add event listener for network stabilization
+        document.addEventListener('DOMContentLoaded', () => {
+            initViz();
+        });
     </script>
 </body>
 </html>
