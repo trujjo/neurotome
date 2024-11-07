@@ -2,7 +2,7 @@
 <html>
 <head>
     <title>Neo4j Force Graph</title>
-    <script src="https://unpkg.com/neo4j-driver"></script>
+    <script src="https://unpkg.com/neo4j-driver@5.15.0"></script>
     <script src="https://d3js.org/d3.v5.min.js"></script>
     <style>
         body { 
@@ -17,6 +17,11 @@
             height: 800px;
             background-color: #1a1a1a;
             border: 1px solid #404040;
+            border-radius: 4px;
+        }
+        #status {
+            margin: 10px 0;
+            padding: 10px;
             border-radius: 4px;
         }
         .button {
@@ -49,27 +54,55 @@
 </head>
 <body>
     <button class="button" onclick="showRandomNodesWithRelationships()">Show Random Connected Nodes</button>
+    <div id="status">Ready to connect...</div>
     <div id="graph"></div>
 
     <script>
-        const driver = neo4j.driver(
-            "neo4j+s://4e5eeae5.databases.neo4j.io:7687",
-            neo4j.auth.basic("neo4j", "Poconoco16!")
-        );
+        let driver;
+        
+        async function initDriver() {
+            try {
+                driver = neo4j.driver(
+                    "neo4j+s://4e5eeae5.databases.neo4j.io:7687",
+                    neo4j.auth.basic("neo4j", "Poconoco16!")
+                );
+                
+                // Test the connection
+                const session = driver.session();
+                await session.run("RETURN 1");
+                await session.close();
+                
+                document.getElementById('status').style.backgroundColor = '#28a745';
+                document.getElementById('status').innerHTML = 'Connected to database';
+            } catch (error) {
+                document.getElementById('status').style.backgroundColor = '#dc3545';
+                document.getElementById('status').innerHTML = 'Connection error: ' + error.message;
+                console.error('Connection error:', error);
+            }
+        }
 
         async function showRandomNodesWithRelationships() {
+            if (!driver) {
+                document.getElementById('status').style.backgroundColor = '#dc3545';
+                document.getElementById('status').innerHTML = 'Not connected to database';
+                return;
+            }
+
             const session = driver.session();
+            document.getElementById('status').innerHTML = 'Fetching data...';
             
             try {
-                // Query to get nodes and their relationships
                 const result = await session.run(`
                     MATCH (n)
                     WITH n, rand() as r
                     ORDER BY r
-                    LIMIT 10
+                    LIMIT 5
                     MATCH (n)-[r]-(m)
                     RETURN DISTINCT n, r, m
+                    LIMIT 15
                 `);
+                
+                document.getElementById('status').innerHTML = 'Processing data...';
                 
                 // Process the data for D3
                 const nodes = new Map();
@@ -81,17 +114,17 @@
                     const relationship = record.get('r');
                     
                     // Add nodes if they don't exist
-                    if (!nodes.has(source.identity.low)) {
-                        nodes.set(source.identity.low, {
-                            id: source.identity.low,
+                    if (!nodes.has(source.identity.toString())) {
+                        nodes.set(source.identity.toString(), {
+                            id: source.identity.toString(),
                             label: source.labels[0],
                             name: source.properties.name || 'Unnamed'
                         });
                     }
                     
-                    if (!nodes.has(target.identity.low)) {
-                        nodes.set(target.identity.low, {
-                            id: target.identity.low,
+                    if (!nodes.has(target.identity.toString())) {
+                        nodes.set(target.identity.toString(), {
+                            id: target.identity.toString(),
                             label: target.labels[0],
                             name: target.properties.name || 'Unnamed'
                         });
@@ -99,16 +132,20 @@
                     
                     // Add relationship
                     links.push({
-                        source: source.identity.low,
-                        target: target.identity.low,
+                        source: source.identity.toString(),
+                        target: target.identity.toString(),
                         type: relationship.type
                     });
                 });
                 
-                // Create the force directed graph
+                document.getElementById('status').innerHTML = 'Rendering graph...';
                 createForceGraph(Array.from(nodes.values()), links);
+                document.getElementById('status').style.backgroundColor = '#28a745';
+                document.getElementById('status').innerHTML = 'Graph rendered successfully';
                 
             } catch (error) {
+                document.getElementById('status').style.backgroundColor = '#dc3545';
+                document.getElementById('status').innerHTML = 'Error: ' + error.message;
                 console.error('Error:', error);
             } finally {
                 await session.close();
@@ -139,7 +176,9 @@
                 .data(links)
                 .enter()
                 .append("line")
-                .attr("class", "link");
+                .attr("class", "link")
+                .style("stroke", "#808080")
+                .style("stroke-width", 2);
             
             // Create link labels
             const linkLabel = svg.append("g")
@@ -233,9 +272,14 @@
             }
         }
 
+        // Initialize the driver when the page loads
+        document.addEventListener('DOMContentLoaded', initDriver);
+
         // Clean up when the page is closed
         window.onbeforeunload = () => {
-            driver.close();
+            if (driver) {
+                driver.close();
+            }
         };
     </script>
 </body>
