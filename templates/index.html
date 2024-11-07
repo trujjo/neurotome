@@ -125,9 +125,66 @@
 </head>
 <body>
     <div class="container">
+        <div class="sidebar">
+            <div class="search-container">
+                <h3>Path Finder</h3>
+                <input type="text" id="sourceNode" class="search-input" placeholder="Source Node">
+                <input type="text" id="targetNode" class="search-input" placeholder="Target Node">
+                <button id="connectButton" class="connect-button">Find Path</button>
+            </div>
 
+            <div class="button-group">
+                <h3>Node Types</h3>
+                {% for node_type in metadata.node_types %}
+                <button onclick="addNodesByType('{{ node_type }}')" style="background-color: {{ metadata.node_colors.get(node_type, '#CC5500') }}">
+                    {{ node_type }}
+                </button>
+                {% endfor %}
+            </div>
 
-            <script type="text/javascript">
+            <div class="button-group">
+                <h3>Locations</h3>
+                {% for location in metadata.locations %}
+                <button class="filter-button" data-criteria="location" data-value="{{ location }}" 
+                        onclick="filterByLocation('{{ location }}')">{{ location }}</button>
+                {% endfor %}
+            </div>
+
+            <div class="button-group">
+                <h3>Sublocations</h3>
+                {% for sublocation in metadata.sublocations %}
+                <button class="filter-button" data-criteria="sublocation" data-value="{{ sublocation }}"
+                        onclick="filterBySublocation('{{ sublocation }}')">{{ sublocation }}</button>
+                {% endfor %}
+            </div>
+
+            <div class="button-group">
+                <h3>Relationships</h3>
+                {% for rel_type in metadata.relationship_types %}
+                <button class="filter-button" data-criteria="relationship" data-value="{{ rel_type }}"
+                        onclick="filterByRelationship('{{ rel_type }}')">{{ rel_type }}</button>
+                {% endfor %}
+            </div>
+
+            <button class="clear-button" onclick="clearNetwork()">Clear All</button>
+            <button class="clear-button" onclick="clearFilters()">Clear Filters</button>
+        </div>
+        
+        <div class="visualization">
+            <div id="mynetwork"></div>
+            <div class="legend">
+                <h4>Node Types</h4>
+                {% for node_type in metadata.node_types %}
+                <div class="legend-item">
+                    <div class="legend-color" style="background-color: {{ metadata.node_colors.get(node_type, '#CC5500') }}"></div>
+                    <span>{{ node_type }}</span>
+                </div>
+                {% endfor %}
+            </div>
+        </div>
+    </div>
+
+    <script type="text/javascript">
         var container = document.getElementById('mynetwork');
         var nodes = new vis.DataSet([]);
         var edges = new vis.DataSet([]);
@@ -405,26 +462,4 @@
             network.setOptions({ physics: false });
         });
 
-        network.on("zoom", function() {
-            const scale = network.getScale();
-            nodes.get().forEach(node => {
-                if (!node.hidden) {
-                    const updatedNode = adjustNodeAppearance({
-                        ...node,
-                        size: 15 / scale,
-                        font: { size: Math.max(4, 8 / scale) }
-                    });
-                    nodes.update(updatedNode);
-                }
-            });
-        });
-
-        // Initialize network with proper scaling
-        network.once("afterDrawing", function() {
-            network.fit({
-                animation: true
-            });
-        });
-    </script>
-</body>
-</html>
+        network.on("zoom", function
