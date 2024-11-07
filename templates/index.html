@@ -16,7 +16,66 @@
             --border-color: #404040;
         }
         
-        /* ... [previous styles remain the same] ... */
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: var(--primary-bg);
+            color: var(--text-primary);
+            margin: 0;
+            padding: 0;
+        }
+        
+        .navbar {
+            background-color: var(--secondary-bg);
+            padding: 1rem;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.2);
+            margin-bottom: 2rem;
+        }
+
+        .main-container {
+            display: flex;
+            max-width: 1400px;
+            margin: 0 auto;
+            padding: 0 1rem;
+            gap: 2rem;
+        }
+
+        .sidebar {
+            width: 250px;
+            flex-shrink: 0;
+        }
+
+        .content {
+            flex-grow: 1;
+        }
+
+        .filter-section {
+            background-color: var(--secondary-bg);
+            padding: 1rem;
+            border-radius: 8px;
+            margin-bottom: 1rem;
+            border: 1px solid var(--border-color);
+        }
+
+        .filter-section h3 {
+            margin-top: 0;
+            margin-bottom: 1rem;
+            color: var(--burnt-orange);
+        }
+
+        select {
+            width: 100%;
+            padding: 0.5rem;
+            background-color: var(--primary-bg);
+            color: var(--text-primary);
+            border: 1px solid var(--border-color);
+            border-radius: 4px;
+            margin-bottom: 0.5rem;
+        }
+
+        select:focus {
+            border-color: var(--burnt-orange);
+            outline: none;
+        }
 
         .search-container {
             background-color: var(--secondary-bg);
@@ -26,7 +85,7 @@
             border: 1px solid var(--border-color);
         }
 
-        .search-input {
+        #searchInput {
             width: 100%;
             padding: 0.75rem;
             border-radius: 4px;
@@ -36,14 +95,12 @@
             font-size: 1rem;
         }
 
-        .search-results {
-            margin-top: 0.5rem;
-            color: var(--text-secondary);
-        }
-
-        .highlighted-node {
-            border: 2px solid var(--burnt-orange) !important;
-            background-color: var(--burnt-orange) !important;
+        #network-container {
+            background-color: var(--secondary-bg);
+            border-radius: 8px;
+            border: 1px solid var(--border-color);
+            height: 600px;
+            width: 100%;
         }
     </style>
 </head>
@@ -55,30 +112,53 @@
     </nav>
 
     <div class="main-container">
-        <!-- Sidebar with filters -->
+        <!-- Sidebar -->
         <div class="sidebar">
-            <!-- ... [filter sections remain the same] ... -->
+            <!-- Location Filter -->
+            <div class="filter-section">
+                <h3>Location</h3>
+                <select id="locationSelect">
+                    <option value="">All Locations</option>
+                </select>
+            </div>
+
+            <!-- Sublocation Filter -->
+            <div class="filter-section">
+                <h3>Sublocation</h3>
+                <select id="sublocationSelect">
+                    <option value="">All Sublocations</option>
+                </select>
+            </div>
+
+            <!-- Relationship Types Filter -->
+            <div class="filter-section">
+                <h3>Relationship Types</h3>
+                <div id="relationshipFilters" class="filter-list"></div>
+            </div>
         </div>
 
-        <!-- Main content -->
+        <!-- Main Content -->
         <div class="content">
             <!-- Search Box -->
             <div class="search-container">
                 <input type="text" 
                        id="searchInput" 
-                       class="search-input" 
-                       placeholder="Search nodes (min. 2 characters)...">
-                <div id="searchResults" class="search-results"></div>
+                       placeholder="Search nodes... (minimum 2 characters)">
             </div>
 
-            <!-- Network container -->
+            <!-- Network Visualization -->
             <div id="network-container"></div>
         </div>
     </div>
 
     <script>
-        // Initialize network visualization
         const container = document.getElementById('network-container');
+        const searchInput = document.getElementById('searchInput');
+        const locationSelect = document.getElementById('locationSelect');
+        const sublocationSelect = document.getElementById('sublocationSelect');
+        let searchTimeout = null;
+
+        // Initialize network
         const data = {
             nodes: new vis.DataSet([]),
             edges: new vis.DataSet([])
@@ -112,93 +192,137 @@
                     springConstant: 0.001,
                     springLength: 200
                 }
-            },
-            interaction: {
-                hover: true,
-                tooltipDelay: 200
             }
         };
         
         const network = new vis.Network(container, data, options);
 
-        // Improved search functionality
-        const searchInput = document.getElementById('searchInput');
-        const searchResults = document.getElementById('searchResults');
-        let searchTimeout = null;
-        let highlightedNodes = new Set();
-
-        function resetHighlights() {
-            // Reset all previously highlighted nodes
-            highlightedNodes.forEach(nodeId => {
-                const node = data.nodes.get(nodeId);
-                if (node) {
-                    node.color = node.originalColor || undefined;
-                    node.borderWidth = 1;
-                    data.nodes.update(node);
-                }
-            });
-            highlightedNodes.clear();
-        }
-
-        function highlightNode(nodeId) {
-            const node = data.nodes.get(nodeId);
-            if (node) {
-                if (!node.originalColor) {
-                    node.originalColor = node.color;
-                }
-                node.color = '#CC5500';
-                node.borderWidth = 3;
-                data.nodes.update(node);
-                highlightedNodes.add(nodeId);
-            }
-        }
-
+        // Search functionality
         function performSearch(searchTerm) {
             if (searchTerm.length < 2) {
-                searchResults.textContent = 'Enter at least 2 characters to search';
-                resetHighlights();
+                // Reset all nodes to original state
+                data.nodes.forEach(node => {
+                    node.color = undefined;
+                    data.nodes.update(node);
+                });
                 return;
             }
 
             fetch(`/api/quick_search?term=${encodeURIComponent(searchTerm)}`)
                 .then(response => response.json())
-                .then(nodes => {
-                    resetHighlights();
-                    
-                    if (nodes.length === 0) {
-                        searchResults.textContent = 'No matches found';
-                        return;
-                    }
-
-                    searchResults.textContent = `Found ${nodes.length} matching nodes`;
-                    
-                    // Highlight matching nodes
-                    nodes.forEach(node => {
-                        highlightNode(node.id);
+                .then(matchingNodes => {
+                    // Reset all nodes
+                    data.nodes.forEach(node => {
+                        node.color = undefined;
+                        data.nodes.update(node);
                     });
 
-                    // If there are matches, focus the network on the first match
-                    if (nodes.length > 0) {
-                        network.focus(nodes[0].id, {
+                    // Highlight matching nodes
+                    matchingNodes.forEach(node => {
+                        data.nodes.update({
+                            id: node.id,
+                            color: {
+                                background: '#CC5500',
+                                border: '#CC5500'
+                            }
+                        });
+                    });
+
+                    if (matchingNodes.length > 0) {
+                        network.focus(matchingNodes[0].id, {
                             scale: 1.5,
                             animation: true
                         });
                     }
-                })
-                .catch(error => {
-                    console.error('Search error:', error);
-                    searchResults.textContent = 'Error performing search';
                 });
         }
 
-        searchInput.addEventListener('input', (event) => {
+        searchInput.addEventListener('input', (e) => {
             clearTimeout(searchTimeout);
-            const searchTerm = event.target.value.trim();
-            
             searchTimeout = setTimeout(() => {
-                performSearch(searchTerm);
-            }, 300); // 300ms debounce
+                performSearch(e.target.value.trim());
+            }, 300);
         });
+
+        // Load and populate filters
+        function populateFilters(graphData) {
+            // Get unique locations and sublocations
+            const locations = new Set();
+            const sublocations = new Set();
+            const relationshipTypes = new Set();
+
+            graphData.nodes.forEach(node => {
+                if (node.properties && node.properties.location) {
+                    locations.add(node.properties.location);
+                }
+                if (node.properties && node.properties.sublocation) {
+                    sublocations.add(node.properties.sublocation);
+                }
+            });
+
+            graphData.edges.forEach(edge => {
+                relationshipTypes.add(edge.type);
+            });
+
+            // Populate location dropdown
+            locations.forEach(location => {
+                const option = document.createElement('option');
+                option.value = location;
+                option.textContent = location;
+                locationSelect.appendChild(option);
+            });
+
+            // Populate sublocation dropdown
+            sublocations.forEach(sublocation => {
+                const option = document.createElement('option');
+                option.value = sublocation;
+                option.textContent = sublocation;
+                sublocationSelect.appendChild(option);
+            });
+
+            // Populate relationship checkboxes
+            const relationshipFilters = document.getElementById('relationshipFilters');
+            relationshipTypes.forEach(type => {
+                const div = document.createElement('div');
+                div.innerHTML = `
+                    <label>
+                        <input type="checkbox" value="${type}" checked>
+                        ${type}
+                    </label>
+                `;
+                relationshipFilters.appendChild(div);
+            });
+        }
+
+        // Filter handling
+        function applyFilters() {
+            const selectedLocation = locationSelect.value;
+            const selectedSublocation = sublocationSelect.value;
+            const selectedRelationships = Array.from(document.querySelectorAll('#relationshipFilters input:checked'))
+                .map(cb => cb.value);
+
+            // Filter nodes
+            data.nodes.forEach(node => {
+                const locationMatch = !selectedLocation || 
+                    (node.properties && node.properties.location === selectedLocation);
+                const sublocationMatch = !selectedSublocation || 
+                    (node.properties && node.properties.sublocation === selectedSublocation);
+                
+                node.hidden = !(locationMatch && sublocationMatch);
+                data.nodes.update(node);
+            });
+
+            // Filter edges
+            data.edges.forEach(edge => {
+                edge.hidden = !selectedRelationships.includes(edge.type);
+                data.edges.update(edge);
+            });
+        }
+
+        // Add filter change listeners
+        locationSelect.addEventListener('change', applyFilters);
+        sublocationSelect.addEventListener('change', applyFilters);
+        document.getElementById('relationshipFilters').addEventListener('change', applyFilters);
 
         // Load initial graph data
         fetch('/api/graph')
@@ -206,12 +330,8 @@
             .then(graphData => {
                 data.nodes.add(graphData.nodes);
                 data.edges.add(graphData.edges);
-            })
-            .catch(error => {
-                console.error('Error loading graph:', error);
+                populateFilters(graphData);
             });
-
-        // ... [rest of your existing code for filters, etc.] ...
     </script>
 </body>
 </html>
