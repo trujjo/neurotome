@@ -53,24 +53,3 @@
     </script>
 </body>
 </html>
-
-
-@app.route('/')
-def home():
-    return render_template_string(html_template)
-
-@app.route('/refresh-data')
-def refresh_data():
-    success, data = get_neo4j_data()
-    timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-    response_data = {
-        'success': success,
-        'timestamp': timestamp,
-        'message': 'Data refreshed successfully' if success else f'Error: {data}',
-        'graph_data': data if success else None
-    }
-    logger.info(f"Refresh data response: {response_data['message']}")
-    return jsonify(response_data)
-
-if __name__ == '__main__':
-    app.run(host='0.0.0.0', port=int(os.getenv('PORT', 5000)))
