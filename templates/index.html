@@ -48,7 +48,7 @@
             flex-grow: 1;
         }
 
-        .filter-section {
+        .search-container {
             background-color: var(--secondary-bg);
             padding: 1rem;
             border-radius: 8px;
@@ -56,10 +56,14 @@
             border: 1px solid var(--border-color);
         }
 
-        .filter-section h3 {
-            margin-top: 0;
-            margin-bottom: 1rem;
-            color: var(--burnt-orange);
+        .search-input {
+            width: 100%;
+            padding: 0.75rem;
+            border-radius: 4px;
+            background-color: var(--primary-bg);
+            color: var(--text-primary);
+            border: 1px solid var(--border-color);
+            font-size: 1rem;
         }
 
         select {
@@ -72,41 +76,11 @@
             margin-bottom: 0.5rem;
         }
 
-        select:focus {
-            border-color: var(--burnt-orange);
-        }
-
-        .search-container {
-            background-color: var(--secondary-bg);
-            padding: 1rem;
-            border-radius: 8px;
-            margin-bottom: 1rem;
-            border: 1px solid var(--border-color);
-        }
-
-        #quickSearch {
-            width: 100%;
-            padding: 0.75rem;
-            border-radius: 4px;
-            background-color: var(--primary-bg);
-            color: var(--text-primary);
-            border: 1px solid var(--border-color);
-            font-size: 1rem;
-        }
-
         #network-container {
-            background-color: var(--secondary-bg);
-            border-radius: 8px;
-            border: 1px solid var(--border-color);
             height: 600px;
-            width: 100%;
-        }
-
-        .relationship-checkbox {
-            display: flex;
-            align-items: center;
-            gap: 0.5rem;
-            margin-bottom: 0.5rem;
+            border: 1px solid var(--border-color);
+            border-radius: 8px;
+            background-color: var(--secondary-bg);
         }
     </style>
 </head>
@@ -134,22 +108,15 @@
                     <option value="">All Sublocations</option>
                 </select>
             </div>
-
-            <!-- Relationship Types Filter -->
-            <div class="filter-section">
-                <h3>Relationship Types</h3>
-                <div id="relationshipFilters">
-                    <!-- Dynamically populated -->
-                </div>
-            </div>
         </div>
 
         <div class="content">
             <!-- Search Box -->
             <div class="search-container">
                 <input type="text" 
-                       id="quickSearch" 
-                       placeholder="Search nodes... (min. 2 characters)">
+                       id="searchInput" 
+                       class="search-input"
+                       placeholder="Search nodes...">
             </div>
 
             <!-- Network Visualization -->
@@ -158,7 +125,7 @@
     </div>
 
     <script>
-        // Initialize network visualization
+        // Initialize network
         const container = document.getElementById('network-container');
         const data = {
             nodes: new vis.DataSet([]),
@@ -193,24 +160,20 @@
                     springConstant: 0.001,
                     springLength: 200
                 }
-            },
-            interaction: {
-                hover: true,
-                tooltipDelay: 200
             }
         };
         
         const network = new vis.Network(container, data, options);
 
         // Search functionality
-        const searchInput = document.getElementById('quickSearch');
+        const searchInput = document.getElementById('searchInput');
         let searchTimeout = null;
 
         function performSearch(searchTerm) {
             if (!searchTerm || searchTerm.length < 2) {
                 // Reset all nodes
                 data.nodes.forEach(node => {
-                    node.color = node.originalColor || undefined;
+                    node.color = node.originalColor;
                     node.borderWidth = 1;
                     data.nodes.update(node);
                 });
@@ -219,20 +182,20 @@
 
             fetch(`/api/search?term=${encodeURIComponent(searchTerm)}`)
                 .then(response => response.json())
-                .then(matchedNodes => {
+                .then(matches => {
                     // Reset all nodes first
                     data.nodes.forEach(node => {
-                        node.color = node.originalColor || undefined;
+                        node.color = node.originalColor;
                         node.borderWidth = 1;
                         data.nodes.update(node);
                     });
 
-                    // Highlight matched nodes
-                    matchedNodes.forEach(matchedNode => {
-                        const node = data.nodes.get(matchedNode.id);
+                    // Highlight matches
+                    matches.forEach(match => {
+                        const node = data.nodes.get(match.id);
                         if (node) {
                             if (!node.originalColor) {
-                                node.originalColor = node.color || undefined;
+                                node.originalColor = node.color;
                             }
                             node.color = '#CC5500';
                             node.borderWidth = 3;
@@ -240,9 +203,9 @@
                         }
                     });
 
-                    // Focus on first match if any
-                    if (matchedNodes.length > 0) {
-                        network.focus(matchedNodes[0].id, {
+                    // Focus on first match
+                    if (matches.length > 0) {
+                        network.focus(matches[0].id, {
                             scale: 1.5,
                             animation: true
                         });
@@ -259,7 +222,7 @@
             }, 300);
         });
 
-        // Populate filters
+        // Load and populate filters
         function populateFilters() {
             // Populate locations
             fetch('/api/locations')
@@ -279,4 +242,44 @@
                 .then(response => response.json())
                 .then(sublocations => {
                     const sublocationSelect = document.getElementById('sublocationSelect');
-                    
+                    sublocations.forEach(sublocation => {
+                        const option = document.createElement('option');
+                        option.value = sublocation;
+                        option.textContent = sublocation;
+                        sublocationSelect.appendChild(option);
+                    });
+                });
+        }
+
+        // Filter change handlers
+        document.getElementById('locationSelect').addEventListener('change', function(e) {
+            const selectedLocation = e.target.value;
+            data.nodes.forEach(node => {
+                const locationMatch = !selectedLocation || 
+                    (node.properties && node.properties.location === selectedLocation);
+                node.hidden = !locationMatch;
+                data.nodes.update(node);
+            });
+        });
+
+        document.getElementById('sublocationSelect').addEventListener('change', function(e) {
+            const selectedSublocation = e.target.value;
+            data.nodes.forEach(node => {
+                const sublocationMatch = !selectedSublocation || 
+                    (node.properties && node.properties.sublocation === selectedSublocation);
+                node.hidden = !sublocationMatch;
+                data.nodes.update(node);
+            });
+        });
+
+        // Load initial graph data
+        fetch('/api/graph')
+            .then(response => response.json())
+            .then(graphData => {
+                data.nodes.add(graphData.nodes);
+                data.edges.add(graphData.edges);
+                populateFilters();
+            });
+    </script>
+</body>
+</html>
