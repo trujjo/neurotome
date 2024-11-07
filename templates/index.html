@@ -1,11 +1,11 @@
 <!DOCTYPE html>
-<html lang=""en"">
+<html lang="en">
 <head>
-    <meta charset=""UTF-8"">
-    <meta name=""viewport"" content=""width=device-width, initial-scale=1.0"">
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>NeuroNetwork Explorer</title>
-    <link href=""https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600&display=swap"" rel=""stylesheet"">
-    <script src=""https://cdn.jsdelivr.net/npm/vis-network@9.1.2/dist/vis-network.min.js""></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600&display=swap" rel="stylesheet">
+    <script src="https://cdn.jsdelivr.net/npm/vis-network@9.1.2/dist/vis-network.min.js"></script>
     <style>
         :root {
             --primary-bg: #1a1a1a;
@@ -95,25 +95,25 @@
     </style>
 </head>
 <body>
-    <nav class=""navbar"">
-        <div class=""container"">
-            <h1 style=""margin: 0; text-align: center;"">NeuroNetwork Explorer</h1>
+    <nav class="navbar">
+        <div class="container">
+            <h1 style="margin: 0; text-align: center;">NeuroNetwork Explorer</h1>
         </div>
     </nav>
 
-    <div class=""container"">
+    <div class="container">
         <!-- Quick Search -->
-        <div class=""quick-search"">
-            <input type=""text"" id=""quickSearch"" placeholder=""Quick search nodes... (e.g., 'neuron', 'synapse', 'ID:123')"">
+        <div class="quick-search">
+            <input type="text" id="quickSearch" placeholder="Quick search nodes... (e.g., 'neuron', 'synapse', 'ID:123')">
         </div>
 
         <!-- Node Type Buttons -->
-        <div class=""node-type-buttons"" id=""nodeTypeButtons"">
+        <div class="node-type-buttons" id="nodeTypeButtons">
             <!-- Dynamically populated -->
         </div>
 
         <!-- Network Visualization -->
-        <div id=""network-container""></div>
+        <div id="network-container"></div>
     </div>
 
     <script>
