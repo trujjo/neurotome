@@ -4,6 +4,7 @@ from neo4j import GraphDatabase
 import json
 import os
 
+# Create Flask app at module level
 app = Flask(__name__)
 
 # Get Neo4j connection details from environment variables or use defaults
@@ -91,7 +92,7 @@ class Neo4jConnection:
             'edges': relationships
         }
 
-# Initialize Neo4j connection
+# Initialize Neo4j connection at module level
 neo4j_conn = Neo4jConnection(URI, USER, PASSWORD)
 
 @app.route('/')
@@ -118,6 +119,7 @@ def search():
 def health():
     return jsonify({'status': 'healthy'})
 
+# Only run the application directly if this file is being run directly
 if __name__ == '__main__':
     port = int(os.environ.get('PORT', 5000))
     app.run(host='0.0.0.0', port=port)
@@ -127,11 +129,14 @@ if __name__ == '__main__':
 with open('app.py', 'w') as f:
     f.write(app_code)
 
-print("Created corrected app.py with all CSS removed (CSS should be in templates/index.html)")
+print("Created corrected app.py with Flask app instance at module level")
 print("\
-Make sure your project structure looks like this:")
-print("project/")
-print("\u251c\u2500\u2500 app.py")
-print("\u251c\u2500\u2500 requirements.txt")
-print("\u2514\u2500\u2500 templates/")
-print("    \u2514\u2500\u2500 index.html")
+Key changes:")
+print("1. Moved 'app = Flask(__name__)' to module level")
+print("2. Initialized neo4j_conn at module level")
+print("3. Kept all route definitions outside of __main__ block")
+print("\
+To deploy on Render.com:")
+print("1. Build command: pip install -r requirements.txt")
+print("2. Start command: gunicorn app:app")
+print("3. Add environment variables for NEO4J_URI, NEO4J_USER, and NEO4J_PASSWORD")
