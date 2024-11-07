@@ -1,9 +1,9 @@
 # Create a minimal Flask app directly in app.py
 with open('app.py', 'w') as f:
-    f.write("""from flask import Flask, render_template, jsonify, request
+    f.write("""import os  # Added this import
+from flask import Flask, render_template, jsonify, request
 from neo4j import GraphDatabase
 from dotenv import load_dotenv
-import os
 
 # Load environment variables
 load_dotenv()
@@ -138,9 +138,10 @@ if __name__ == '__main__':
     app.run(debug=True)
 """)
 
-print("Created new simplified app.py")
+print("Created new app.py with os import added")
 
 # Create templates directory if it doesn't exist
+import os
 if not os.path.exists('templates'):
     os.makedirs('templates')
 
@@ -219,4 +220,4 @@ with open('templates/index.html', 'w') as f:
 </html>
 """)
 
-print("Created new simplified index.html")
+print("Created index.html")
