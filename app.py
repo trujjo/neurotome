@@ -5,13 +5,13 @@ import logging
 app = Flask(__name__)
 logging.basicConfig(level=logging.INFO)
 
-# Define html_template BEFORE the routes
 html_template = '''
 <!DOCTYPE html>
 <html>
 <head>
     <title>Neo4j Graph Viewer</title>
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/css/bootstrap.min.css" rel="stylesheet">
+    <script src="https://unpkg.com/vis-network/standalone/umd/vis-network.min.js"></script>
     <style>
         .container { margin-top: 50px; }
         .search-box { margin-bottom: 20px; }
@@ -44,21 +44,55 @@ html_template = '''
         </div>
     </div>
 
-    <script src="https://unpkg.com/vis-network/standalone/umd/vis-network.min.js"></script>
     <script>
+        let network;
+        
+        function initializeNetwork(data) {
+            const container = document.getElementById('visualization-area');
+            const options = {
+                nodes: {
+                    shape: 'dot',
+                    size: 30
+                },
+                physics: {
+                    enabled: true
+                }
+            };
+            
+            network = new vis.Network(container, data, options);
+        }
+
         document.getElementById('refreshButton').addEventListener('click', function() {
             fetch('/refresh-data')
                 .then(response => response.json())
                 .then(data => {
                     document.getElementById('lastUpdated').textContent = data.timestamp;
-                    // Here you can add code to update the visualization
-                    alert('Data refreshed successfully!');
+                    if (data.success) {
+                        initializeNetwork({
+                            nodes: new vis.DataSet(data.graph_data.nodes),
+                            edges: new vis.DataSet(data.graph_data.edges)
+                        });
+                    }
                 })
                 .catch(error => {
                     console.error('Error:', error);
                     alert('Error refreshing data. Please try again.');
                 });
         });
+
+        // Initialize the network on page load
+        fetch('/refresh-data')
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    document.getElementById('lastUpdated').textContent = data.timestamp;
+                    initializeNetwork({
+                        nodes: new vis.DataSet(data.graph_data.nodes),
+                        edges: new vis.DataSet(data.graph_data.edges)
+                    });
+                }
+            })
+            .catch(error => console.error('Error:', error));
     </script>
 </body>
 </html>
@@ -96,42 +130,3 @@ def refresh_data():
 
 if __name__ == '__main__':
     app.run(host='0.0.0.0', port=10000, debug=False)
-
-
-# Add this JavaScript after the existing script
-<script>
-    let network;
-    
-    function initializeNetwork(data) {
-        const container = document.getElementById('visualization-area');
-        const options = {
-            nodes: {
-                shape: 'dot',
-                size: 30
-            },
-            physics: {
-                enabled: true
-            }
-        };
-        
-        network = new vis.Network(container, data, options);
-    }
-
-    document.getElementById('refreshButton').addEventListener('click', function() {
-        fetch('/refresh-data')
-            .then(response => response.json())
-            .then(data => {
-                document.getElementById('lastUpdated').textContent = data.timestamp;
-                if (data.success) {
-                    initializeNetwork({
-                        nodes: new vis.DataSet(data.graph_data.nodes),
-                        edges: new vis.DataSet(data.graph_data.edges)
-                    });
-                }
-            })
-            .catch(error => {
-                console.error('Error:', error);
-                alert('Error refreshing data. Please try again.');
-            });
-    });
-</script>
