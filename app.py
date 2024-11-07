@@ -1,6 +1,6 @@
 from flask import Flask, render_template, jsonify, g
 from neo4j import GraphDatabase
-from neo4j.exceptions import ResultFailedError
+from neo4j.exceptions import ServiceUnavailable, DatabaseError
 import os
 from dotenv import load_dotenv
 
@@ -33,8 +33,9 @@ def get_nodes_by_type(tx, node_type):
         '''
         result = tx.run(query)
         return [dict(record) for record in result]
-    except Exception as e:
-        raise ResultFailedError(f"Failed to execute query: {str(e)}")
+    except (ServiceUnavailable, DatabaseError) as e:
+        print(f"Database error: {str(e)}")
+        raise
 
 @app.route('/')
 def index():
