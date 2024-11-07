@@ -1,20 +1,43 @@
 <!DOCTYPE html>
 <html>
 <head>
-    <title>Neo4j Network Visualization</title>
+    <title>Neural Network Visualization</title>
     <style>
         #viz {
             width: 900px;
             height: 700px;
             border: 1px solid lightgray;
-            font: 22pt arial;
+        }
+        .button-container {
+            margin: 20px;
+            display: flex;
+            flex-wrap: wrap;
+            gap: 10px;
+        }
+        .node-button {
+            padding: 10px 20px;
+            background-color: #4CAF50;
+            color: white;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            transition: background-color 0.3s;
+        }
+        .node-button:hover {
+            background-color: #45a049;
         }
     </style>
     <script src="https://unpkg.com/neovis.js@2.0.2"></script>
+    <script src="https://d3js.org/d3.v7.min.js"></script>
 </head>
 <body>
+    <div class="button-container">
+        {% for node_type in node_types %}
+        <button class="node-button" onclick="visualizeNodeType('{{ node_type }}')">{{ node_type }}</button>
+        {% endfor %}
+    </div>
     <div id="viz"></div>
-    
+
     <script>
         const config = {
             container_id: "viz",
@@ -22,23 +45,44 @@
             server_user: "neo4j",
             server_password: "Poconoco16!",
             labels: {
-                "Node": {
+                "*": {
                     caption: "name",
-                    size: "pagerank",
+                    size: 1.5,
                     community: "community"
                 }
             },
             relationships: {
-                "CONNECTS_TO": {
-                    thickness: "weight",
+                "*": {
+                    thickness: 1,
                     caption: false
                 }
-            },
-            initial_cypher: "MATCH (n)-[r]->(m) RETURN n,r,m"
+            }
         };
 
-        const viz = new NeoVis.default(config);
-        viz.render();
+        let viz;
+
+        function initViz() {
+            viz = new NeoVis.default(config);
+            viz.render();
+        }
+
+        function visualizeNodeType(nodeType) {
+            fetch(`/nodes/${nodeType}`)
+                .then(response => response.json())
+                .then(data => {
+                    // Clear previous visualization
+                    document.getElementById('viz').innerHTML = '';
+                    
+                    // Create new visualization with filtered data
+                    config.initial_cypher = `MATCH (n:${nodeType}) RETURN n`;
+                    viz = new NeoVis.default(config);
+                    viz.render();
+                })
+                .catch(error => console.error('Error:', error));
+        }
+
+        // Initialize visualization on page load
+        document.addEventListener('DOMContentLoaded', initViz);
     </script>
 </body>
 </html>
