@@ -151,7 +151,6 @@ def filter_nodes():
 
 if __name__ == '__main__':
     app.run(debug=True)
-"""
 
 # Write the Flask application code directly to app.py
 with open('app.py', 'w') as f:
