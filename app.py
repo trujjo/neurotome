@@ -3,7 +3,12 @@ from neo4j import GraphDatabase
 from neo4j.exceptions import ServiceUnavailable, DatabaseError
 import os
 import time
+import logging
 from dotenv import load_dotenv
+
+# Configure logging
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
 
 # Load environment variables
 load_dotenv()
@@ -20,6 +25,7 @@ NEO4J_PASSWORD = os.getenv('NEO4J_PASSWORD', 'Poconoco16!')
 def init_driver(max_retries=3, retry_delay=5):
     for attempt in range(max_retries):
         try:
+            logger.info(f"Attempting to connect to Neo4j (attempt {attempt + 1}/{max_retries})")
             driver = GraphDatabase.driver(
                 NEO4J_URI,
                 auth=(NEO4J_USER, NEO4J_PASSWORD),
@@ -29,20 +35,20 @@ def init_driver(max_retries=3, retry_delay=5):
             )
             # Verify connectivity
             driver.verify_connectivity()
+            logger.info("Successfully connected to Neo4j")
             return driver
-        except ServiceUnavailable as e:
+        except Exception as e:
+            logger.error(f"Connection attempt {attempt + 1} failed: {str(e)}")
             if attempt == max_retries - 1:
-                print(f"Failed to connect to Neo4j after {max_retries} attempts: {str(e)}")
                 raise
-            print(f"Connection attempt {attempt + 1} failed, retrying in {retry_delay} seconds...")
             time.sleep(retry_delay)
 
 # Initialize driver
 try:
     driver = init_driver()
 except Exception as e:
-    print(f"Failed to initialize Neo4j driver: {str(e)}")
-    raise
+    logger.error(f"Failed to initialize Neo4j driver: {str(e)}")
+    driver = None
 
 def get_nodes_by_type(tx, node_type):
     try:
@@ -52,8 +58,8 @@ def get_nodes_by_type(tx, node_type):
         '''
         result = tx.run(query)
         return [dict(record) for record in result]
-    except (ServiceUnavailable, DatabaseError) as e:
-        print(f"Database error in get_nodes_by_type: {str(e)}")
+    except Exception as e:
+        logger.error(f"Database error in get_nodes_by_type: {str(e)}")
         raise
 
 @app.route('/')
@@ -62,40 +68,31 @@ def index():
 
 @app.route('/api/nodes/<node_type>')
 def get_nodes(node_type):
+    if not driver:
+        return jsonify({'success': False, 'error': 'Database connection not available'}), 503
+    
     try:
         with driver.session(connection_timeout=60) as session:
             nodes = session.read_transaction(get_nodes_by_type, node_type)
             return jsonify({'success': True, 'data': nodes})
     except Exception as e:
-        print(f"Error in get_nodes: {str(e)}")
+        logger.error(f"Error in get_nodes: {str(e)}")
         return jsonify({'success': False, 'error': str(e)}), 500
 
 @app.route('/api/node-types')
 def get_node_types():
     node_types = [
-        'nerve',
-        'bone',
-        'neuro',
-        'region',
-        'viscera',
-        'muscle',
-        'sense',
-        'vein',
-        'artery',
-        'cv',
-        'function',
-        'sensory',
-        'gland',
-        'lymph',
-        'head',
-        'organ',
-        'sensation',
-        'skin'
+        'nerve', 'bone', 'neuro', 'region', 'viscera', 'muscle', 'sense',
+        'vein', 'artery', 'cv', 'function', 'sensory', 'gland', 'lymph',
+        'head', 'organ', 'sensation', 'skin'
     ]
     return jsonify({'success': True, 'node_types': node_types})
 
 @app.route('/api/graph')
 def get_full_graph():
+    if not driver:
+        return jsonify({'success': False, 'error': 'Database connection not available'}), 503
+    
     try:
         with driver.session(connection_timeout=60) as session:
             query = '''
@@ -106,7 +103,7 @@ def get_full_graph():
             nodes = [dict(record) for record in result]
             return jsonify({'success': True, 'data': nodes})
     except Exception as e:
-        print(f"Error in get_full_graph: {str(e)}")
+        logger.error(f"Error in get_full_graph: {str(e)}")
         return jsonify({'success': False, 'error': str(e)}), 500
 
 # Error handling
