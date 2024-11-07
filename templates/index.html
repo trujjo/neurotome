@@ -3,130 +3,98 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>NeuroNetwork Explorer</title>
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600&display=swap" rel="stylesheet">
+    <title>Network Explorer</title>
     <script src="https://cdn.jsdelivr.net/npm/vis-network@9.1.2/dist/vis-network.min.js"></script>
     <style>
         :root {
-            --primary-bg: #1a1a1a;
-            --secondary-bg: #2d2d2d;
             --burnt-orange: #CC5500;
-            --text-primary: #e0e0e0;
-            --text-secondary: #a0a0a0;
-            --border-color: #404040;
+            --dark-bg: #1a1a1a;
+            --light-text: #ffffff;
         }
         
         body {
-            font-family: 'Inter', sans-serif;
-            background-color: var(--primary-bg);
-            color: var(--text-primary);
             margin: 0;
-            padding: 0;
-        }
-        
-        .navbar {
-            background-color: var(--secondary-bg);
-            padding: 1rem;
-            box-shadow: 0 2px 4px rgba(0,0,0,0.2);
-            margin-bottom: 2rem;
+            padding: 20px;
+            font-family: Arial, sans-serif;
+            background-color: var(--dark-bg);
+            color: var(--light-text);
         }
 
-        .main-container {
+        .container {
             display: flex;
-            max-width: 1400px;
-            margin: 0 auto;
-            padding: 0 1rem;
-            gap: 2rem;
+            gap: 20px;
         }
 
         .sidebar {
             width: 250px;
-            flex-shrink: 0;
         }
 
-        .content {
+        .main-content {
             flex-grow: 1;
         }
 
-        .search-container {
-            background-color: var(--secondary-bg);
-            padding: 1rem;
-            border-radius: 8px;
-            margin-bottom: 1rem;
-            border: 1px solid var(--border-color);
-        }
-
-        .search-input {
-            width: 100%;
-            padding: 0.75rem;
-            border-radius: 4px;
-            background-color: var(--primary-bg);
-            color: var(--text-primary);
-            border: 1px solid var(--border-color);
-            font-size: 1rem;
-        }
-
-        select {
-            width: 100%;
-            padding: 0.5rem;
-            background-color: var(--primary-bg);
-            color: var(--text-primary);
-            border: 1px solid var(--border-color);
-            border-radius: 4px;
-            margin-bottom: 0.5rem;
-        }
-
-        #network-container {
+        #network {
             height: 600px;
-            border: 1px solid var(--border-color);
-            border-radius: 8px;
-            background-color: var(--secondary-bg);
+            border: 1px solid #444;
+            background-color: #2d2d2d;
+        }
+
+        .search-box {
+            margin-bottom: 20px;
+        }
+
+        input {
+            width: 100%;
+            padding: 8px;
+            background-color: #2d2d2d;
+            border: 1px solid #444;
+            color: white;
+        }
+
+        .filter-buttons {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 10px;
+            margin-bottom: 20px;
+        }
+
+        .filter-button {
+            background-color: #2d2d2d;
+            color: white;
+            border: 1px solid #444;
+            padding: 8px 16px;
+            cursor: pointer;
+            border-radius: 4px;
+        }
+
+        .filter-button.active {
+            background-color: var(--burnt-orange);
+            border-color: var(--burnt-orange);
         }
     </style>
 </head>
 <body>
-    <nav class="navbar">
-        <div class="container">
-            <h1 style="margin: 0; text-align: center;">NeuroNetwork Explorer</h1>
-        </div>
-    </nav>
-
-    <div class="main-container">
+    <div class="container">
         <div class="sidebar">
-            <!-- Location Filter -->
-            <div class="filter-section">
-                <h3>Location</h3>
-                <select id="locationSelect">
-                    <option value="">All Locations</option>
-                </select>
+            <div class="search-box">
+                <input type="text" id="searchInput" placeholder="Search nodes...">
             </div>
-
-            <!-- Sublocation Filter -->
-            <div class="filter-section">
-                <h3>Sublocation</h3>
-                <select id="sublocationSelect">
-                    <option value="">All Sublocations</option>
-                </select>
-            </div>
+            
+            <h3>Node Types</h3>
+            <div id="nodeTypeButtons" class="filter-buttons"></div>
+            
+            <h3>Locations</h3>
+            <div id="locationButtons" class="filter-buttons"></div>
         </div>
-
-        <div class="content">
-            <!-- Search Box -->
-            <div class="search-container">
-                <input type="text" 
-                       id="searchInput" 
-                       class="search-input"
-                       placeholder="Search nodes...">
-            </div>
-
-            <!-- Network Visualization -->
-            <div id="network-container"></div>
+        
+        <div class="main-content">
+            <div id="network"></div>
         </div>
     </div>
 
     <script>
         // Initialize network
-        const container = document.getElementById('network-container');
+        const container = document.getElementById('network');
         const data = {
             nodes: new vis.DataSet([]),
             edges: new vis.DataSet([])
@@ -137,20 +105,13 @@
                 shape: 'dot',
                 size: 16,
                 font: {
-                    size: 14,
-                    color: '#e0e0e0'
-                },
-                borderWidth: 2,
-                shadow: true
+                    color: '#ffffff'
+                }
             },
             edges: {
-                width: 2,
                 color: {
-                    color: '#404040',
+                    color: '#ffffff',
                     highlight: '#CC5500'
-                },
-                smooth: {
-                    type: 'continuous'
                 }
             },
             physics: {
@@ -167,110 +128,106 @@
 
         // Search functionality
         const searchInput = document.getElementById('searchInput');
-        let searchTimeout = null;
+        let searchTimeout;
 
-        function performSearch(searchTerm) {
-            if (!searchTerm || searchTerm.length < 2) {
-                // Reset all nodes
-                data.nodes.forEach(node => {
-                    node.color = node.originalColor;
-                    node.borderWidth = 1;
-                    data.nodes.update(node);
-                });
+        searchInput.addEventListener('input', function(e) {
+            clearTimeout(searchTimeout);
+            const searchTerm = e.target.value.trim();
+            
+            if (searchTerm.length < 2) {
+                resetHighlights();
                 return;
             }
 
-            fetch(`/api/search?term=${encodeURIComponent(searchTerm)}`)
-                .then(response => response.json())
-                .then(matches => {
-                    // Reset all nodes first
-                    data.nodes.forEach(node => {
-                        node.color = node.originalColor;
-                        node.borderWidth = 1;
-                        data.nodes.update(node);
-                    });
-
-                    // Highlight matches
-                    matches.forEach(match => {
-                        const node = data.nodes.get(match.id);
-                        if (node) {
-                            if (!node.originalColor) {
-                                node.originalColor = node.color;
-                            }
-                            node.color = '#CC5500';
-                            node.borderWidth = 3;
-                            data.nodes.update(node);
-                        }
-                    });
-
-                    // Focus on first match
-                    if (matches.length > 0) {
-                        network.focus(matches[0].id, {
-                            scale: 1.5,
-                            animation: true
-                        });
-                    }
-                });
-        }
-
-        searchInput.addEventListener('input', (event) => {
-            clearTimeout(searchTimeout);
-            const searchTerm = event.target.value.trim();
-            
             searchTimeout = setTimeout(() => {
-                performSearch(searchTerm);
+                fetch(`/api/search?term=${encodeURIComponent(searchTerm)}`)
+                    .then(response => response.json())
+                    .then(matchedIds => {
+                        highlightNodes(matchedIds);
+                    });
             }, 300);
         });
 
-        // Load and populate filters
-        function populateFilters() {
-            // Populate locations
-            fetch('/api/locations')
+        function highlightNodes(nodeIds) {
+            data.nodes.forEach(node => {
+                if (nodeIds.includes(node.id)) {
+                    node.color = {
+                        background: '#CC5500',
+                        border: '#CC5500'
+                    };
+                } else {
+                    delete node.color;
+                }
+                data.nodes.update(node);
+            });
+
+            if (nodeIds.length > 0) {
+                network.focus(nodeIds[0], {
+                    scale: 1.5,
+                    animation: true
+                });
+            }
+        }
+
+        function resetHighlights() {
+            data.nodes.forEach(node => {
+                delete node.color;
+                data.nodes.update(node);
+            });
+        }
+
+        // Load and create filter buttons
+        function createFilterButtons() {
+            // Load node types
+            fetch('/api/node_types')
                 .then(response => response.json())
-                .then(locations => {
-                    const locationSelect = document.getElementById('locationSelect');
-                    locations.forEach(location => {
-                        const option = document.createElement('option');
-                        option.value = location;
-                        option.textContent = location;
-                        locationSelect.appendChild(option);
+                .then(types => {
+                    const container = document.getElementById('nodeTypeButtons');
+                    types.forEach(type => {
+                        const button = document.createElement('button');
+                        button.className = 'filter-button';
+                        button.textContent = type;
+                        button.onclick = () => toggleNodeType(type, button);
+                        container.appendChild(button);
                     });
                 });
 
-            // Populate sublocations
-            fetch('/api/sublocations')
+            // Load locations
+            fetch('/api/locations')
                 .then(response => response.json())
-                .then(sublocations => {
-                    const sublocationSelect = document.getElementById('sublocationSelect');
-                    sublocations.forEach(sublocation => {
-                        const option = document.createElement('option');
-                        option.value = sublocation;
-                        option.textContent = sublocation;
-                        sublocationSelect.appendChild(option);
+                .then(locations => {
+                    const container = document.getElementById('locationButtons');
+                    locations.forEach(location => {
+                        const button = document.createElement('button');
+                        button.className = 'filter-button';
+                        button.textContent = location;
+                        button.onclick = () => toggleLocation(location, button);
+                        container.appendChild(button);
                     });
                 });
         }
 
-        // Filter change handlers
-        document.getElementById('locationSelect').addEventListener('change', function(e) {
-            const selectedLocation = e.target.value;
+        function toggleNodeType(type, button) {
+            button.classList.toggle('active');
+            const activeTypes = Array.from(document.querySelectorAll('#nodeTypeButtons .active'))
+                .map(btn => btn.textContent);
+            
             data.nodes.forEach(node => {
-                const locationMatch = !selectedLocation || 
-                    (node.properties && node.properties.location === selectedLocation);
-                node.hidden = !locationMatch;
+                node.hidden = activeTypes.length > 0 && !node.labels.includes(type);
                 data.nodes.update(node);
             });
-        });
+        }
 
-        document.getElementById('sublocationSelect').addEventListener('change', function(e) {
-            const selectedSublocation = e.target.value;
+        function toggleLocation(location, button) {
+            button.classList.toggle('active');
+            const activeLocations = Array.from(document.querySelectorAll('#locationButtons .active'))
+                .map(btn => btn.textContent);
+            
             data.nodes.forEach(node => {
-                const sublocationMatch = !selectedSublocation || 
-                    (node.properties && node.properties.sublocation === selectedSublocation);
-                node.hidden = !sublocationMatch;
+                node.hidden = activeLocations.length > 0 && node.location !== location;
                 data.nodes.update(node);
             });
-        });
+        }
 
         // Load initial graph data
         fetch('/api/graph')
@@ -278,7 +235,7 @@
             .then(graphData => {
                 data.nodes.add(graphData.nodes);
                 data.edges.add(graphData.edges);
-                populateFilters();
+                createFilterButtons();
             });
     </script>
 </body>
