@@ -79,6 +79,18 @@ def get_full_graph():
         except Exception as e:
             return jsonify({'success': False, 'error': str(e)})
 
+def get_nodes_by_type(tx, node_type):
+    try:
+        query = f'''
+        MATCH (n:{node_type})-[r]-(m)
+        RETURN n, r, m
+        LIMIT 100
+        '''
+        result = tx.run(query)
+        return [dict(record) for record in result]
+    except Exception as e:
+        raise ResultFailedError(f"Failed to execute query: {str(e)}")
+
 # Error handling
 @app.errorhandler(404)
 def not_found_error(error):
