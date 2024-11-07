@@ -1,4 +1,4 @@
-# Create updated app.py
+# Create the app.py file with direct Flask code
 from flask import Flask, render_template, jsonify, request
 from neo4j import GraphDatabase
 from dotenv import load_dotenv
@@ -151,7 +151,10 @@ def filter_nodes():
 
 if __name__ == '__main__':
     app.run(debug=True)
+"""
 
+# Write the Flask application code directly to app.py
 with open('app.py', 'w') as f:
-    f.write(app_content)
-print("Created app.py with updated endpoints")
+    f.write(flask_app_content)
+
+print("Created new app.py with direct Flask code")
