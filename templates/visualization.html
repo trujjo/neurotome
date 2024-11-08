@@ -2,7 +2,6 @@
 <html>
 <head>
     <title>neo4j force graph</title>
-    <script src="https://unpkg.com/neo4j-driver@5.15.0"></script>
     <script src="https://d3js.org/d3.v5.min.js"></script>
     <style>
         body { 
@@ -28,8 +27,6 @@
             display: flex;
             gap: 10px;
             flex-wrap: wrap;
-            max-height: 200px;
-            overflow-y: auto;
         }
         .filter-button {
             padding: 8px 16px;
@@ -58,16 +55,6 @@
             border: 1px solid #404040;
             border-radius: 4px;
             color: white;
-            text-transform: lowercase;
-        }
-        #search-input::placeholder {
-            text-transform: lowercase;
-        }
-        #status {
-            margin: 10px 0;
-            padding: 10px;
-            border-radius: 4px;
-            text-transform: lowercase;
         }
     </style>
 </head>
@@ -98,62 +85,77 @@
         <button class="filter-button active" onclick="showAll()">show all</button>
     </div>
 
-    <div id="status"></div>
     <div id="graph"></div>
 
     <script>
-        // Create the SVG container
-        let svg = d3.select("#graph")
+        const width = document.getElementById('graph').clientWidth;
+        const height = document.getElementById('graph').clientHeight;
+        
+        const svg = d3.select("#graph")
             .append("svg")
-            .attr("width", "100%")
-            .attr("height", "100%");
+            .attr("width", width)
+            .attr("height", height);
 
-        let width = svg.node().getBoundingClientRect().width;
-        let height = svg.node().getBoundingClientRect().height;
+        const g = svg.append("g");
 
-        // Add zoom capabilities
-        let zoom = d3.zoom()
+        // Add zoom behavior
+        const zoom = d3.zoom()
             .scaleExtent([0.1, 4])
-            .on("zoom", function() {
+            .on("zoom", () => {
                 g.attr("transform", d3.event.transform);
-                currentTransform = d3.event.transform;
             });
 
         svg.call(zoom);
-        let currentTransform = d3.zoomIdentity;
 
-        let g = svg.append("g");
-
-        // Create the force simulation
-        let simulation = d3.forceSimulation()
-            .force("link", d3.forceLink().id(d => d.id))
-            .force("charge", d3.forceManyBody().strength(-1000))
-            .force("center", d3.forceCenter(width / 2, height / 2));
-
-        let allNodes = [];
-        let allRelationships = [];
-        let originalPositions = new Map();
+        function getNodeColor(label) {
+            const colors = {
+                'Nerve': '#ff7f0e',
+                'Bone': '#2ca02c',
+                'Region': '#d62728',
+                'Muscle': '#9467bd',
+                'Vessel': '#8c564b',
+                'Organ': '#e377c2',
+                'Function': '#7f7f7f',
+                'Sensation': '#bcbd22'
+            };
+            return colors[label] || '#1f77b4';
+        }
 
         function updateVisualization(nodes, relationships) {
             g.selectAll("*").remove();
 
-            let links = g.selectAll(".link")
+            // Draw relationships
+            const links = g.selectAll(".link")
                 .data(relationships)
                 .enter()
                 .append("line")
                 .attr("class", "link")
                 .style("stroke", "#404040")
-                .style("stroke-width", 1);
+                .style("stroke-width", 1)
+                .attr("x1", d => {
+                    const source = nodes.find(n => n.id === d.source);
+                    return source ? source.x : 0;
+                })
+                .attr("y1", d => {
+                    const source = nodes.find(n => n.id === d.source);
+                    return source ? source.y : 0;
+                })
+                .attr("x2", d => {
+                    const target = nodes.find(n => n.id === d.target);
+                    return target ? target.x : 0;
+                })
+                .attr("y2", d => {
+                    const target = nodes.find(n => n.id === d.target);
+                    return target ? target.y : 0;
+                });
 
-            let nodes_g = g.selectAll(".node")
+            // Draw nodes
+            const nodes_g = g.selectAll(".node")
                 .data(nodes)
                 .enter()
                 .append("g")
                 .attr("class", "node")
-                .call(d3.drag()
-                    .on("start", dragstarted)
-                    .on("drag", dragged)
-                    .on("end", dragended));
+                .attr("transform", d => `translate(${d.x},${d.y})`);
 
             nodes_g.append("circle")
                 .attr("r", 5)
@@ -165,124 +167,64 @@
                 .text(d => (d.properties.name || d.id).toLowerCase())
                 .style("fill", "white")
                 .style("font-size", "12px");
+        }
 
-            nodes.forEach(node => {
-                if (!originalPositions.has(node.id)) {
-                    originalPositions.set(node.id, { x: node.x, y: node.y });
-                }
+        // Load initial data
+        fetch('/graph')
+            .then(response => response.json())
+            .then(data => {
+                updateVisualization(data.nodes, data.relationships);
+            })
+            .catch(error => {
+                console.error('Error:', error);
             });
-
-            simulation
-                .nodes(nodes)
-                .on("tick", ticked);
-
-            simulation.force("link")
-                .links(relationships);
-
-            function ticked() {
-                links
-                    .attr("x1", d => d.source.x)
-                    .attr("y1", d => d.source.y)
-                    .attr("x2", d => d.target.x)
-                    .attr("y2", d => d.target.y);
-
-                nodes_g
-                    .attr("transform", d => `translate(${d.x},${d.y})`);
-            }
-        }
-
-        function showAll() {
-            document.querySelectorAll('.filter-button').forEach(btn => btn.classList.remove('active'));
-            document.querySelector('.filter-button[onclick="showAll()"]').classList.add('active');
-            
-            allNodes.forEach(node => {
-                const pos = originalPositions.get(node.id);
-                if (pos) {
-                    node.x = pos.x;
-                    node.y = pos.y;
-                }
-            });
-            
-            updateVisualization(allNodes, allRelationships);
-        }
-
-        function getNodeColor(label) {
-            const colors = {
-                nerve: "#ff7f0e",
-                bone: "#1f77b4",
-                neuro: "#2ca02c",
-                region: "#d62728",
-                viscera: "#9467bd",
-                muscle: "#8c564b",
-                sense: "#e377c2",
-                vein: "#7f7f7f",
-                artery: "#bcbd22",
-                cv: "#17becf",
-                function: "#aec7e8",
-                sensory: "#ffbb78",
-                gland: "#98df8a",
-                lymph: "#ff9896",
-                head: "#c5b0d5",
-                organ: "#c49c94",
-                sensation: "#f7b6d2",
-                skin: "#dbdb8d"
-            };
-            return colors[label.toLowerCase()] || "#7f7f7f";
-        }
 
         function filterNodes(type) {
             document.querySelectorAll('.filter-button').forEach(btn => {
                 btn.classList.remove('active');
-                if (btn.textContent.toLowerCase() === type.toLowerCase()) {
+                if (btn.textContent === type) {
                     btn.classList.add('active');
                 }
             });
 
-            let filteredNodes = allNodes.filter(node => 
-                node.labels.some(label => label.toLowerCase() === type.toLowerCase())
-            );
-            
-            const filteredNodeIds = new Set(filteredNodes.map(n => n.id));
-            let filteredRelationships = allRelationships.filter(rel => 
-                filteredNodeIds.has(rel.source.id) && filteredNodeIds.has(rel.target.id)
-            );
-
-            updateVisualization(filteredNodes, filteredRelationships);
+            fetch('/graph')
+                .then(response => response.json())
+                .then(data => {
+                    const filteredNodes = data.nodes.filter(node => 
+                        node.labels.some(label => label.toLowerCase() === type.toLowerCase())
+                    );
+                    const nodeIds = new Set(filteredNodes.map(n => n.id));
+                    const filteredRelationships = data.relationships.filter(rel =>
+                        nodeIds.has(rel.source) && nodeIds.has(rel.target)
+                    );
+                    updateVisualization(filteredNodes, filteredRelationships);
+                })
+                .catch(error => {
+                    console.error('Error:', error);
+                });
         }
 
-        function dragstarted(d) {
-            if (!d3.event.active) simulation.alphaTarget(0.3).restart();
-            d.fx = d.x;
-            d.fy = d.y;
-        }
-
-        function dragged(d) {
-            d.fx = currentTransform.invertX(d3.event.x);
-            d.fy = currentTransform.invertY(d3.event.y);
-        }
-
-        function dragended(d) {
-            if (!d3.event.active) simulation.alphaTarget(0);
-            d.fx = null;
-            d.fy = null;
-        }
-
-        // Initialize the visualization with data from the server
-        fetch('/graph')
-            .then(response => response.json())
-            .then(data => {
-                allNodes = data.nodes;
-                allRelationships = data.relationships;
-                updateVisualization(data.nodes, data.relationships);
-            })
-            .catch(error => {
-                console.error('error:', error);
-                document.getElementById('status').textContent = 'error loading data';
+        function showAll() {
+            document.querySelectorAll('.filter-button').forEach(btn => {
+                btn.classList.remove('active');
+                if (btn.textContent === 'show all') {
+                    btn.classList.add('active');
+                }
             });
 
+            fetch('/graph')
+                .then(response => response.json())
+                .then(data => {
+                    updateVisualization(data.nodes, data.relationships);
+                })
+                .catch(error => {
+                    console.error('Error:', error);
+                });
+        }
+
         // Search functionality
-        let searchTimeout;
         const searchInput = document.getElementById('search-input');
+        let searchTimeout;
 
         searchInput.addEventListener('input', function(e) {
             const query = e.target.value.trim().toLowerCase();
@@ -293,18 +235,13 @@
                     return;
                 }
                 
-                fetch(`/search?q=${encodeURIComponent(query)}`)
+                fetch('/search?q=' + encodeURIComponent(query))
                     .then(response => response.json())
                     .then(data => {
-                        if (data.nodes && data.relationships) {
-                            allNodes = data.nodes;
-                            allRelationships = data.relationships;
-                            updateVisualization(data.nodes, data.relationships);
-                        }
+                        updateVisualization(data.nodes, data.relationships);
                     })
                     .catch(error => {
-                        console.error('error:', error);
-                        document.getElementById('status').textContent = 'error loading data';
+                        console.error('Error:', error);
                     });
             }, 300);
         });
