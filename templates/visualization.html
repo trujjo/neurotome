@@ -1,240 +1,298 @@
 <!DOCTYPE html>
 <html>
 <head>
-<title>Neo4j Force Graph</title>
-<script src="https://unpkg.com/neo4j-driver@5.15.0"></script>
-<script src="https://d3js.org/d3.v5.min.js"></script>
-<style>
-body {
-margin: 0;
-padding: 20px;
-background-color: #1a1a1a;
-color: white;
-font-family: Arial, sans-serif;
-}
-#graph {
-width: 100%;
-height: 800px;
-background-color: #1a1a1a;
-border: 1px solid #404040;
-border-radius: 4px;
-}
-#status {
-margin: 10px 0;
-padding: 10px;
-border-radius: 4px;
-}
-#controls {
-margin-bottom: 20px;
-display: flex;
-gap: 10px;
-flex-wrap: wrap;
-}
-.node-type-button {
-padding: 8px 16px;
-border: none;
-border-radius: 4px;
-background-color: #404040;
-color: white;
-cursor: pointer;
-transition: background-color 0.3s;
-}
-.node-type-button.active {
-background-color: #007bff;
-}
-.node-type-button:hover {
-background-color: #505050;
-}
-#search-container {
-margin-bottom: 20px;
-}
-#search-input {
-padding: 8px;
-border-radius: 4px;
-border: 1px solid #404040;
-background-color: #2a2a2a;
-color: white;
-width: 200px;
-}
-</style>
+    <title>neo4j force graph</title>
+    <script src="https://unpkg.com/neo4j-driver@5.15.0"></script>
+    <script src="https://d3js.org/d3.v5.min.js"></script>
+    <style>
+        body { 
+            margin: 0;
+            padding: 20px;
+            background-color: #1a1a1a;
+            color: white;
+            font-family: Arial, sans-serif;
+            text-transform: lowercase;
+        }
+        #graph {
+            width: 100%;
+            height: 700px;
+            background-color: #1a1a1a;
+            border: 1px solid #404040;
+            border-radius: 4px;
+        }
+        #controls {
+            margin: 20px 0;
+            padding: 10px;
+            background-color: #2a2a2a;
+            border-radius: 4px;
+            display: flex;
+            gap: 10px;
+            flex-wrap: wrap;
+            max-height: 200px;
+            overflow-y: auto;
+        }
+        .filter-button {
+            padding: 8px 16px;
+            background-color: #404040;
+            color: white;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            min-width: 100px;
+            text-transform: lowercase;
+        }
+        .filter-button:hover {
+            background-color: #505050;
+        }
+        .filter-button.active {
+            background-color: #007bff;
+        }
+        #search-container {
+            margin-bottom: 20px;
+        }
+        #search-input {
+            padding: 8px;
+            width: 200px;
+            background-color: #2a2a2a;
+            border: 1px solid #404040;
+            border-radius: 4px;
+            color: white;
+            text-transform: lowercase;
+        }
+        #search-input::placeholder {
+            text-transform: lowercase;
+        }
+        #status {
+            margin: 10px 0;
+            padding: 10px;
+            border-radius: 4px;
+            text-transform: lowercase;
+        }
+    </style>
 </head>
 <body>
-<div id="search-container">
-<input type="text" id="search-input" placeholder="Search nodes...">
-</div>
-<div id="controls">
-<!-- Buttons will be dynamically added here -->
-</div>
-<div id="status"></div>
-<div id="graph"></div>
-<script>
-let svg = d3.select("#graph")
-.append("svg")
-.attr("width", "100%")
-.attr("height", "100%");
-let width = svg.node().getBoundingClientRect().width;
-let height = svg.node().getBoundingClientRect().height;
-let simulation = d3.forceSimulation()
-.force("link", d3.forceLink().id(d => d.id))
-.force("charge", d3.forceManyBody().strength(-1000))
-.force("center", d3.forceCenter(width / 2, height / 2));
-let g = svg.append("g");
-let zoom = d3.zoom()
-.scaleExtent([0.1, 4])
-.on("zoom", function() {
-g.attr("transform", d3.event.transform);
-currentTransform = d3.event.transform;
-});
-svg.call(zoom);
-let currentTransform = d3.zoomIdentity;
-// Store all nodes and relationships
-let allNodes = [];
-let allRelationships = [];
-let nodeTypes = new Set();
-function updateVisualization(nodes, relationships) {
-// Clear existing elements
-g.selectAll("*").remove();
-// Create links
-let links = g.selectAll(".link")
-.data(relationships)
-.enter()
-.append("line")
-.attr("class", "link")
-.style("stroke", "#404040")
-.style("stroke-width", 1);
-// Create nodes
-let nodes_g = g.selectAll(".node")
-.data(nodes)
-.enter()
-.append("g")
-.attr("class", "node")
-.call(d3.drag()
-.on("start", dragstarted)
-.on("drag", dragged)
-.on("end", dragended));
-nodes_g.append("circle")
-.attr("r", 5)
-.style("fill", d => getNodeColor(d.labels[0]));
-nodes_g.append("text")
-.attr("dx", 12)
-.attr("dy", ".35em")
-.text(d => d.properties.name || d.id)
-.style("fill", "white")
-.style("font-size", "12px");
-simulation
-.nodes(nodes)
-.on("tick", ticked);
-simulation.force("link")
-.links(relationships);
-function ticked() {
-links
-.attr("x1", d => d.source.x)
-.attr("y1", d => d.source.y)
-.attr("x2", d => d.target.x)
-.attr("y2", d => d.target.y);
-nodes_g
-.attr("transform", d => `translate(${d.x},${d.y})`);
-}
-}
-function getNodeColor(label) {
-// Add more colors as needed
-const colors = {
-Person: "#ff7f0e",
-Movie: "#1f77b4",
-Book: "#2ca02c",
-Company: "#d62728",
-Default: "#7f7f7f"
-};
-return colors[label] || colors.Default;
-}
-function dragstarted(d) {
-if (!d3.event.active) simulation.alphaTarget(0.3).restart();
-d.fx = d.x;
-d.fy = d.y;
-}
-function dragged(d) {
-d.fx = currentTransform.invertX(d3.event.x);
-d.fy = currentTransform.invertY(d3.event.y);
-}
-function dragended(d) {
-if (!d3.event.active) simulation.alphaTarget(0);
-d.fx = null;
-d.fy = null;
-}
-// Function to create node type buttons
-function createNodeTypeButtons(nodes) {
-const controls = document.getElementById('controls');
-controls.innerHTML = ''; // Clear existing buttons
-// Add "All" button
-const allButton = document.createElement('button');
-allButton.textContent = 'All';
-allButton.className = 'node-type-button active';
-allButton.onclick = () => filterNodes('All');
-controls.appendChild(allButton);
-// Get unique node types
-const nodeTypes = new Set();
-nodes.forEach(node => {
-node.labels.forEach(label => nodeTypes.add(label));
-});
-// Create button for each node type
-nodeTypes.forEach(type => {
-const button = document.createElement('button');
-button.textContent = type;
-button.className = 'node-type-button';
-button.onclick = () => filterNodes(type);
-controls.appendChild(button);
-});
-}
-// Function to filter nodes by type
-function filterNodes(type) {
-// Update button states
-document.querySelectorAll('.node-type-button').forEach(btn => {
-btn.classList.remove('active');
-if (btn.textContent === type) {
-btn.classList.add('active');
-}
-});
-let filteredNodes, filteredRelationships;
-if (type === 'All') {
-filteredNodes = allNodes;
-filteredRelationships = allRelationships;
-} else {
-filteredNodes = allNodes.filter(node => node.labels.includes(type));
-const filteredNodeIds = new Set(filteredNodes.map(n => n.id));
-filteredRelationships = allRelationships.filter(rel =>
-filteredNodeIds.has(rel.source.id) && filteredNodeIds.has(rel.target.id)
-);
-}
-updateVisualization(filteredNodes, filteredRelationships);
-}
-// Search functionality
-let searchTimeout;
-const searchInput = document.getElementById('search-input');
-searchInput.addEventListener('input', function(e) {
-const query = e.target.value.trim();
-clearTimeout(searchTimeout);
-searchTimeout = setTimeout(() => {
-if (query.length < 3 && query.length > 0) {
-return;
-}
-fetch(`/search?q=${encodeURIComponent(query)}`)
-.then(response => response.json())
-.then(data => {
-if (data.nodes && data.relationships) {
-allNodes = data.nodes;
-allRelationships = data.relationships;
-createNodeTypeButtons(data.nodes);
-updateVisualization(data.nodes, data.relationships);
-}
-})
-.catch(error => {
-console.error('Error:', error);
-document.getElementById('status').textContent = 'Error loading data';
-});
-}, 300);
-});
-// Initial load
-searchInput.dispatchEvent(new Event('input'));
-</script>
+    <div id="search-container">
+        <input type="text" id="search-input" placeholder="search nodes...">
+    </div>
+    
+    <div id="controls">
+        <button class="filter-button" onclick="filterNodes('skin')">skin</button>
+        <button class="filter-button" onclick="filterNodes('nerve')">nerve</button>
+        <button class="filter-button" onclick="filterNodes('bone')">bone</button>
+        <button class="filter-button" onclick="filterNodes('neuro')">neuro</button>
+        <button class="filter-button" onclick="filterNodes('region')">region</button>
+        <button class="filter-button" onclick="filterNodes('viscera')">viscera</button>
+        <button class="filter-button" onclick="filterNodes('muscle')">muscle</button>
+        <button class="filter-button" onclick="filterNodes('sense')">sense</button>
+        <button class="filter-button" onclick="filterNodes('vein')">vein</button>
+        <button class="filter-button" onclick="filterNodes('artery')">artery</button>
+        <button class="filter-button" onclick="filterNodes('cv')">cv</button>
+        <button class="filter-button" onclick="filterNodes('function')">function</button>
+        <button class="filter-button" onclick="filterNodes('sensory')">sensory</button>
+        <button class="filter-button" onclick="filterNodes('gland')">gland</button>
+        <button class="filter-button" onclick="filterNodes('lymph')">lymph</button>
+        <button class="filter-button" onclick="filterNodes('head')">head</button>
+        <button class="filter-button" onclick="filterNodes('organ')">organ</button>
+        <button class="filter-button" onclick="filterNodes('sensation')">sensation</button>
+        <button class="filter-button active" onclick="showAll()">show all</button>
+    </div>
+
+    <div id="status"></div>
+    <div id="graph"></div>
+
+    <script>
+        let svg = d3.select("#graph")
+            .append("svg")
+            .attr("width", "100%")
+            .attr("height", "100%");
+
+        let width = svg.node().getBoundingClientRect().width;
+        let height = svg.node().getBoundingClientRect().height;
+
+        let zoom = d3.zoom()
+            .scaleExtent([0.1, 4])
+            .on("zoom", function() {
+                g.attr("transform", d3.event.transform);
+                currentTransform = d3.event.transform;
+            });
+
+        svg.call(zoom);
+        let currentTransform = d3.zoomIdentity;
+
+        let g = svg.append("g");
+
+        let simulation = d3.forceSimulation()
+            .force("link", d3.forceLink().id(d => d.id))
+            .force("charge", d3.forceManyBody().strength(-1000))
+            .force("center", d3.forceCenter(width / 2, height / 2));
+
+        let allNodes = [];
+        let allRelationships = [];
+        let originalPositions = new Map();
+
+        function updateVisualization(nodes, relationships) {
+            g.selectAll("*").remove();
+
+            let links = g.selectAll(".link")
+                .data(relationships)
+                .enter()
+                .append("line")
+                .attr("class", "link")
+                .style("stroke", "#404040")
+                .style("stroke-width", 1);
+
+            let nodes_g = g.selectAll(".node")
+                .data(nodes)
+                .enter()
+                .append("g")
+                .attr("class", "node")
+                .call(d3.drag()
+                    .on("start", dragstarted)
+                    .on("drag", dragged)
+                    .on("end", dragended));
+
+            nodes_g.append("circle")
+                .attr("r", 5)
+                .style("fill", d => getNodeColor(d.labels[0]));
+
+            nodes_g.append("text")
+                .attr("dx", 12)
+                .attr("dy", ".35em")
+                .text(d => (d.properties.name || d.id).toLowerCase())
+                .style("fill", "white")
+                .style("font-size", "12px");
+
+            nodes.forEach(node => {
+                if (!originalPositions.has(node.id)) {
+                    originalPositions.set(node.id, { x: node.x, y: node.y });
+                }
+            });
+
+            simulation
+                .nodes(nodes)
+                .on("tick", ticked);
+
+            simulation.force("link")
+                .links(relationships);
+
+            function ticked() {
+                links
+                    .attr("x1", d => d.source.x)
+                    .attr("y1", d => d.source.y)
+                    .attr("x2", d => d.target.x)
+                    .attr("y2", d => d.target.y);
+
+                nodes_g
+                    .attr("transform", d => `translate(${d.x},${d.y})`);
+            }
+        }
+
+        function showAll() {
+            document.querySelectorAll('.filter-button').forEach(btn => btn.classList.remove('active'));
+            document.querySelector('.filter-button').classList.add('active');
+            
+            allNodes.forEach(node => {
+                const pos = originalPositions.get(node.id);
+                if (pos) {
+                    node.x = pos.x;
+                    node.y = pos.y;
+                }
+            });
+            
+            updateVisualization(allNodes, allRelationships);
+        }
+
+        function getNodeColor(label) {
+            const colors = {
+                nerve: "#ff7f0e",
+                bone: "#1f77b4",
+                neuro: "#2ca02c",
+                region: "#d62728",
+                viscera: "#9467bd",
+                muscle: "#8c564b",
+                sense: "#e377c2",
+                vein: "#7f7f7f",
+                artery: "#bcbd22",
+                cv: "#17becf",
+                function: "#aec7e8",
+                sensory: "#ffbb78",
+                gland: "#98df8a",
+                lymph: "#ff9896",
+                head: "#c5b0d5",
+                organ: "#c49c94",
+                sensation: "#f7b6d2",
+                skin: "#dbdb8d"
+            };
+            return colors[label.toLowerCase()] || "#7f7f7f";
+        }
+
+        function filterNodes(type) {
+            document.querySelectorAll('.filter-button').forEach(btn => {
+                btn.classList.remove('active');
+                if (btn.textContent.toLowerCase() === type.toLowerCase()) {
+                    btn.classList.add('active');
+                }
+            });
+
+            let filteredNodes = allNodes.filter(node => 
+                node.labels.some(label => label.toLowerCase() === type.toLowerCase())
+            );
+            
+            const filteredNodeIds = new Set(filteredNodes.map(n => n.id));
+            let filteredRelationships = allRelationships.filter(rel => 
+                filteredNodeIds.has(rel.source.id) && filteredNodeIds.has(rel.target.id)
+            );
+
+            updateVisualization(filteredNodes, filteredRelationships);
+        }
+
+        function dragstarted(d) {
+            if (!d3.event.active) simulation.alphaTarget(0.3).restart();
+            d.fx = d.x;
+            d.fy = d.y;
+        }
+
+        function dragged(d) {
+            d.fx = currentTransform.invertX(d3.event.x);
+            d.fy = currentTransform.invertY(d3.event.y);
+        }
+
+        function dragended(d) {
+            if (!d3.event.active) simulation.alphaTarget(0);
+            d.fx = null;
+            d.fy = null;
+        }
+
+        let searchTimeout;
+        const searchInput = document.getElementById('search-input');
+
+        searchInput.addEventListener('input', function(e) {
+            const query = e.target.value.trim().toLowerCase();
+            
+            clearTimeout(searchTimeout);
+            searchTimeout = setTimeout(() => {
+                if (query.length < 3 && query.length > 0) {
+                    return;
+                }
+                
+                fetch(`/search?q=${encodeURIComponent(query)}`)
+                    .then(response => response.json())
+                    .then(data => {
+                        if (data.nodes && data.relationships) {
+                            allNodes = data.nodes;
+                            allRelationships = data.relationships;
+                            updateVisualization(data.nodes, data.relationships);
+                        }
+                    })
+                    .catch(error => {
+                        console.error('error:', error);
+                        document.getElementById('status').textContent = 'error loading data';
+                    });
+            }, 300);
+        });
+
+        searchInput.dispatchEvent(new Event('input'));
+    </script>
 </body>
 </html>
