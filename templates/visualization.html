@@ -1,109 +1,292 @@
+
 <!DOCTYPE html>
 <html>
 <head>
+    <title>Neo4j Force Graph</title>
+    <script src="https://unpkg.com/neo4j-driver@5.15.0"></script>
+    <script src="https://d3js.org/d3.v5.min.js"></script>
     <style>
-        body {
+        body { 
+            margin: 0;
+            padding: 20px;
             background-color: #1a1a1a;
             color: white;
             font-family: Arial, sans-serif;
-            padding: 20px;
         }
-        .type-buttons {
-            display: grid;
-            grid-template-rows: repeat(2, 1fr);
-            grid-template-columns: repeat(9, 1fr);
-            gap: 6px;
-            margin-bottom: 12px;
-            padding: 12px;
-            background-color: #2d2d2d;
-            border-radius: 4px;
-            width: calc(100% - 24px);
-        }
-        .type-button {
-            padding: 4px 8px;
-            background-color: #cc5500;
-            color: white;
-            border: none;
-            border-radius: 3px;
-            cursor: pointer;
-            font-size: 10px;
-            text-align: center;
+        #graph {
             width: 100%;
-            min-width: 60px;
-            height: 25px;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            text-transform: lowercase;
+            height: 800px;
+            background-color: #1a1a1a;
+            border: 1px solid #404040;
+            border-radius: 4px;
         }
-        .controls {
-            display: flex;
-            gap: 8px;
-            align-items: center;
-            margin: 12px;
-            background-color: #2d2d2d;
-            padding: 12px;
+        #status {
+            margin: 10px 0;
+            padding: 10px;
             border-radius: 4px;
         }
         .button {
+            padding: 10px 20px;
             background-color: #cc5500;
             color: white;
             border: none;
-            border-radius: 3px;
-            padding: 6px 12px;
+            border-radius: 4px;
             cursor: pointer;
-            height: 25px;
-            font-size: 10px;
-            text-transform: lowercase;
+            margin-bottom: 20px;
         }
-        #searchBox {
-            padding: 6px;
-            border-radius: 3px;
-            border: 1px solid #666;
-            background-color: #333;
-            color: white;
-            width: 180px;
-            height: 25px;
-            box-sizing: border-box;
-            font-size: 10px;
+        .button:hover {
+            background-color: #ff6a00;
         }
-        .preview-label {
-            color: #666;
-            margin: 8px 0;
-            font-style: italic;
+        .node-label {
+            font-size: 12px;
+            text-anchor: middle;
+            pointer-events: none;
+            fill: white;
+        }
+        .link {
+            stroke: #808080;
+            stroke-opacity: 0.6;
+        }
+        .link-label {
             font-size: 10px;
+            fill: #cccccc;
         }
     </style>
 </head>
 <body>
-    <div class="preview-label">layout preview:</div>
-    <div class="type-buttons">
-        <button class="type-button">nerve</button>
-        <button class="type-button">bone</button>
-        <button class="type-button">neuro</button>
-        <button class="type-button">region</button>
-        <button class="type-button">viscera</button>
-        <button class="type-button">muscle</button>
-        <button class="type-button">sense</button>
-        <button class="type-button">vein</button>
-        <button class="type-button">artery</button>
+    <button class="button" onclick="showRandomNodesWithRelationships()">Show Random Connected Nodes</button>
+    <div id="status">Ready to connect...</div>
+    <div id="graph"></div>
+
+    <script>
+        let driver;
         
-        <button class="type-button">cv</button>
-        <button class="type-button">function</button>
-        <button class="type-button">sensory</button>
-        <button class="type-button">gland</button>
-        <button class="type-button">lymph</button>
-        <button class="type-button">head</button>
-        <button class="type-button">organ</button>
-        <button class="type-button">sensation</button>
-        <button class="type-button">skin</button>
-    </div>
-    
-    <div class="controls">
-        <button class="button">show random connected nodes</button>
-        <input type="text" id="searchBox" placeholder="search nodes...">
-    </div>
-    
-    <div class="preview-label">graph visualization would appear below...</div>
+        async function initDriver() {
+            try {
+                driver = neo4j.driver(
+                    "neo4j+s://4e5eeae5.databases.neo4j.io:7687",
+                    neo4j.auth.basic("neo4j", "Poconoco16!")
+                );
+                
+                // Test the connection
+                const session = driver.session();
+                await session.run("RETURN 1");
+                await session.close();
+                
+                document.getElementById('status').style.backgroundColor = '#28a745';
+                document.getElementById('status').innerHTML = 'Connected to database';
+            } catch (error) {
+                document.getElementById('status').style.backgroundColor = '#dc3545';
+                document.getElementById('status').innerHTML = 'Connection error: ' + error.message;
+                console.error('Connection error:', error);
+            }
+        }
+
+        async function showRandomNodesWithRelationships() {
+            if (!driver) {
+                document.getElementById('status').style.backgroundColor = '#dc3545';
+                document.getElementById('status').innerHTML = 'Not connected to database';
+                return;
+            }
+
+            const session = driver.session();
+            document.getElementById('status').innerHTML = 'Fetching data...';
+            
+            try {
+                // Fixed query with different variable name for random
+                const result = await session.run(`
+                    MATCH (n)
+                    WITH n, rand() as random
+                    ORDER BY random
+                    LIMIT 5
+                    MATCH (n)-[rel]-(m)
+                    RETURN DISTINCT n, rel, m
+                    LIMIT 15
+                `);
+                
+                document.getElementById('status').innerHTML = 'Processing data...';
+                
+                // Process the data for D3
+                const nodes = new Map();
+                const links = [];
+                
+                result.records.forEach(record => {
+                    const source = record.get('n');
+                    const target = record.get('m');
+                    const relationship = record.get('rel');
+                    
+                    // Add nodes if they don't exist
+                    if (!nodes.has(source.identity.toString())) {
+                        nodes.set(source.identity.toString(), {
+                            id: source.identity.toString(),
+                            label: source.labels[0],
+                            name: source.properties.name || 'Unnamed'
+                        });
+                    }
+                    
+                    if (!nodes.has(target.identity.toString())) {
+                        nodes.set(target.identity.toString(), {
+                            id: target.identity.toString(),
+                            label: target.labels[0],
+                            name: target.properties.name || 'Unnamed'
+                        });
+                    }
+                    
+                    // Add relationship
+                    links.push({
+                        source: source.identity.toString(),
+                        target: target.identity.toString(),
+                        type: relationship.type
+                    });
+                });
+                
+                document.getElementById('status').innerHTML = 'Rendering graph...';
+                createForceGraph(Array.from(nodes.values()), links);
+                document.getElementById('status').style.backgroundColor = '#28a745';
+                document.getElementById('status').innerHTML = 'Graph rendered successfully';
+                
+            } catch (error) {
+                document.getElementById('status').style.backgroundColor = '#dc3545';
+                document.getElementById('status').innerHTML = 'Error: ' + error.message;
+                console.error('Error:', error);
+            } finally {
+                await session.close();
+            }
+        }
+
+        function createForceGraph(nodes, links) {
+            // Clear previous graph
+            d3.select("#graph").selectAll("*").remove();
+            
+            const width = document.getElementById('graph').clientWidth;
+            const height = document.getElementById('graph').clientHeight;
+            
+            const svg = d3.select("#graph")
+                .append("svg")
+                .attr("width", width)
+                .attr("height", height);
+            
+            // Create force simulation
+            const simulation = d3.forceSimulation(nodes)
+                .force("link", d3.forceLink(links).id(d => d.id).distance(200))
+                .force("charge", d3.forceManyBody().strength(-500))
+                .force("center", d3.forceCenter(width / 2, height / 2));
+            
+            // Create links
+            const link = svg.append("g")
+                .selectAll("line")
+                .data(links)
+                .enter()
+                .append("line")
+                .attr("class", "link")
+                .style("stroke", "#808080")
+                .style("stroke-width", 2);
+            
+            // Create link labels
+            const linkLabel = svg.append("g")
+                .selectAll("text")
+                .data(links)
+                .enter()
+                .append("text")
+                .attr("class", "link-label")
+                .text(d => d.type);
+            
+            // Create nodes
+            const node = svg.append("g")
+                .selectAll("g")
+                .data(nodes)
+                .enter()
+                .append("g");
+            
+            // Add circles to nodes
+            node.append("circle")
+                .attr("r", 30)
+                .style("fill", "#cc5500")
+                .style("stroke", "#ff6a00")
+                .style("stroke-width", 2);
+            
+            // Add labels to nodes
+            node.append("text")
+                .attr("class", "node-label")
+                .attr("dy", ".35em")
+                .text(d => d.name)
+                .each(function(d) {
+                    // Wrap text if too long
+                    let text = d3.select(this);
+                    let words = d.name.split(' ');
+                    let line = [];
+                    let lineNumber = 0;
+                    let lineHeight = 1.1;
+                    let y = text.attr("y");
+                    let dy = parseFloat(text.attr("dy"));
+                    let tspan = text.text(null).append("tspan").attr("x", 0).attr("y", y).attr("dy", dy + "em");
+                    
+                    words.forEach(word => {
+                        line.push(word);
+                        tspan.text(line.join(" "));
+                        if (tspan.node().getComputedTextLength() > 50) {
+                            line.pop();
+                            tspan.text(line.join(" "));
+                            line = [word];
+                            tspan = text.append("tspan").attr("x", 0).attr("y", y).attr("dy", ++lineNumber * lineHeight + dy + "em").text(word);
+                        }
+                    });
+                });
+            
+            // Add drag behavior
+            node.call(d3.drag()
+                .on("start", dragstarted)
+                .on("drag", dragged)
+                .on("end", dragended));
+            
+            // Update positions on each tick
+            simulation.on("tick", () => {
+                link
+                    .attr("x1", d => d.source.x)
+                    .attr("y1", d => d.source.y)
+                    .attr("x2", d => d.target.x)
+                    .attr("y2", d => d.target.y);
+                
+                linkLabel
+                    .attr("x", d => (d.source.x + d.target.x) / 2)
+                    .attr("y", d => (d.source.y + d.target.y) / 2);
+                
+                node
+                    .attr("transform", d => `translate(${d.x},${d.y})`);
+            });
+            
+            // Drag functions
+            function dragstarted(d) {
+                if (!d3.event.active) simulation.alphaTarget(0.3).restart();
+                d.fx = d.x;
+                d.fy = d.y;
+            }
+            
+            function dragged(d) {
+                d.fx = d3.event.x;
+                d.fy = d3.event.y;
+            }
+            
+            function dragended(d) {
+                if (!d3.event.active) simulation.alphaTarget(0);
+                d.fx = null;
+                d.fy = null;
+            }
+        }
+
+        // Initialize the driver when the page loads
+        document.addEventListener('DOMContentLoaded', initDriver);
+
+        // Clean up when the page is closed
+        window.onbeforeunload = () => {
+            if (driver) {
+                driver.close();
+            }
+        };
+    </script>
 </body>
 </html>
+
+
+
+
