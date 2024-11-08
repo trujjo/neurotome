@@ -1,111 +1,69 @@
-from flask import Flask, jsonify, request
-import logging
+from flask import Flask, jsonify, request, render_template
 from neo4j import GraphDatabase
-from datetime import datetime
 import os
-from dotenv import load_dotenv
 
-# Load environment variables
-load_dotenv()
-
-# Configure logging
-logging.basicConfig(level=logging.INFO)
-
-# Initialize Flask app
 app = Flask(__name__)
 
-# Neo4j connection configuration
-uri = os.getenv("NEO4J_URI", "bolt://localhost:7687")
-user = os.getenv("NEO4J_USER", "neo4j")
-password = os.getenv("NEO4J_PASSWORD")
-port = int(os.getenv("PORT", 5000))
+# Neo4j connection settings - using the repository variables directly
+uri = "neo4j+s://4e5eeae5.databases.neo4j.io"
+user = "neo4j"
+password = "Poconoco16!"
 
-# Initialize Neo4j driver
-try:
-    driver = GraphDatabase.driver(uri, auth=(user, password))
-except Exception as e:
-    logging.error(f"Failed to create Neo4j driver: {str(e)}")
-    driver = None
+# Create the driver
+driver = GraphDatabase.driver(uri, auth=(user, password))
+
+@app.route('/')
+def index():
+    return render_template('visualization.html')
+
+@app.route('/graph')
+def get_graph():
+    try:
+        with driver.session() as session:
+            result = session.run("""
+                MATCH (n)
+                OPTIONAL MATCH (n)-[r]-(m)
+                RETURN collect(distinct n) as nodes, 
+                       collect(distinct r) as relationships
+            """)
+            
+            data = result.single()
+            nodes = [{"id": node.id, "labels": list(node.labels), 
+                     "properties": dict(node.items())} for node in data["nodes"]]
+            rels = [{"source": rel.start_node.id, "target": rel.end_node.id, 
+                    "type": rel.type} for rel in data["relationships"]]
+            
+            return jsonify({"nodes": nodes, "relationships": rels})
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
 
 @app.route('/search')
-def search_nodes():
+def search():
     query = request.args.get('q', '').lower()
     if len(query) < 3:
         return jsonify({'nodes': [], 'relationships': []})
-    
+
     try:
         with driver.session() as session:
-            # Search in node properties and labels
             result = session.run("""
                 MATCH (n)
-                WHERE any(prop in keys(n) WHERE toString(n[prop]) CONTAINS $query)
-                   OR any(label in labels(n) WHERE toLower(label) CONTAINS $query)
+                WHERE toLower(n.name) CONTAINS $query 
+                   OR any(label IN labels(n) WHERE toLower(label) CONTAINS $query)
                 WITH n
-                OPTIONAL MATCH (n)-[r]-(connected)
-                RETURN 
-                    id(n) as nodeId,
-                    labels(n) as nodeLabels,
-                    properties(n) as nodeProperties,
-                    id(connected) as connectedId,
-                    labels(connected) as connectedLabels,
-                    properties(connected) as connectedProperties,
-                    type(r) as relationType
+                OPTIONAL MATCH (n)-[r]-(m)
+                RETURN collect(distinct n) as nodes, 
+                       collect(distinct r) as relationships
             """, query=query)
             
-            nodes_data = []
-            relationships_data = []
-            processed_nodes = set()
+            data = result.single()
+            nodes = [{"id": node.id, "labels": list(node.labels), 
+                     "properties": dict(node.items())} for node in data["nodes"]]
+            rels = [{"source": rel.start_node.id, "target": rel.end_node.id, 
+                    "type": rel.type} for rel in data["relationships"]]
             
-            for record in result:
-                if str(record['nodeId']) not in processed_nodes:
-                    nodes_data.append({
-                        'id': str(record['nodeId']),
-                        'labels': record['nodeLabels'],
-                        'properties': record['nodeProperties']
-                    })
-                    processed_nodes.add(str(record['nodeId']))
-                
-                if record['connectedId'] is not None and str(record['connectedId']) not in processed_nodes:
-                    nodes_data.append({
-                        'id': str(record['connectedId']),
-                        'labels': record['connectedLabels'],
-                        'properties': record['connectedProperties']
-                    })
-                    processed_nodes.add(str(record['connectedId']))
-                
-                if record['connectedId'] is not None:
-                    relationships_data.append({
-                        'from': str(record['nodeId']),
-                        'to': str(record['connectedId']),
-                        'type': record['relationType']
-                    })
-            
-            return jsonify({
-                'nodes': nodes_data,
-                'relationships': relationships_data
-            })
-            
+            return jsonify({"nodes": nodes, "relationships": rels})
     except Exception as e:
-        logging.error(f"Error in search_nodes: {str(e)}")
-        return jsonify({'error': str(e)}), 500
-
-# Error handlers
-@app.errorhandler(404)
-def not_found_error(error):
-    return jsonify({'error': 'Not found'}), 404
-
-@app.errorhandler(500)
-def internal_error(error):
-    return jsonify({'error': 'Internal server error'}), 500
+        return jsonify({"error": str(e)}), 500
 
 if __name__ == '__main__':
-    try:
-        with driver.session() as session:
-            session.run("MATCH (n) RETURN count(n) LIMIT 1")
-        logging.info("Successfully connected to Neo4j database")
-        app.run(host='0.0.0.0', port=port, debug=False)
-    except Exception as e:
-        logging.error(f"Failed to connect to Neo4j: {str(e)}")
-    finally:
-        if driver:
-            driver.close()
+    app.run(debug=True)
