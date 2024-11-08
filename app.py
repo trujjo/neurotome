@@ -158,6 +158,72 @@ def health_check():
     except Exception as e:
         return jsonify({'status': 'unhealthy', 'error': str(e)}), 500
 
+@app.route('/search')
+def search_nodes():
+    query = request.args.get('q', '').lower()
+    if len(query) < 3:
+        return jsonify({'nodes': [], 'relationships': []})
+    
+    try:
+        with driver.session() as session:
+            # Search in node properties and labels
+            result = session.run('''
+                MATCH (n)
+                WHERE any(prop in keys(n) WHERE toString(n[prop]) CONTAINS $query)
+                   OR any(label in labels(n) WHERE toLower(label) CONTAINS $query)
+                WITH n
+                OPTIONAL MATCH (n)-[r]-(connected)
+                RETURN 
+                    id(n) as nodeId,
+                    labels(n) as nodeLabels,
+                    properties(n) as nodeProperties,
+                    id(connected) as connectedId,
+                    labels(connected) as connectedLabels,
+                    properties(connected) as connectedProperties,
+                    type(r) as relationType
+            ''', query=query)
+            
+            nodes_data = []
+            relationships_data = []
+            processed_nodes = set()
+            
+            for record in result:
+                # Add main node if not already added
+                if str(record['nodeId']) not in processed_nodes:
+                    nodes_data.append({
+                        'id': str(record['nodeId']),
+                        'label': record['nodeLabels'][0] if record['nodeLabels'] else 'Node',
+                        'properties': record['nodeProperties']
+                    })
+                    processed_nodes.add(str(record['nodeId']))
+                
+                # Add connected node and relationship if they exist
+                if record['connectedId'] is not None:
+                    if str(record['connectedId']) not in processed_nodes:
+                        nodes_data.append({
+                            'id': str(record['connectedId']),
+                            'label': record['connectedLabels'][0] if record['connectedLabels'] else 'Node',
+                            'properties': record['connectedProperties']
+                        })
+                        processed_nodes.add(str(record['connectedId']))
+                    
+                    relationships_data.append({
+                        'from': str(record['nodeId']),
+                        'to': str(record['connectedId']),
+                        'type': record['relationType']
+                    })
+            
+            return jsonify({
+                'nodes': nodes_data,
+                'relationships': relationships_data
+            })
+            
+    except Exception as e:
+        logging.error(f"Error in search_nodes: {str(e)}")
+        return jsonify({'error': str(e)}), 500
+
+
+
 # Error handlers
 @app.errorhandler(404)
 def not_found_error(error):
