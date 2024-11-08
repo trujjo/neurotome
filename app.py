@@ -20,16 +20,29 @@ def index():
 def get_graph():
     try:
         with driver.session() as session:
+            # Updated query to include x, y coordinates
             result = session.run("""
                 MATCH (n)
                 OPTIONAL MATCH (n)-[r]-(m)
-                RETURN collect(distinct n) as nodes, 
-                       collect(distinct r) as relationships
+                RETURN collect(distinct {
+                    id: id(n), 
+                    labels: labels(n), 
+                    properties: properties(n),
+                    x: n.x,
+                    y: n.y
+                }) as nodes, 
+                collect(distinct r) as relationships
             """)
             
             data = result.single()
-            nodes = [{"id": node.id, "labels": list(node.labels), 
-                     "properties": dict(node.items())} for node in data["nodes"]]
+            nodes = [{
+                "id": node["id"], 
+                "labels": node["labels"], 
+                "properties": node["properties"],
+                "x": node["x"],
+                "y": node["y"]
+            } for node in data["nodes"]]
+            
             rels = [{"source": rel.start_node.id, "target": rel.end_node.id, 
                     "type": rel.type} for rel in data["relationships"]]
             
@@ -51,13 +64,25 @@ def search():
                    OR any(label IN labels(n) WHERE toLower(label) CONTAINS $query)
                 WITH n
                 OPTIONAL MATCH (n)-[r]-(m)
-                RETURN collect(distinct n) as nodes, 
-                       collect(distinct r) as relationships
+                RETURN collect(distinct {
+                    id: id(n), 
+                    labels: labels(n), 
+                    properties: properties(n),
+                    x: n.x,
+                    y: n.y
+                }) as nodes, 
+                collect(distinct r) as relationships
             """, query=query)
             
             data = result.single()
-            nodes = [{"id": node.id, "labels": list(node.labels), 
-                     "properties": dict(node.items())} for node in data["nodes"]]
+            nodes = [{
+                "id": node["id"], 
+                "labels": node["labels"], 
+                "properties": node["properties"],
+                "x": node["x"],
+                "y": node["y"]
+            } for node in data["nodes"]]
+            
             rels = [{"source": rel.start_node.id, "target": rel.end_node.id, 
                     "type": rel.type} for rel in data["relationships"]]
             
