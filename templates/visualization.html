@@ -222,6 +222,109 @@
                 });
         }
 
+// Add this to your visualization.html
+
+<div id="location-filters">
+  <h4>Location</h4>
+  <div id="location-buttons"></div>
+  <h4>Sublocation</h4>
+  <div id="sublocation-buttons"></div>
+</div>
+
+<script>
+// Location-sublocation mapping
+const locationMap = {
+    'head': ['brain', 'eye', 'face', 'ear', 'nose', 'skull', 'mouth', 'head'],
+    'neck': ['cervical spine', 'visceral', 'vascular'],
+    'upper limb': ['wrist', 'hand', 'fingers', 'arm', 'forearm', 'elbow', 'shoulder'],
+    'thorax': ['thoracic spine', 'ribcage', 'heart', 'lung'],
+    'abdomen': ['lumbar spine', 'right upper quadrant', 'left upper quadrant', 'right lower quadrant', 'left lower quadrant'],
+    'spine': ['spinal cord', 'vertebral', 'tracts', 'sacral spine'],
+    'pelvis': ['sacral spine', 'greater pelvis', 'lesser pelvis'],
+    'lower limb': ['foot', 'thigh', 'knee', 'leg', 'ankle', 'toes']
+};
+
+// Create location buttons
+const locationButtons = document.getElementById('location-buttons');
+Object.keys(locationMap).forEach(location => {
+    const button = document.createElement('button');
+    button.className = 'filter-button';
+    button.textContent = location;
+    button.onclick = () => selectLocation(location);
+    locationButtons.appendChild(button);
+});
+
+let currentLocation = null;
+
+function selectLocation(location) {
+    currentLocation = location;
+    
+    // Update location button states
+    document.querySelectorAll('#location-buttons .filter-button').forEach(btn => {
+        btn.classList.toggle('active', btn.textContent === location);
+    });
+    
+    // Update sublocation buttons
+    updateSublocationButtons(location);
+    
+    // Filter graph based on location
+    filterByLocation(location);
+}
+
+function updateSublocationButtons(location) {
+    const sublocationButtons = document.getElementById('sublocation-buttons');
+    sublocationButtons.innerHTML = '';
+    
+    locationMap[location].forEach(sublocation => {
+        const button = document.createElement('button');
+        button.className = 'filter-button';
+        button.textContent = sublocation;
+        button.onclick = () => filterBySublocation(sublocation);
+        sublocationButtons.appendChild(button);
+    });
+}
+
+function filterByLocation(location) {
+    const filteredNodes = allNodes.filter(node => 
+        node.properties.location === location
+    );
+    const filteredRelationships = allRelationships.filter(rel =>
+        filteredNodes.some(n => n.id === rel.source) &&
+        filteredNodes.some(n => n.id === rel.target)
+    );
+    updateVisualization(filteredNodes, filteredRelationships);
+}
+
+function filterBySublocation(sublocation) {
+    document.querySelectorAll('#sublocation-buttons .filter-button').forEach(btn => {
+        btn.classList.toggle('active', btn.textContent === sublocation);
+    });
+    
+    const filteredNodes = allNodes.filter(node => 
+        node.properties.sublocation === sublocation
+    );
+    const filteredRelationships = allRelationships.filter(rel =>
+        filteredNodes.some(n => n.id === rel.source) &&
+        filteredNodes.some(n => n.id === rel.target)
+    );
+    updateVisualization(filteredNodes, filteredRelationships);
+}
+
+// Add CSS styles
+<style>
+.filter-button {
+    opacity: 1;
+    transition: opacity 0.3s;
+}
+
+.filter-button.disabled {
+    opacity: 0.5;
+    pointer-events: none;
+}
+</style>
+
+
+        
         // Search functionality
         const searchInput = document.getElementById('search-input');
         let searchTimeout;
