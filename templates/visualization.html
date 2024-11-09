@@ -82,6 +82,10 @@
             display: flex;
             align-items: center;
             justify-content: center;
+            transition: background-color 0.3s;
+        }
+        .zoom-button:hover {
+            background-color: #505050;
         }
         .node {
             transition: opacity 0.3s ease;
@@ -99,14 +103,10 @@
     </style>
 </head>
 <body>
-    <div id="search-container">
-        <input type="text" id="search-input" placeholder="Search nodes...">
-    </div>
-
     <div class="filter-section">
         <div class="filter-group">
             <div class="filter-label">Node Types</div>
-            <div id="type-buttons" class="button-container"></div>
+            <div id="node-type-buttons" class="button-container"></div>
         </div>
         
         <div class="filter-group">
@@ -154,6 +154,18 @@
 
         svg.call(zoom);
 
+        const initialScale = Math.min(
+            width / (xScale(180) - xScale(-180)),
+            height / (yScale(-90) - yScale(90))
+        ) * 0.9;
+
+        const initialTransform = d3.zoomIdentity
+            .translate(width / 2, height / 2)
+            .scale(initialScale)
+            .translate(-(xScale(0)), -(yScale(0)));
+
+        svg.call(zoom.transform, initialTransform);
+
         let allNodes = [];
         let allRelationships = [];
         let activeFilters = {
@@ -167,51 +179,69 @@
         }
 
         function zoomIn() {
-            svg.transition().duration(300).call(zoom.scaleBy, 1.5);
+            svg.transition()
+                .duration(300)
+                .call(zoom.scaleBy, 1.5);
         }
 
         function zoomOut() {
-            svg.transition().duration(300).call(zoom.scaleBy, 0.67);
+            svg.transition()
+                .duration(300)
+                .call(zoom.scaleBy, 0.75);
         }
 
-        function createButton(container, text, type) {
-            const button = document.createElement('button');
-            button.className = 'filter-button';
-            button.textContent = text;
-            button.addEventListener('click', () => toggleFilter(button, text, type));
-            container.appendChild(button);
-            return button;
-        }
-
-        function toggleFilter(button, value, type) {
-            button.classList.toggle('active');
-            if (button.classList.contains('active')) {
-                activeFilters[type].add(value);
-            } else {
-                activeFilters[type].delete(value);
-            }
-            updateNodeVisibility();
-        }
-
-        function initializeButtons() {
-            const typeContainer = document.getElementById('type-buttons');
-            const locationContainer = document.getElementById('location-buttons');
-            const sublocationContainer = document.getElementById('sublocation-buttons');
-
+        function initializeButtons(data) {
             // Clear existing buttons
-            typeContainer.innerHTML = '';
-            locationContainer.innerHTML = '';
-            sublocationContainer.innerHTML = '';
+            document.getElementById('node-type-buttons').innerHTML = '';
+            document.getElementById('location-buttons').innerHTML = '';
+            document.getElementById('sublocation-buttons').innerHTML = '';
 
-            // Get unique values
-            const types = new Set(allNodes.flatMap(node => node.labels));
-            const locations = new Set(allNodes.map(node => node.properties.location).filter(Boolean));
-            const sublocations = new Set(allNodes.map(node => node.properties.sublocation).filter(Boolean));
+            // Create buttons for node types
+            const nodeTypes = [...new Set(data.nodes.flatMap(node => node.labels))];
+            nodeTypes.forEach(type => {
+                const button = document.createElement('button');
+                button.className = 'filter-button';
+                button.textContent = type;
+                button.onclick = () => toggleFilter('types', type);
+                document.getElementById('node-type-buttons').appendChild(button);
+            });
 
-            // Create buttons
-            types.forEach(type => createButton(typeContainer, type, 'types'));
-            locations.forEach(location => createButton(locationContainer, location, 'locations'));
-            sublocations.forEach(sublocation => createButton(sublocationContainer, sublocation, 'sublocations'));
+            // Create buttons for locations
+            const locations = [...new Set(data.nodes
+                .map(node => node.properties.location)
+                .filter(location => location))];
+            locations.forEach(location => {
+                const button = document.createElement('button');
+                button.className = 'filter-button';
+                button.textContent = location;
+                button.onclick = () => toggleFilter('locations', location);
+                document.getElementById('location-buttons').appendChild(button);
+            });
+
+            // Create buttons for sublocations
+            const sublocations = [...new Set(data.nodes
+                .map(node => node.properties.sublocation)
+                .filter(sublocation => sublocation))];
+            sublocations.forEach(sublocation => {
+                const button = document.createElement('button');
+                button.className = 'filter-button';
+                button.textContent = sublocation;
+                button.onclick = () => toggleFilter('sublocations', sublocation);
+                document.getElementById('sublocation-buttons').appendChild(button);
+            });
+        }
+
+        function toggleFilter(filterType, value) {
+            const button = event.target;
+            button.classList.toggle('active');
+            
+            if (button.classList.contains('active')) {
+                activeFilters[filterType].add(value);
+            } else {
+                activeFilters[filterType].delete(value);
+            }
+            
+            updateNodeVisibility();
         }
 
         function updateNodeVisibility() {
@@ -223,10 +253,11 @@
                 const nodeLocation = d.properties.location;
                 const nodeSublocation = d.properties.sublocation;
 
-                const isVisible = (activeFilters.types.size === 0 || activeFilters.types.has(nodeType)) &&
-                                (activeFilters.locations.size === 0 || activeFilters.locations.has(nodeLocation)) &&
-                                (activeFilters.sublocations.size === 0 || activeFilters.sublocations.has(nodeSublocation));
-                
+                const isVisible = 
+                    (activeFilters.types.size === 0 || activeFilters.types.has(nodeType)) &&
+                    (activeFilters.locations.size === 0 || activeFilters.locations.has(nodeLocation)) &&
+                    (activeFilters.sublocations.size === 0 || activeFilters.sublocations.has(nodeSublocation));
+
                 d3.select(this).classed('hidden', !isVisible);
             });
 
@@ -270,6 +301,7 @@
                     const node = d3.select(this);
                     let fontSize = 14;
                     const maxWidth = 28;
+                    
                     while (this.getComputedTextLength() > maxWidth && fontSize > 6) {
                         fontSize--;
                         node.style('font-size', `${fontSize}px`);
@@ -301,37 +333,10 @@
             .then(data => {
                 allNodes = data.nodes;
                 allRelationships = data.relationships;
-                initializeButtons();
+                initializeButtons(data);
                 updateVisualization(allNodes, allRelationships);
             })
             .catch(error => console.error('Error:', error));
-
-        // Search functionality
-        const searchInput = document.getElementById('search-input');
-        let searchTimeout;
-
-        searchInput.addEventListener('input', function(e) {
-            const query = e.target.value.trim().toLowerCase();
-            
-            clearTimeout(searchTimeout);
-            searchTimeout = setTimeout(() => {
-                if (query.length < 3 && query.length > 0) {
-                    return;
-                }
-                
-                if (query.length === 0) {
-                    updateVisualization(allNodes, allRelationships);
-                    return;
-                }
-
-                fetch('/search?q=' + encodeURIComponent(query))
-                    .then(response => response.json())
-                    .then(data => {
-                        updateVisualization(data.nodes, data.relationships);
-                    })
-                    .catch(error => console.error('Error:', error));
-            }, 300);
-        });
     </script>
 </body>
 </html>
