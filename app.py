@@ -59,7 +59,6 @@ def search():
     query = request.args.get('q', '')
     
     with driver.session() as session:
-        # Search nodes based on properties
         result = session.run("""
             MATCH (n)
             WHERE any(prop in keys(n) WHERE toString(n[prop]) CONTAINS $query)
