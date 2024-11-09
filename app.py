@@ -1,5 +1,5 @@
-# Create improved app.py with proper label handling
-improved_code = """from flask import Flask, render_template, jsonify, request
+# Create improved app.py with proper Flask app export
+from flask import Flask, render_template, jsonify, request
 from neo4j import GraphDatabase
 import os
 import logging
@@ -8,6 +8,7 @@ import logging
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
+# Create Flask app instance - THIS NEEDS TO BE AT MODULE LEVEL
 app = Flask(__name__)
 
 # Neo4j connection configuration
@@ -39,7 +40,6 @@ def index():
 @app.route('/api/nodes/types')
 def get_node_types():
     try:
-        # Return the predefined valid labels instead of querying
         return jsonify(VALID_LABELS)
     except Exception as e:
         logger.error(f"Error fetching node types: {str(e)}")
@@ -80,15 +80,12 @@ def get_sublocations():
 @app.route('/api/graph/filtered')
 def get_filtered_graph():
     try:
-        # Get filter parameters
         node_types = request.args.getlist('nodeTypes[]')
         locations = request.args.getlist('locations[]')
         sublocations = request.args.getlist('sublocations[]')
         
-        # Validate node types against valid labels
         valid_node_types = [label for label in node_types if label in VALID_LABELS]
         
-        # Build the Cypher query
         query = '''
         MATCH (n)
         WHERE (size($nodeTypes) = 0 OR any(label IN labels(n) WHERE label IN $nodeTypes))
@@ -110,24 +107,20 @@ def get_filtered_graph():
             if not record:
                 return jsonify({"nodes": [], "relationships": []})
             
-            # Process nodes
             nodes = []
             nodes_set = set()
             for node in record['nodes']:
                 node_dict = dict(node)
-                # Use name as the primary identifier, fallback to neo4j internal id
                 node_id = node_dict.get('name', str(node.id))
                 if node_id not in nodes_set:
                     nodes_set.add(node_id)
                     node_dict['id'] = node_id
                     node_dict['labels'] = list(node.labels)
-                    # Include x, y coordinates if they exist
                     if 'x' in node_dict and 'y' in node_dict:
                         node_dict['x'] = float(node_dict['x'])
                         node_dict['y'] = float(node_dict['y'])
                     nodes.append(node_dict)
             
-            # Process relationships
             relationships = []
             for rel in record['rels']:
                 source_node = dict(rel.start_node)
@@ -161,18 +154,7 @@ def health_check():
         logger.error(f"Health check failed: {str(e)}")
         return jsonify({"status": "unhealthy", "error": str(e)}), 500
 
+# This ensures the app variable is available at the module level
 if __name__ == '__main__':
     port = int(os.getenv('PORT', 5000))
     app.run(host='0.0.0.0', port=port)
-"""
-
-with open('app.py', 'w') as f:
-    f.write(improved_code)
-
-print("Created improved app.py with the following updates:")
-print("1. Added predefined list of valid node labels")
-print("2. Improved node type filtering")
-print("3. Enhanced Cypher query to properly handle label filtering")
-print("4. Added proper handling of node coordinates")
-print("5. Improved node identification using name property")
-print("6. Added validation for node types against valid labels")
