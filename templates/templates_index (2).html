@@ -1,0 +1,32 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Neo4j Graph Visualization</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/styles.css') }}">
+    <script src="https://d3js.org/d3.v7.min.js"></script>
+</head>
+<body>
+    <div class="container">
+        <div class="sidebar">
+            <div class="filter-section">
+                <h3>Node Types</h3>
+                <div id="node-type-filters"></div>
+            </div>
+            <div class="filter-section">
+                <h3>Locations</h3>
+                <div id="location-filters"></div>
+            </div>
+        </div>
+        <div class="main-content">
+            <div id="graph-container"></div>
+            <div id="details-panel">
+                <h3>Details</h3>
+                <div id="node-details"></div>
+                <div id="relationship-details"></div>
+            </div>
+        </div>
+    </div>
+    <script src="{{ url_for('static', filename='js/visualization_config.js') }}"></script>
+    <script src="{{ url_for('static', filename='js/main.js') }}"></script>
+</body>
+</html>
