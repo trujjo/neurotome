@@ -12,11 +12,11 @@ const graphConfig = {
     // Color configuration
     nodeColor: d => {
         const colorMap = {
-            'Nerve': '#ff7f0e',
-            'Muscle': '#1f77b4',
-            'Bone': '#2ca02c',
-            'Region': '#d62728',
-            'Vessel': '#9467bd',
+            'nerve': '#ff7f0e',
+            'muscle': '#1f77b4',
+            'bone': '#2ca02c',
+            'region': '#d62728',
+            'vessel': '#9467bd',
             'default': '#7f7f7f'
         };
         return colorMap[d.labels[0]] || colorMap.default;
