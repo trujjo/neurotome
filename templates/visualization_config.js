@@ -131,7 +131,7 @@ class NeoViz {
         selectedLocations.forEach(location => params.append('locations[]', location));
         selectedSublocations.forEach(sublocation => params.append('sublocations[]', sublocation));
 
-        fetch(`/api/graph/filtered?${params.toString()}`)
+        fetch(`/api/graph/filtered?nodeTypes[]=nerve&nodeTypes[]=bone`)
             .then(response => response.json())
             .then(data => {
                 this.updateData(data.nodes, data.relationships);
