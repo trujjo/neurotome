@@ -9,6 +9,7 @@ uri = "neo4j+s://4e5eeae5.databases.neo4j.io"
 user = "neo4j"
 password = "Poconoco16!"
 
+# Create the driver
 driver = GraphDatabase.driver(uri, auth=(user, password))
 
 @app.route('/')
@@ -46,10 +47,13 @@ def filter_nodes():
     location = request.args.get('location')
     sublocation = request.args.get('sublocation')
     
+    if not location:
+        return jsonify({"error": "Location parameter is required"}), 400
+        
     try:
         with driver.session() as session:
             if sublocation:
-                result = session.run("""
+                query = """
                     MATCH (n)
                     WHERE n.location = $location AND n.sublocation = $sublocation
                     OPTIONAL MATCH (n)-[r]-(m)
@@ -62,9 +66,10 @@ def filter_nodes():
                         y: n.y
                     }) as nodes,
                     collect(distinct r) as relationships
-                """, location=location, sublocation=sublocation)
+                """
+                result = session.run(query, location=location, sublocation=sublocation)
             else:
-                result = session.run("""
+                query = """
                     MATCH (n)
                     WHERE n.location = $location
                     OPTIONAL MATCH (n)-[r]-(m)
@@ -77,7 +82,8 @@ def filter_nodes():
                         y: n.y
                     }) as nodes,
                     collect(distinct r) as relationships
-                """, location=location)
+                """
+                result = session.run(query, location=location)
             
             data = result.single()
             nodes = data["nodes"]
@@ -104,3 +110,22 @@ def search():
                 OPTIONAL MATCH (n)-[r]-(m)
                 RETURN collect(distinct {
                     id: id(n),
+                    labels: labels(n),
+                    properties: properties(n),
+                    x: n.x,
+                    y: n.y
+                }) as nodes,
+                collect(distinct r) as relationships
+            """, query=query)
+            
+            data = result.single()
+            nodes = data["nodes"]
+            rels = [{"source": rel.start_node.id, "target": rel.end_node.id, 
+                    "type": rel.type} for rel in data["relationships"]]
+            
+            return jsonify({"nodes": nodes, "relationships": rels})
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+if __name__ == '__main__':
+    app.run(debug=True)
