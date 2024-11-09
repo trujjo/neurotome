@@ -27,7 +27,6 @@ VALID_LABELS = [
 ]
 
 def get_neo4j_driver():
-    """Create and return a Neo4j driver instance."""
     try:
         driver = GraphDatabase.driver(
             NEO4J_URI,
@@ -46,13 +45,13 @@ def get_neo4j_driver():
 
 @app.route('/')
 def index():
-    """Render the main page."""
     return render_template('index.html')
 
 @app.route('/api/nodes/types')
 def get_node_types():
-    """Return the list of valid node types."""
     try:
+        # Log the request
+        logger.info("Fetching node types")
         return jsonify(VALID_LABELS)
     except Exception as e:
         logger.error(f"Error fetching node types: {str(e)}")
@@ -60,8 +59,9 @@ def get_node_types():
 
 @app.route('/api/nodes/locations')
 def get_locations():
-    """Fetch distinct locations from the database."""
     try:
+        # Log the request
+        logger.info("Fetching locations")
         with get_neo4j_driver().session() as session:
             result = session.run('''
                 MATCH (n)
@@ -70,6 +70,7 @@ def get_locations():
                 ORDER BY location
             ''')
             locations = [record['location'] for record in result if record['location']]
+            logger.info(f"Found {len(locations)} locations")
             return jsonify(locations)
     except exceptions.ServiceUnavailable as e:
         logger.error(f"Database connection error: {str(e)}")
@@ -80,8 +81,9 @@ def get_locations():
 
 @app.route('/api/nodes/sublocations')
 def get_sublocations():
-    """Fetch distinct sublocations from the database."""
     try:
+        # Log the request
+        logger.info("Fetching sublocations")
         with get_neo4j_driver().session() as session:
             result = session.run('''
                 MATCH (n)
@@ -90,6 +92,7 @@ def get_sublocations():
                 ORDER BY sublocation
             ''')
             sublocations = [record['sublocation'] for record in result if record['sublocation']]
+            logger.info(f"Found {len(sublocations)} sublocations")
             return jsonify(sublocations)
     except exceptions.ServiceUnavailable as e:
         logger.error(f"Database connection error: {str(e)}")
@@ -100,28 +103,32 @@ def get_sublocations():
 
 @app.route('/api/graph/filtered')
 def get_filtered_graph():
-    """Fetch filtered graph data based on selected criteria."""
     try:
         # Get filter parameters
         node_types = request.args.getlist('nodeTypes[]')
         locations = request.args.getlist('locations[]')
         sublocations = request.args.getlist('sublocations[]')
 
+        # Log the received filters
+        logger.info(f"Received filters - Node Types: {node_types}, Locations: {locations}, Sublocations: {sublocations}")
+
         # Validate node types
         if node_types and any(node_type not in VALID_LABELS for node_type in node_types):
+            logger.error("Invalid node type provided")
             return jsonify({"error": "Invalid node type provided"}), 400
 
-        # Build the Cypher query dynamically
+        # Build the Cypher query
         query_parts = []
         where_conditions = []
         params = {}
 
-        # Base MATCH clause
+        # Start with base MATCH clause
+        query_parts.append("MATCH (n)")
+
+        # Add label filter if node types are specified
         if node_types:
-            query_parts.append("MATCH (n) WHERE any(label IN labels(n) WHERE label IN $nodeTypes)")
+            where_conditions.append("any(label IN labels(n) WHERE label IN $nodeTypes)")
             params['nodeTypes'] = node_types
-        else:
-            query_parts.append("MATCH (n)")
 
         # Add location filters
         if locations:
@@ -132,25 +139,31 @@ def get_filtered_graph():
             where_conditions.append("n.sublocation IN $sublocations")
             params['sublocations'] = sublocations
 
-        # Combine WHERE conditions
+        # Combine WHERE conditions if any exist
         if where_conditions:
-            query_parts.append("AND " + " AND ".join(where_conditions))
+            query_parts.append("WHERE " + " AND ".join(where_conditions))
 
-        # Add relationship pattern
-        query_parts.append("""
-        WITH COLLECT(n) as nodes
-        UNWIND nodes as n
-        MATCH (n)-[r]-(m)
-        WHERE m IN nodes
-        RETURN COLLECT(DISTINCT n) as nodes, COLLECT(DISTINCT r) as rels
-        """)
+        # Add relationship pattern and return statement
+        query_parts.extend([
+            "WITH COLLECT(n) as nodes",
+            "UNWIND nodes as n",
+            "OPTIONAL MATCH (n)-[r]-(m)",
+            "WHERE m IN nodes",
+            "RETURN COLLECT(DISTINCT n) as nodes, COLLECT(DISTINCT r) as rels"
+        ])
+
+        # Combine query parts
+        final_query = " ".join(query_parts)
+        logger.info(f"Executing query: {final_query}")
+        logger.info(f"With parameters: {params}")
 
         # Execute query
         with get_neo4j_driver().session() as session:
-            result = session.run(" ".join(query_parts), params)
+            result = session.run(final_query, params)
             record = result.single()
 
             if not record:
+                logger.info("No results found")
                 return jsonify({"nodes": [], "relationships": []})
 
             # Process nodes
@@ -165,40 +178,39 @@ def get_filtered_graph():
                     node_dict['id'] = node_id
                     node_dict['labels'] = list(node.labels)
                     
-                    # Safely convert coordinates to float if they exist
-                    if 'x' in node_dict:
-                        try:
-                            node_dict['x'] = float(node_dict['x'])
-                        except (ValueError, TypeError):
-                            node_dict['x'] = 0.0
+                    # Safely convert coordinates
+                    for coord in ['x', 'y']:
+                        if coord in node_dict:
+                            try:
+                                node_dict[coord] = float(node_dict[coord])
+                            except (ValueError, TypeError):
+                                node_dict[coord] = 0.0
                     
-                    if 'y' in node_dict:
-                        try:
-                            node_dict['y'] = float(node_dict['y'])
-                        except (ValueError, TypeError):
-                            node_dict['y'] = 0.0
-                            
                     nodes.append(node_dict)
 
             # Process relationships
             relationships = []
             for rel in record['rels']:
-                source_node = dict(rel.start_node)
-                target_node = dict(rel.end_node)
-                source_id = source_node.get('name', str(rel.start_node.id))
-                target_id = target_node.get('name', str(rel.end_node.id))
+                if rel is not None:  # Check if relationship exists
+                    source_node = dict(rel.start_node)
+                    target_node = dict(rel.end_node)
+                    source_id = source_node.get('name', str(rel.start_node.id))
+                    target_id = target_node.get('name', str(rel.end_node.id))
 
-                relationships.append({
-                    'source': source_id,
-                    'target': target_id,
-                    'type': rel.type,
-                    'properties': dict(rel)
-                })
+                    relationships.append({
+                        'source': source_id,
+                        'target': target_id,
+                        'type': rel.type,
+                        'properties': dict(rel)
+                    })
 
-            return jsonify({
+            response_data = {
                 'nodes': nodes,
                 'relationships': relationships
-            })
+            }
+            
+            logger.info(f"Returning {len(nodes)} nodes and {len(relationships)} relationships")
+            return jsonify(response_data)
 
     except exceptions.ServiceUnavailable as e:
         logger.error(f"Database connection error: {str(e)}")
@@ -209,7 +221,6 @@ def get_filtered_graph():
 
 @app.route('/health')
 def health_check():
-    """Perform a health check of the application and database connection."""
     try:
         with get_neo4j_driver().session() as session:
             session.run("RETURN 1")
