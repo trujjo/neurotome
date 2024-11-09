@@ -4,12 +4,11 @@ import os
 
 app = Flask(__name__)
 
-# Neo4j connection settings - using the repository variables directly
+# Neo4j connection settings
 uri = "neo4j+s://4e5eeae5.databases.neo4j.io"
 user = "neo4j"
 password = "Poconoco16!"
 
-# Create the driver
 driver = GraphDatabase.driver(uri, auth=(user, password))
 
 @app.route('/')
@@ -20,29 +19,68 @@ def index():
 def get_graph():
     try:
         with driver.session() as session:
-            # Updated query to include x, y coordinates
             result = session.run("""
                 MATCH (n)
                 OPTIONAL MATCH (n)-[r]-(m)
                 RETURN collect(distinct {
-                    id: id(n), 
-                    labels: labels(n), 
+                    id: id(n),
+                    labels: labels(n),
                     properties: properties(n),
                     x: n.x,
                     y: n.y
-                }) as nodes, 
+                }) as nodes,
                 collect(distinct r) as relationships
             """)
             
             data = result.single()
-            nodes = [{
-                "id": node["id"], 
-                "labels": node["labels"], 
-                "properties": node["properties"],
-                "x": node["x"],
-                "y": node["y"]
-            } for node in data["nodes"]]
+            nodes = data["nodes"]
+            rels = [{"source": rel.start_node.id, "target": rel.end_node.id, 
+                    "type": rel.type} for rel in data["relationships"]]
             
+            return jsonify({"nodes": nodes, "relationships": rels})
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+@app.route('/filter')
+def filter_nodes():
+    location = request.args.get('location')
+    sublocation = request.args.get('sublocation')
+    
+    try:
+        with driver.session() as session:
+            if sublocation:
+                result = session.run("""
+                    MATCH (n)
+                    WHERE n.location = $location AND n.sublocation = $sublocation
+                    OPTIONAL MATCH (n)-[r]-(m)
+                    WHERE m.location = $location
+                    RETURN collect(distinct {
+                        id: id(n),
+                        labels: labels(n),
+                        properties: properties(n),
+                        x: n.x,
+                        y: n.y
+                    }) as nodes,
+                    collect(distinct r) as relationships
+                """, location=location, sublocation=sublocation)
+            else:
+                result = session.run("""
+                    MATCH (n)
+                    WHERE n.location = $location
+                    OPTIONAL MATCH (n)-[r]-(m)
+                    WHERE m.location = $location
+                    RETURN collect(distinct {
+                        id: id(n),
+                        labels: labels(n),
+                        properties: properties(n),
+                        x: n.x,
+                        y: n.y
+                    }) as nodes,
+                    collect(distinct r) as relationships
+                """, location=location)
+            
+            data = result.single()
+            nodes = data["nodes"]
             rels = [{"source": rel.start_node.id, "target": rel.end_node.id, 
                     "type": rel.type} for rel in data["relationships"]]
             
@@ -65,30 +103,4 @@ def search():
                 WITH n
                 OPTIONAL MATCH (n)-[r]-(m)
                 RETURN collect(distinct {
-                    id: id(n), 
-                    labels: labels(n), 
-                    properties: properties(n),
-                    x: n.x,
-                    y: n.y
-                }) as nodes, 
-                collect(distinct r) as relationships
-            """, query=query)
-            
-            data = result.single()
-            nodes = [{
-                "id": node["id"], 
-                "labels": node["labels"], 
-                "properties": node["properties"],
-                "x": node["x"],
-                "y": node["y"]
-            } for node in data["nodes"]]
-            
-            rels = [{"source": rel.start_node.id, "target": rel.end_node.id, 
-                    "type": rel.type} for rel in data["relationships"]]
-            
-            return jsonify({"nodes": nodes, "relationships": rels})
-    except Exception as e:
-        return jsonify({"error": str(e)}), 500
-
-if __name__ == '__main__':
-    app.run(debug=True)
+                    id: id(n),
