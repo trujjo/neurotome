@@ -1,3 +1,4 @@
+# Create updated app.py with fixes and new endpoints
 from flask import Flask, render_template, jsonify, request
 from neo4j import GraphDatabase
 import os
@@ -18,6 +19,42 @@ def get_neo4j_driver():
 @app.route('/')
 def index():
     return render_template('index.html')
+
+@app.route('/api/nodes/types')
+def get_node_types():
+    with get_neo4j_driver().session() as session:
+        result = session.run('''
+            MATCH (n)
+            UNWIND labels(n) as label
+            RETURN DISTINCT label
+            ORDER BY label
+        ''')
+        types = [record['label'] for record in result]
+        return jsonify(types)
+
+@app.route('/api/nodes/locations')
+def get_locations():
+    with get_neo4j_driver().session() as session:
+        result = session.run('''
+            MATCH (n)
+            WHERE exists(n.location)
+            RETURN DISTINCT n.location as location
+            ORDER BY location
+        ''')
+        locations = [record['location'] for record in result]
+        return jsonify(locations)
+
+@app.route('/api/nodes/sublocations')
+def get_sublocations():
+    with get_neo4j_driver().session() as session:
+        result = session.run('''
+            MATCH (n)
+            WHERE exists(n.sublocation)
+            RETURN DISTINCT n.sublocation as sublocation
+            ORDER BY sublocation
+        ''')
+        sublocations = [record['sublocation'] for record in result]
+        return jsonify(sublocations)
 
 @app.route('/api/nodes/by-type/<node_type>')
 def get_nodes_by_type(node_type):
@@ -55,41 +92,59 @@ def get_relationships():
 def get_filtered_graph():
     node_types = request.args.getlist('nodeTypes[]')
     locations = request.args.getlist('locations[]')
+    sublocations = request.args.getlist('sublocations[]')
     
-    # Updated query to handle node properties and relationships better
     query = '''
-    MATCH (n)
-    WHERE (size($nodeTypes) = 0 OR any(label IN labels(n) WHERE label IN $nodeTypes))
-    AND (size($locations) = 0 OR n.location IN $locations)
-    WITH collect(distinct n) as nodes
-    MATCH (n1)-[r]->(n2)
-    WHERE n1 IN nodes AND n2 IN nodes
-    RETURN {
-        nodes: [node IN nodes | {
-            id: id(node),
-            labels: labels(node),
-            properties: properties(node),
-            name: coalesce(node.name, head(labels(node))),
-            type: head(labels(node))
-        }],
-        relationships: [{
-            id: id(r),
-            source: id(startNode(r)),
-            target: id(endNode(r)),
-            type: type(r),
-            properties: properties(r)
-        } | r in collect(distinct r)]
-    } as graph
+    MATCH (n)-[r]->(m)
+    WHERE 
+        (size($nodeTypes) = 0 OR any(label IN labels(n) WHERE label IN $nodeTypes))
+        AND (size($locations) = 0 OR n.location IN $locations)
+        AND (size($sublocations) = 0 OR n.sublocation IN $sublocations)
+    RETURN n, r, m
     '''
     
     with get_neo4j_driver().session() as session:
-        try:
-            result = session.run(query, nodeTypes=node_types, locations=locations)
-            graph_data = result.single()['graph']
-            return jsonify(graph_data)
-        except Exception as e:
-            print(f"Error executing query: {str(e)}")
-            return jsonify({'error': str(e)}), 500
+        result = session.run(query, 
+                           nodeTypes=node_types,
+                           locations=locations,
+                           sublocations=sublocations)
+        
+        nodes = []
+        relationships = []
+        nodes_set = set()
+
+        for record in result:
+            # Process source node
+            source = dict(record['n'])
+            source_id = source.get('id', str(id(source)))
+            if source_id not in nodes_set:
+                nodes_set.add(source_id)
+                source['id'] = source_id
+                source['labels'] = list(record['n'].labels)
+                nodes.append(source)
+
+            # Process target node
+            target = dict(record['m'])
+            target_id = target.get('id', str(id(target)))
+            if target_id not in nodes_set:
+                nodes_set.add(target_id)
+                target['id'] = target_id
+                target['labels'] = list(record['m'].labels)
+                nodes.append(target)
+
+            # Process relationship
+            rel = {
+                'source': source_id,
+                'target': target_id,
+                'type': type(record['r']).__name__,
+                'properties': dict(record['r'])
+            }
+            relationships.append(rel)
+
+        return jsonify({
+            'nodes': nodes,
+            'relationships': relationships
+        })
 
 @app.route('/health')
 def health_check():
@@ -98,3 +153,12 @@ def health_check():
 if __name__ == '__main__':
     port = int(os.environ.get('PORT', 5000))
     app.run(host='0.0.0.0', port=port, debug=True)
+
+
+with open('app.py', 'w') as f:
+    f.write(updated_code)
+
+print("Updated app.py has been created with the following changes:")
+print("1. Added new endpoints for populating filters (/api/nodes/types, /api/nodes/locations, /api/nodes/sublocations)")
+print("2. Removed duplicate implementation of get_filtered_graph()")
+print("3. Organized imports and routes more cleanly")
