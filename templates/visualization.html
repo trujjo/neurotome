@@ -35,11 +35,12 @@
             color: #888;
             margin-bottom: 8px;
             font-weight: bold;
+            font-size: 16px;
         }
-        #node-type-buttons, #location-buttons, #sublocation-buttons {
+        .button-container {
             display: flex;
-            gap: 10px;
             flex-wrap: wrap;
+            gap: 10px;
             margin: 10px 0;
         }
         .filter-button {
@@ -51,7 +52,7 @@
             cursor: pointer;
             transition: all 0.3s ease;
             text-transform: lowercase;
-            margin: 4px;
+            font-size: 14px;
         }
         .filter-button:hover {
             background-color: #505050;
@@ -91,20 +92,19 @@
             display: flex;
             align-items: center;
             justify-content: center;
-            transition: background-color 0.3s;
         }
         .zoom-button:hover {
             background-color: #505050;
         }
         .node {
-            transition: opacity 0.3s ease;
+            transition: opacity 0.3s;
         }
         .node.hidden {
             opacity: 0;
             pointer-events: none;
         }
         .link {
-            transition: opacity 0.3s ease;
+            transition: opacity 0.3s;
         }
         .link.hidden {
             opacity: 0;
@@ -113,23 +113,23 @@
 </head>
 <body>
     <div id="search-container">
-        <input type="text" id="search-input" placeholder="search nodes...">
+        <input type="text" id="search-input" placeholder="Search nodes...">
     </div>
 
     <div class="filter-section">
         <div class="filter-group">
             <div class="filter-label">Node Types</div>
-            <div id="node-type-buttons"></div>
+            <div id="node-type-buttons" class="button-container"></div>
         </div>
         
         <div class="filter-group">
             <div class="filter-label">Locations</div>
-            <div id="location-buttons"></div>
+            <div id="location-buttons" class="button-container"></div>
         </div>
         
         <div class="filter-group">
             <div class="filter-label">Sublocations</div>
-            <div id="sublocation-buttons"></div>
+            <div id="sublocation-buttons" class="button-container"></div>
         </div>
     </div>
 
@@ -167,32 +167,16 @@
 
         svg.call(zoom);
 
-        const initialScale = Math.min(
-            width / (xScale(180) - xScale(-180)),
-            height / (yScale(-90) - yScale(90))
-        ) * 0.9;
-
-        const initialTransform = d3.zoomIdentity
-            .translate(width / 2, height / 2)
-            .scale(initialScale)
-            .translate(-(xScale(0)), -(yScale(0)));
-
-        svg.call(zoom.transform, initialTransform);
-
         function zoomed() {
             g.attr('transform', d3.event.transform);
         }
 
         function zoomIn() {
-            svg.transition()
-                .duration(300)
-                .call(zoom.scaleBy, 1.5);
+            svg.transition().duration(300).call(zoom.scaleBy, 1.5);
         }
 
         function zoomOut() {
-            svg.transition()
-                .duration(300)
-                .call(zoom.scaleBy, 0.67);
+            svg.transition().duration(300).call(zoom.scaleBy, 0.67);
         }
 
         let allNodes = [];
@@ -205,93 +189,72 @@
 
         function initializeButtons() {
             // Get unique values
-            const nodeTypes = [...new Set(allNodes.map(node => node.labels[0]))];
-            const locations = [...new Set(allNodes.map(node => node.properties.location).filter(Boolean))];
-            const sublocations = [...new Set(allNodes.map(node => node.properties.sublocation).filter(Boolean))];
+            const nodeTypes = [...new Set(allNodes.map(n => n.labels[0]))];
+            const locations = [...new Set(allNodes.map(n => n.properties.location).filter(Boolean))];
+            const sublocations = [...new Set(allNodes.map(n => n.properties.sublocation).filter(Boolean))];
 
             // Create buttons for each type
-            const typeButtons = d3.select('#node-type-buttons')
-                .selectAll('button')
-                .data(nodeTypes)
-                .enter()
-                .append('button')
-                .attr('class', 'filter-button')
-                .text(d => d)
-                .on('click', toggleTypeFilter);
+            const typeContainer = document.getElementById('node-type-buttons');
+            nodeTypes.forEach(type => {
+                const button = document.createElement('button');
+                button.className = 'filter-button';
+                button.textContent = type;
+                button.onclick = () => toggleFilter('types', type);
+                typeContainer.appendChild(button);
+            });
 
             // Create buttons for locations
-            const locationButtons = d3.select('#location-buttons')
-                .selectAll('button')
-                .data(locations)
-                .enter()
-                .append('button')
-                .attr('class', 'filter-button')
-                .text(d => d)
-                .on('click', toggleLocationFilter);
+            const locationContainer = document.getElementById('location-buttons');
+            locations.forEach(location => {
+                const button = document.createElement('button');
+                button.className = 'filter-button';
+                button.textContent = location;
+                button.onclick = () => toggleFilter('locations', location);
+                locationContainer.appendChild(button);
+            });
 
             // Create buttons for sublocations
-            const sublocationButtons = d3.select('#sublocation-buttons')
-                .selectAll('button')
-                .data(sublocations)
-                .enter()
-                .append('button')
-                .attr('class', 'filter-button')
-                .text(d => d)
-                .on('click', toggleSublocationFilter);
+            const sublocationContainer = document.getElementById('sublocation-buttons');
+            sublocations.forEach(sublocation => {
+                const button = document.createElement('button');
+                button.className = 'filter-button';
+                button.textContent = sublocation;
+                button.onclick = () => toggleFilter('sublocations', sublocation);
+                sublocationContainer.appendChild(button);
+            });
         }
 
-        function toggleTypeFilter(type) {
-            const button = d3.select(this);
-            if (activeFilters.types.has(type)) {
-                activeFilters.types.delete(type);
-                button.classed('active', false);
+        function toggleFilter(filterType, value) {
+            const filterSet = activeFilters[filterType];
+            const button = event.target;
+            
+            if (filterSet.has(value)) {
+                filterSet.delete(value);
+                button.classList.remove('active');
             } else {
-                activeFilters.types.add(type);
-                button.classed('active', true);
+                filterSet.add(value);
+                button.classList.add('active');
             }
-            updateNodeVisibility();
-        }
-
-        function toggleLocationFilter(location) {
-            const button = d3.select(this);
-            if (activeFilters.locations.has(location)) {
-                activeFilters.locations.delete(location);
-                button.classed('active', false);
-            } else {
-                activeFilters.locations.add(location);
-                button.classed('active', true);
-            }
-            updateNodeVisibility();
-        }
-
-        function toggleSublocationFilter(sublocation) {
-            const button = d3.select(this);
-            if (activeFilters.sublocations.has(sublocation)) {
-                activeFilters.sublocations.delete(sublocation);
-                button.classed('active', false);
-            } else {
-                activeFilters.sublocations.add(sublocation);
-                button.classed('active', true);
-            }
+            
             updateNodeVisibility();
         }
 
         function updateNodeVisibility() {
             const nodes = d3.selectAll('.node');
             const links = d3.selectAll('.link');
-
+            
             nodes.each(function(d) {
                 const nodeType = d.labels[0];
                 const nodeLocation = d.properties.location;
                 const nodeSublocation = d.properties.sublocation;
-
+                
                 const isVisible = (activeFilters.types.size === 0 || activeFilters.types.has(nodeType)) &&
                                 (activeFilters.locations.size === 0 || activeFilters.locations.has(nodeLocation)) &&
                                 (activeFilters.sublocations.size === 0 || activeFilters.sublocations.has(nodeSublocation));
                 
                 d3.select(this).classed('hidden', !isVisible);
             });
-
+            
             links.each(function(d) {
                 const sourceVisible = !d3.select(`.node[data-id="${d.source}"]`).classed('hidden');
                 const targetVisible = !d3.select(`.node[data-id="${d.target}"]`).classed('hidden');
@@ -342,6 +305,8 @@
                 .style('text-anchor', 'middle')
                 .style('dominant-baseline', 'middle')
                 .style('pointer-events', 'none');
+
+            updateNodeVisibility();
         }
 
         function getNodeColor(label) {
@@ -377,4 +342,21 @@
                     .then(response => response.json())
                     .then(data => {
                         updateVisualization(data.nodes, data.relationships);
-                
+                    })
+                    .catch(error => console.error('Error:', error));
+            }, 300);
+        });
+
+        // Initial load
+        fetch('/graph')
+            .then(response => response.json())
+            .then(data => {
+                allNodes = data.nodes;
+                allRelationships = data.relationships;
+                initializeButtons();
+                updateVisualization(allNodes, allRelationships);
+            })
+            .catch(error => console.error('Error:', error));
+    </script>
+</body>
+</html>
