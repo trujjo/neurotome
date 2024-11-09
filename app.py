@@ -56,34 +56,45 @@ def get_filtered_graph():
     node_types = request.args.getlist('nodeTypes[]')
     locations = request.args.getlist('locations[]')
     
+    # Updated query to handle node properties and relationships better
     query = '''
     MATCH (n)
     WHERE (size($nodeTypes) = 0 OR any(label IN labels(n) WHERE label IN $nodeTypes))
     AND (size($locations) = 0 OR n.location IN $locations)
-    OPTIONAL MATCH (n)-[r]->(m)
-    WHERE (size($nodeTypes) = 0 OR any(label IN labels(m) WHERE label IN $nodeTypes))
-    AND (size($locations) = 0 OR m.location IN $locations)
-    RETURN collect(distinct {
-        id: id(n),
-        labels: labels(n),
-        properties: properties(n)
-    }) as nodes,
-    collect(distinct {
-        source: id(startNode(r)),
-        target: id(endNode(r)),
-        type: type(r),
-        properties: properties(r)
-    }) as relationships
+    WITH collect(distinct n) as nodes
+    MATCH (n1)-[r]->(n2)
+    WHERE n1 IN nodes AND n2 IN nodes
+    RETURN {
+        nodes: [node IN nodes | {
+            id: id(node),
+            labels: labels(node),
+            properties: properties(node),
+            name: coalesce(node.name, head(labels(node))),
+            type: head(labels(node))
+        }],
+        relationships: [{
+            id: id(r),
+            source: id(startNode(r)),
+            target: id(endNode(r)),
+            type: type(r),
+            properties: properties(r)
+        } | r in collect(distinct r)]
+    } as graph
     '''
     
     with get_neo4j_driver().session() as session:
-        result = session.run(query, nodeTypes=node_types, locations=locations)
-        graph_data = result.single()
-        return jsonify({
-            'nodes': graph_data['nodes'],
-            'relationships': graph_data['relationships']
-        })
+        try:
+            result = session.run(query, nodeTypes=node_types, locations=locations)
+            graph_data = result.single()['graph']
+            return jsonify(graph_data)
+        except Exception as e:
+            print(f"Error executing query: {str(e)}")
+            return jsonify({'error': str(e)}), 500
+
+@app.route('/health')
+def health_check():
+    return jsonify({"status": "healthy"})
 
 if __name__ == '__main__':
     port = int(os.environ.get('PORT', 5000))
-    app.run(host='0.0.0.0', port=port)
+    app.run(host='0.0.0.0', port=port, debug=True)
