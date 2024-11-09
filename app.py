@@ -1,81 +1,14 @@
 from flask import Flask, render_template, jsonify, request
 from neo4j import GraphDatabase
-import os
-from dotenv import load_dotenv
-
-load_dotenv()
 
 app = Flask(__name__)
 
+# Hardcoded Neo4j credentials
 uri = os.getenv("NEO4J_URI")
 user = os.getenv("NEO4J_USER")
 password = os.getenv("NEO4J_PASSWORD")
 
 driver = GraphDatabase.driver(uri, auth=(user, password))
-
-def get_graph_data():
-    with driver.session() as session:
-        # Query to get nodes with their properties and labels
-        nodes_query = """
-        MATCH (n)
-        RETURN 
-            id(n) as id, 
-            labels(n) as labels, 
-            properties(n) as properties,
-            CASE
-                WHEN exists(n.x) THEN n.x
-                ELSE 0
-            END as x,
-            CASE
-                WHEN exists(n.y) THEN n.y
-                ELSE 0
-            END as y
-        """
-        
-        # Query to get relationships
-        rels_query = """
-        MATCH (a)-[r]->(b)
-        RETURN id(a) as source, id(b) as target, type(r) as type
-        """
-        
-        # Execute queries
-        nodes_result = session.run(nodes_query)
-        rels_result = session.run(rels_query)
-        
-        # Process nodes
-        nodes = []
-        for record in nodes_result:
-            node = {
-                "id": record["id"],
-                "labels": record["labels"],
-                "properties": record["properties"],
-                "x": record["x"],
-                "y": record["y"]
-            }
-            nodes.append(node)
-        
-        # Process relationships
-        relationships = []
-        for record in rels_result:
-            rel = {
-                "source": record["source"],
-                "target": record["target"],
-                "type": record["type"]
-            }
-            relationships.append(rel)
-        
-        # Get unique node types, locations, and sublocations
-        node_types = list(set([label for node in nodes for label in node["labels"]]))
-        locations = list(set([node["properties"].get("location", "") for node in nodes if "location" in node["properties"]]))
-        sublocations = list(set([node["properties"].get("sublocation", "") for node in nodes if "sublocation" in node["properties"]]))
-        
-        return {
-            "nodes": nodes,
-            "relationships": relationships,
-            "nodeTypes": node_types,
-            "locations": locations,
-            "sublocations": sublocations
-        }
 
 @app.route('/')
 def index():
@@ -83,48 +16,130 @@ def index():
 
 @app.route('/graph')
 def get_graph():
-    try:
-        data = get_graph_data()
-        return jsonify(data)
-    except Exception as e:
-        return jsonify({"error": str(e)}), 500
+    with driver.session() as session:
+        # Get nodes, relationships, and metadata for filters
+        result = session.run("""
+            MATCH (n)
+            OPTIONAL MATCH (n)-[r]->(m)
+            WITH n, r, m
+            RETURN {
+                nodes: collect(distinct {
+                    id: id(n),
+                    labels: labels(n),
+                    properties: properties(n),
+                    x: coalesce(n.x, 0),
+                    y: coalesce(n.y, 0)
+                }),
+                relationships: collect(distinct {
+                    source: id(startNode(r)),
+                    target: id(endNode(r)),
+                    type: type(r)
+                }) WHERE r IS NOT NULL,
+                nodeTypes: collect(distinct labels(n)[0]),
+                locations: collect(distinct n.location),
+                sublocations: collect(distinct n.sublocation)
+            }
+        """)
+        
+        data = result.single()
+        
+        # Clean up the data
+        cleaned_data = {
+            'nodes': [node for node in data[0]['nodes'] if node['id'] is not None],
+            'relationships': [rel for rel in data[0]['relationships'] if rel['source'] is not None and rel['target'] is not None],
+            'nodeTypes': [t for t in data[0]['nodeTypes'] if t is not None],
+            'locations': [l for l in data[0]['locations'] if l is not None],
+            'sublocations': [s for s in data[0]['sublocations'] if s is not None]
+        }
+        
+        return jsonify(cleaned_data)
 
 @app.route('/search')
 def search():
-    query = request.args.get('q', '').lower()
+    query = request.args.get('q', '')
     
     with driver.session() as session:
-        # Search query
-        search_query = """
-        MATCH (n)
-        WHERE toLower(n.name) CONTAINS $query
-        OR toLower(n.description) CONTAINS $query
-        WITH n
-        OPTIONAL MATCH (n)-[r]-(m)
-        RETURN 
-            collect(distinct {
+        # Search nodes based on properties
+        result = session.run("""
+            MATCH (n)
+            WHERE any(prop in keys(n) WHERE toString(n[prop]) CONTAINS $query)
+            OPTIONAL MATCH (n)-[r]->(m)
+            WHERE any(prop in keys(m) WHERE toString(m[prop]) CONTAINS $query)
+            RETURN {
+                nodes: collect(distinct {
+                    id: id(n),
+                    labels: labels(n),
+                    properties: properties(n),
+                    x: coalesce(n.x, 0),
+                    y: coalesce(n.y, 0)
+                }),
+                relationships: collect(distinct {
+                    source: id(startNode(r)),
+                    target: id(endNode(r)),
+                    type: type(r)
+                }) WHERE r IS NOT NULL
+            }
+        """, query=query)
+        
+        data = result.single()
+        return jsonify(data[0])
+
+@app.route('/update_layout', methods=['POST'])
+def update_layout():
+    data = request.json
+    node_id = data.get('id')
+    x = data.get('x', 0)
+    y = data.get('y', 0)
+    
+    with driver.session() as session:
+        session.run("""
+            MATCH (n)
+            WHERE id(n) = $id
+            SET n.x = $x, n.y = $y
+        """, id=node_id, x=x, y=y)
+    
+    return jsonify({'status': 'success'})
+
+@app.route('/node_info/<node_id>')
+def node_info(node_id):
+    with driver.session() as session:
+        result = session.run("""
+            MATCH (n)
+            WHERE id(n) = $id
+            RETURN {
                 id: id(n),
                 labels: labels(n),
-                properties: properties(n),
-                x: CASE WHEN exists(n.x) THEN n.x ELSE 0 END,
-                y: CASE WHEN exists(n.y) THEN n.y ELSE 0 END
-            }) as nodes,
-            collect(distinct {
-                source: id(startNode(r)),
-                target: id(endNode(r)),
-                type: type(r)
-            }) as relationships
-        """
+                properties: properties(n)
+            } as node
+        """, id=int(node_id))
         
-        result = session.run(search_query, query=query)
-        record = result.single()
+        node = result.single()
+        return jsonify(node[0])
+
+@app.route('/neighbors/<node_id>')
+def get_neighbors(node_id):
+    with driver.session() as session:
+        result = session.run("""
+            MATCH (n)-[r]-(m)
+            WHERE id(n) = $id
+            RETURN {
+                nodes: collect(distinct {
+                    id: id(m),
+                    labels: labels(m),
+                    properties: properties(m),
+                    x: coalesce(m.x, 0),
+                    y: coalesce(m.y, 0)
+                }),
+                relationships: collect({
+                    source: id(startNode(r)),
+                    target: id(endNode(r)),
+                    type: type(r)
+                })
+            }
+        """, id=int(node_id))
         
-        if record:
-            return jsonify({
-                "nodes": record["nodes"],
-                "relationships": record["relationships"]
-            })
-        return jsonify({"nodes": [], "relationships": []})
+        data = result.single()
+        return jsonify(data[0])
 
 if __name__ == '__main__':
     app.run(debug=True)
