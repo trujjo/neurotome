@@ -5,315 +5,143 @@
     <script src="https://unpkg.com/neo4j-driver@5.15.0"></script>
     <script src="https://d3js.org/d3.v5.min.js"></script>
     <style>
-        body {
-            margin: 0;
-            padding: 20px;
-            background-color: #1a1a1a;
-            color: white;
-            font-family: Arial, sans-serif;
-            text-transform: lowercase;
-        }
-        #graph {
-            width: 100%;
-            height: 700px;
-            background-color: #1a1a1a;
-            border: 1px solid #404040;
-            border-radius: 4px;
-        }
-        .filter-section {
-            margin: 20px 0;
-            padding: 10px;
-            background-color: #2a2a2a;
-            border-radius: 4px;
-        }
-        #node-type-buttons, #location-buttons, #sublocation-buttons {
+        /* ... existing styles ... */
+        
+        .zoom-controls {
+            position: absolute;
+            right: 30px;
+            top: 100px;
             display: flex;
+            flex-direction: column;
             gap: 10px;
-            flex-wrap: wrap;
-            margin: 10px 0;
         }
-        .filter-button {
-            padding: 8px 16px;
+        
+        .zoom-button {
+            width: 40px;
+            height: 40px;
             background-color: #404040;
             color: white;
             border: none;
             border-radius: 4px;
             cursor: pointer;
-            transition: all 0.3s ease;
-            text-transform: lowercase;
+            font-size: 20px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: background-color 0.3s;
         }
-        .filter-button:hover {
+        
+        .zoom-button:hover {
             background-color: #505050;
         }
-        .filter-button.active {
-            background-color: #007bff;
-        }
-        .filter-button.disabled {
-            opacity: 0.5;
+
+        .node text {
+            text-anchor: middle;
+            dominant-baseline: middle;
+            fill: white;
             pointer-events: none;
         }
-        #search-container {
-            margin-bottom: 20px;
-        }
-        #search-input {
-            padding: 8px;
-            width: 200px;
-            background-color: #2a2a2a;
-            border: 1px solid #404040;
-            border-radius: 4px;
-            color: white;
-        }
-        h4 {
-            margin: 10px 0;
-            color: #888;
+
+        .node circle {
+            fill-opacity: 0.8;
         }
     </style>
 </head>
 <body>
-    <div id="search-container">
-        <input type="text" id="search-input" placeholder="search nodes...">
-    </div>
+    <!-- ... existing elements ... -->
     
-    <div class="filter-section">
-        <h4>Node Types</h4>
-        <div id="node-type-buttons"></div>
+    <div class="zoom-controls">
+        <button class="zoom-button" onclick="zoomIn()">+</button>
+        <button class="zoom-button" onclick="zoomOut()">-</button>
     </div>
-
-    <div class="filter-section">
-        <h4>Location</h4>
-        <div id="location-buttons"></div>
-        <h4>Sublocation</h4>
-        <div id="sublocation-buttons"></div>
-    </div>
-
-    <div id="graph"></div>
 
     <script>
-        const locationMap = {
-            'head': ['brain', 'eye', 'face', 'ear', 'nose', 'skull', 'mouth', 'head'],
-            'neck': ['cervical spine', 'visceral', 'vascular'],
-            'upper limb': ['wrist', 'hand', 'fingers', 'arm', 'forearm', 'elbow', 'shoulder'],
-            'thorax': ['thoracic spine', 'ribcage', 'heart', 'lung'],
-            'abdomen': ['lumbar spine', 'right upper quadrant', 'left upper quadrant', 'right lower quadrant', 'left lower quadrant'],
-            'spine': ['spinal cord', 'vertebral', 'tracts', 'sacral spine'],
-            'pelvis': ['sacral spine', 'greater pelvis', 'lesser pelvis'],
-            'lower limb': ['foot', 'thigh', 'knee', 'leg', 'ankle', 'toes']
-        };
+        // ... existing variables ...
+        
+        let currentZoom = 1;
+        const zoomStep = 0.5;
+        const minZoom = 0.1;
+        const maxZoom = 5;
 
-        let width = document.getElementById('graph').clientWidth;
-        let height = document.getElementById('graph').clientHeight;
-        let allNodes = [];
-        let allRelationships = [];
-        let nodeTypes = new Set();
-        let currentLocation = null;
-        let currentSublocation = null;
-        let currentNodeType = null;
-
-        const svg = d3.select("#graph")
-            .append("svg")
-            .attr("width", width)
-            .attr("height", height);
-
-        const g = svg.append("g");
-
-        // Add zoom behavior
+        // Create zoom behavior
         const zoom = d3.zoom()
-            .scaleExtent([0.1, 4])
-            .on("zoom", () => {
-                g.attr("transform", d3.event.transform);
-            });
+            .scaleExtent([minZoom, maxZoom])
+            .on('zoom', zoomed);
 
+        // Apply zoom behavior to svg
         svg.call(zoom);
 
-        // Load initial data
-        fetch('/graph')
-            .then(response => response.json())
-            .then(data => {
-                allNodes = data.nodes;
-                allRelationships = data.relationships;
-                
-                // Extract and create node type buttons
-                allNodes.forEach(node => {
-                    node.labels.forEach(label => nodeTypes.add(label));
-                });
+        // Initial zoom to fit x: [-90,90] and y: [-180,180]
+        const width = svg.node().getBoundingClientRect().width;
+        const height = svg.node().getBoundingClientRect().height;
+        const initialScale = Math.min(width / 180, height / 360);
+        const initialTransform = d3.zoomIdentity
+            .translate(width/2, height/2)
+            .scale(initialScale);
+        svg.call(zoom.transform, initialTransform);
 
-                const nodeTypeButtons = document.getElementById('node-type-buttons');
-                nodeTypes.forEach(type => {
-                    const button = document.createElement('button');
-                    button.className = 'filter-button';
-                    button.textContent = type;
-                    button.onclick = () => filterByNodeType(type);
-                    nodeTypeButtons.appendChild(button);
-                });
-
-                // Create location buttons
-                const locationButtons = document.getElementById('location-buttons');
-                Object.keys(locationMap).forEach(location => {
-                    const button = document.createElement('button');
-                    button.className = 'filter-button';
-                    button.textContent = location;
-                    button.onclick = () => selectLocation(location);
-                    locationButtons.appendChild(button);
-                });
-
-                updateVisualization(allNodes, allRelationships);
-            });
-
-        function selectLocation(location) {
-            currentLocation = location;
-            document.querySelectorAll('#location-buttons .filter-button').forEach(btn => {
-                btn.classList.toggle('active', btn.textContent === location);
-            });
-
-            // Update sublocation buttons
-            const sublocationButtons = document.getElementById('sublocation-buttons');
-            sublocationButtons.innerHTML = '';
-            locationMap[location].forEach(sublocation => {
-                const button = document.createElement('button');
-                button.className = 'filter-button';
-                button.textContent = sublocation;
-                button.onclick = () => selectSublocation(sublocation);
-                sublocationButtons.appendChild(button);
-            });
-
-            filterNodes();
+        function zoomIn() {
+            currentZoom = Math.min(currentZoom + zoomStep, maxZoom);
+            svg.transition()
+                .duration(300)
+                .call(zoom.scaleTo, currentZoom);
         }
 
-        function selectSublocation(sublocation) {
-            currentSublocation = sublocation;
-            document.querySelectorAll('#sublocation-buttons .filter-button').forEach(btn => {
-                btn.classList.toggle('active', btn.textContent === sublocation);
-            });
-            filterNodes();
+        function zoomOut() {
+            currentZoom = Math.max(currentZoom - zoomStep, minZoom);
+            svg.transition()
+                .duration(300)
+                .call(zoom.scaleTo, currentZoom);
         }
 
-        function filterByNodeType(type) {
-            currentNodeType = type === currentNodeType ? null : type;
-            document.querySelectorAll('#node-type-buttons .filter-button').forEach(btn => {
-                btn.classList.toggle('active', btn.textContent === currentNodeType);
-            });
-            filterNodes();
-        }
-
-        function filterNodes() {
-            let filteredNodes = allNodes;
-
-            if (currentLocation) {
-                filteredNodes = filteredNodes.filter(node => 
-                    node.properties.location === currentLocation
-                );
-            }
-
-            if (currentSublocation) {
-                filteredNodes = filteredNodes.filter(node => 
-                    node.properties.sublocation === currentSublocation
-                );
-            }
-
-            if (currentNodeType) {
-                filteredNodes = filteredNodes.filter(node => 
-                    node.labels.includes(currentNodeType)
-                );
-            }
-
-            const filteredRelationships = allRelationships.filter(rel =>
-                filteredNodes.some(n => n.id === rel.source) &&
-                filteredNodes.some(n => n.id === rel.target)
-            );
-
-            updateVisualization(filteredNodes, filteredRelationships);
+        function zoomed() {
+            g.attr('transform', d3.event.transform);
         }
 
         function updateVisualization(nodes, relationships) {
-            // Clear existing visualization
-            g.selectAll("*").remove();
+            // ... existing visualization code ...
 
-            // Add relationships
-            const links = g.selectAll(".link")
-                .data(relationships)
-                .enter()
-                .append("line")
-                .attr("class", "link")
-                .style("stroke", "#404040")
-                .style("stroke-width", 1);
-
-            // Add nodes
-            const nodes_g = g.selectAll(".node")
+            // Update node creation to include adaptive text sizing
+            const nodes_g = g.selectAll('.node')
                 .data(nodes)
                 .enter()
-                .append("g")
-                .attr("class", "node")
-                .attr("transform", d => `translate(${d.x || 0},${d.y || 0})`);
+                .append('g')
+                .attr('class', 'node')
+                .attr('transform', d => `translate(${xScale(d.x)},${yScale(d.y)})`);
 
-            nodes_g.append("circle")
-                .attr("r", 5)
-                .style("fill", d => getNodeColor(d.labels[0]));
+            nodes_g.append('circle')
+                .attr('r', 10)
+                .style('fill', d => getNodeColor(d.labels[0]));
 
-            nodes_g.append("text")
-                .attr("dx", 12)
-                .attr("dy", ".35em")
+            nodes_g.append('text')
                 .text(d => d.properties.name || d.id)
-                .style("fill", "white")
-                .style("font-size", "12px");
+                .each(function(d) {
+                    const node = d3.select(this);
+                    let fontSize = 12;
+                    const maxWidth = 18; // diameter of circle - 2
+                    
+                    // Reduce font size until text fits
+                    while (this.getComputedTextLength() > maxWidth && fontSize > 4) {
+                        fontSize--;
+                        node.style('font-size', `${fontSize}px`);
+                    }
+                })
+                .style('font-size', '12px') // Starting font size
+                .style('pointer-events', 'none');
 
-            // Update link positions
-            links
-                .attr("x1", d => {
-                    const sourceNode = nodes.find(n => n.id === d.source);
-                    return sourceNode ? sourceNode.x : 0;
-                })
-                .attr("y1", d => {
-                    const sourceNode = nodes.find(n => n.id === d.source);
-                    return sourceNode ? sourceNode.y : 0;
-                })
-                .attr("x2", d => {
-                    const targetNode = nodes.find(n => n.id === d.target);
-                    return targetNode ? targetNode.x : 0;
-                })
-                .attr("y2", d => {
-                    const targetNode = nodes.find(n => n.id === d.target);
-                    return targetNode ? targetNode.y : 0;
-                });
+            // ... rest of the visualization code ...
         }
 
-        function getNodeColor(label) {
-            const colors = {
-                'Person': '#ff7f0e',
-                'Movie': '#1f77b4',
-                'Director': '#2ca02c',
-                // Add more colors for different node types
-            };
-            return colors[label] || '#ff7f0e';
-        }
+        // Update the xScale and yScale to match the desired ranges
+        const xScale = d3.scaleLinear()
+            .domain([-90, 90])
+            .range([0, width]);
 
-        // Search functionality
-        const searchInput = document.getElementById('search-input');
-        let searchTimeout;
+        const yScale = d3.scaleLinear()
+            .domain([-180, 180])
+            .range([height, 0]);
 
-        searchInput.addEventListener('input', function(e) {
-            const query = e.target.value.trim().toLowerCase();
-            
-            clearTimeout(searchTimeout);
-            searchTimeout = setTimeout(() => {
-                if (query.length < 3 && query.length > 0) {
-                    return;
-                }
-                
-                if (query.length === 0) {
-                    updateVisualization(allNodes, allRelationships);
-                    return;
-                }
-
-                fetch('/search?q=' + encodeURIComponent(query))
-                    .then(response => response.json())
-                    .then(data => {
-                        updateVisualization(data.nodes, data.relationships);
-                    })
-                    .catch(error => {
-                        console.error('Error:', error);
-                    });
-            }, 300);
-        });
+        // ... rest of the existing code ...
     </script>
 </body>
 </html>
