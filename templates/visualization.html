@@ -1,365 +1,129 @@
-visualization.html
-<!DOCTYPE html>
-<html>
-<head>
-    <title>Neo4j Force Graph</title>
-    <script src="https://unpkg.com/neo4j-driver@5.15.0"></script>
-    <script src="https://d3js.org/d3.v5.min.js"></script>
-    <style>
-        body { 
-            margin: 0;
-            padding: 20px;
-            background-color: #1a1a1a;
-            color: white;
-            font-family: Arial, sans-serif;
-        }
-        #graph {
-            width: 100%;
-            height: 800px;
-            background-color: #1a1a1a;
-            border: 1px solid #404040;
-            border-radius: 4px;
-        }
-        #status {
-            margin: 10px 0;
-            padding: 10px;
-            border-radius: 4px;
-        }
-        .button {
-            padding: 10px 20px;
-            background-color: #cc5500;
-            color: white;
-            border: none;
-            border-radius: 4px;
-            cursor: pointer;
-            margin-bottom: 20px;
-        }
-        .button:hover {
-            background-color: #ff6a00;
-        }
-        .node-label {
-            font-size: 12px;
-            text-anchor: middle;
-            pointer-events: none;
-            fill: white;
-        }
-        .link {
-            stroke: #808080;
-            stroke-opacity: 0.6;
-        }
-        .link-label {
-            font-size: 10px;
-            fill: #cccccc;
-        }
-        .form-control {
-            padding: 8px 12px;
-            background-color: #2a2a2a;
-            color: white;
-            border: 1px solid #404040;
-            border-radius: 4px;
-            margin-bottom: 20px;
-            width: 300px;
-            font-size: 14px;
-        }
-        .form-control::placeholder {
-            color: #808080;
-        }
-        .form-control:focus {
-            outline: none;
-            border-color: #cc5500;
-        }
-        svg {
-            touch-action: none; /* Prevents default touch behaviors */
-        }
-        .zoom-container {
-            pointer-events: all;
-        }
-    </style>
-</head>
-<body>
-    <!-- Search input -->
-    <input type="text" id="search-input" class="form-control" placeholder="Search nodes...">
+// Force Graph Configuration
+const graphConfig = {
+    nodeId: d => d.id,
+    nodeGroup: d => d.labels[0],
+    nodeTitle: d => `${d.labels.join(', ')}\n${Object.entries(d.properties).map(([k,v]) => `${k}: ${v}`).join('\n')}`,
+    linkSource: d => d.source,
+    linkTarget: d => d.target,
+    width: 800,
+    height: 600,
+    nodeRadius: 5,
     
-    <button class="button" onclick="showRandomNodesWithRelationships()">Show Random Connected Nodes</button>
-    <div id="status">Ready to connect...</div>
-    <div id="graph"></div>
-
-    <script>
-        let driver;
-        let network;
-        let zoom; // For zoom behavior
-        let currentTransform = d3.zoomIdentity; // Keep track of zoom state
-        
-        async function initDriver() {
-            try {
-                driver = neo4j.driver(
-                    "neo4j+s://4e5eeae5.databases.neo4j.io:7687",
-                    neo4j.auth.basic("neo4j", "Poconoco16!")
-                );
-                
-                const session = driver.session();
-                await session.run("RETURN 1");
-                await session.close();
-                
-                document.getElementById('status').style.backgroundColor = "#004400";
-                document.getElementById('status').textContent = "Connected to Neo4j!";
-                
-                await showRandomNodesWithRelationships();
-            } catch (error) {
-                console.error(error);
-                document.getElementById('status').style.backgroundColor = "#440000";
-                document.getElementById('status').textContent = "Failed to connect: " + error;
-            }
+    // Color configuration
+    nodeColor: d => {
+        const colorMap = {
+            'Nerve': '#ff7f0e',
+            'Muscle': '#1f77b4',
+            'Bone': '#2ca02c',
+            'Region': '#d62728',
+            'Vessel': '#9467bd',
+            'default': '#7f7f7f'
+        };
+        return colorMap[d.labels[0]] || colorMap.default;
+    },
+    
+    // Link configuration
+    linkStroke: '#999',
+    linkStrokeOpacity: 0.6,
+    linkStrokeWidth: d => Math.sqrt(d.value),
+    
+    // Forces configuration
+    d3Force: {
+        center: {
+            x: 400,
+            y: 300
+        },
+        charge: {
+            strength: -30,
+            distanceMax: 200
+        },
+        link: {
+            distance: 50,
+            iterations: 1
         }
+    },
+    
+    // Interaction
+    onNodeClick: node => {
+        console.log('Clicked node:', node);
+        highlightConnectedNodes(node);
+    },
+    
+    onLinkClick: link => {
+        console.log('Clicked link:', link);
+        showRelationshipDetails(link);
+    }
+};
 
-        async function showRandomNodesWithRelationships() {
-            if (!driver) return;
+// Node highlighting
+function highlightConnectedNodes(node) {
+    const connectedNodes = new Set();
+    graph.links.forEach(link => {
+        if (link.source.id === node.id) connectedNodes.add(link.target.id);
+        if (link.target.id === node.id) connectedNodes.add(link.source.id);
+    });
+    
+    graph.nodes.forEach(n => {
+        n.highlighted = n.id === node.id || connectedNodes.has(n.id);
+    });
+    
+    updateVisualization();
+}
+
+// Relationship details
+function showRelationshipDetails(link) {
+    const details = document.getElementById('relationship-details');
+    details.innerHTML = `
+        <h3>Relationship Details</h3>
+        <p>Type: ${link.type}</p>
+        <p>Source: ${link.source.labels.join(', ')}</p>
+        <p>Target: ${link.target.labels.join(', ')}</p>
+        ${Object.entries(link.properties || {}).map(([k,v]) => `<p>${k}: ${v}</p>`).join('')}
+    `;
+    details.style.display = 'block';
+}
+
+// Update visualization
+function updateVisualization() {
+    // Update node appearance
+    node.attr('fill', d => d.highlighted ? '#ff0' : graphConfig.nodeColor(d))
+        .attr('r', d => d.highlighted ? 8 : graphConfig.nodeRadius);
+    
+    // Update link appearance
+    link.attr('stroke-width', d => {
+        const sourceHighlighted = d.source.highlighted;
+        const targetHighlighted = d.target.highlighted;
+        return (sourceHighlighted && targetHighlighted) ? 2 : 1;
+    });
+}
+
+// Legend creation
+function createLegend() {
+    const legend = d3.select('#graph-legend')
+        .append('g')
+        .attr('class', 'legend')
+        .attr('transform', 'translate(20,20)');
+
+    const legendItems = Object.entries(graphConfig.nodeColor.colorMap);
+    
+    legendItems.forEach(([label, color], i) => {
+        const legendRow = legend.append('g')
+            .attr('transform', `translate(0, ${i * 20})`);
             
-            const session = driver.session();
-            try {
-                const result = await session.run(`
-                    MATCH (n)-[r]-(m)
-                    WITH n, r, m, rand() as random
-                    ORDER BY random
-                    LIMIT 50
-                    RETURN collect(DISTINCT n) as nodes, collect(DISTINCT r) as rels, collect(DISTINCT m) as connected
-                `);
-                
-                const record = result.records[0];
-                const nodes = record.get('nodes');
-                const relationships = record.get('rels');
-                const connectedNodes = record.get('connected');
-                
-                const allNodes = [...nodes, ...connectedNodes];
-                
-                const width = document.getElementById('graph').clientWidth;
-                const height = document.getElementById('graph').clientHeight;
-                
-                const svg = d3.select("#graph")
-                    .html("") // Clear previous content
-                    .append("svg")
-                    .attr("width", width)
-                    .attr("height", height);
-
-                // Create container group for zoom
-                const container = svg.append("g")
-                    .attr("class", "zoom-container");
-
-                // Set up zoom behavior
-                zoom = d3.zoom()
-                    .scaleExtent([0.1, 4]) // Min and max zoom scale
-                    .on("zoom", zoomed);
-
-                // Apply zoom behavior to SVG
-                svg.call(zoom)
-                    .call(zoom.transform, d3.zoomIdentity);
-
-                // Zoom function
-                function zoomed() {
-                    currentTransform = d3.event.transform;
-                    container.attr("transform", currentTransform);
-                }
-
-                // Add double-click to reset zoom
-                svg.on("dblclick.zoom", function() {
-                    svg.transition()
-                        .duration(750)
-                        .call(zoom.transform, d3.zoomIdentity);
-                });
-                
-                // Create arrow marker
-                svg.append("defs").append("marker")
-                    .attr("id", "arrowhead")
-                    .attr("viewBox", "-0 -5 10 10")
-                    .attr("refX", 20)
-                    .attr("refY", 0)
-                    .attr("orient", "auto")
-                    .attr("markerWidth", 6)
-                    .attr("markerHeight", 6)
-                    .attr("xoverflow", "visible")
-                    .append("svg:path")
-                    .attr("d", "M 0,-5 L 10 ,0 L 0,5")
-                    .attr("fill", "#808080")
-                    .style("stroke", "none");
-                
-                const simulation = d3.forceSimulation()
-                    .force("link", d3.forceLink().id(d => d.identity.low))
-                    .force("charge", d3.forceManyBody().strength(-1000))
-                    .force("center", d3.forceCenter(width / 2, height / 2))
-                    .force("collision", d3.forceCollide().radius(50));
-                
-                // Create links in container
-                const link = container.append("g")
-                    .selectAll("line")
-                    .data(relationships)
-                    .enter().append("line")
-                    .attr("class", "link")
-                    .attr("marker-end", "url(#arrowhead)");
-                
-                // Add relationship labels in container
-                const linkLabel = container.append("g")
-                    .selectAll("text")
-                    .data(relationships)
-                    .enter().append("text")
-                    .attr("class", "link-label")
-                    .text(d => d.type);
-                
-                // Create nodes in container
-                const node = container.append("g")
-                    .selectAll("g")
-                    .data(allNodes)
-                    .enter().append("g");
-                
-                // Add circles for nodes
-                node.append("circle")
-                    .attr("r", 20)
-                    .style("fill", d => {
-                        const label = d.labels[0];
-                        let hash = 0;
-                        for (let i = 0; i < label.length; i++) {
-                            hash = label.charCodeAt(i) + ((hash << 5) - hash);
-                        }
-                        const hue = hash % 360;
-                        return `hsl(${hue}, 70%, 50%)`;
-                    });
-                
-                // Add labels for nodes
-                node.append("text")
-                    .attr("class", "node-label")
-                    .attr("dy", 30)
-                    .text(d => {
-                        const props = d.properties;
-                        return props.name || props.title || d.labels[0];
-                    })
-                    .each(function(d) {
-                        const text = d3.select(this);
-                        const words = text.text().split(/\s+/);
-                        text.text('');
-                        
-                        const lineHeight = 1.1;
-                        const dy = parseFloat(text.attr("dy"));
-                        let line = [];
-                        let lineNumber = 0;
-                        let tspan = text.append("tspan").attr("x", 0).attr("y", 0).attr("dy", dy + "px");
-                        
-                        words.forEach(word => {
-                            line.push(word);
-                            tspan.text(line.join(" "));
-                            if (tspan.node().getComputedTextLength() > 50) {
-                                line.pop();
-                                tspan.text(line.join(" "));
-                                line = [word];
-                                tspan = text.append("tspan").attr("x", 0).attr("y", 0).attr("dy", ++lineNumber * lineHeight + dy + "em").text(word);
-                            }
-                        });
-                    });
+        legendRow.append('circle')
+            .attr('cx', 10)
+            .attr('cy', 10)
+            .attr('r', 6)
+            .style('fill', color);
             
-                // Add drag behavior with zoom support
-                node.call(d3.drag()
-                    .on("start", dragstarted)
-                    .on("drag", dragged)
-                    .on("end", dragended));
-                
-                // Update positions on each tick
-                simulation.on("tick", () => {
-                    link
-                        .attr("x1", d => d.source.x)
-                        .attr("y1", d => d.source.y)
-                        .attr("x2", d => d.target.x)
-                        .attr("y2", d => d.target.y);
-                    
-                    linkLabel
-                        .attr("x", d => (d.source.x + d.target.x) / 2)
-                        .attr("y", d => (d.source.y + d.target.y) / 2);
-                    
-                    node
-                        .attr("transform", d => `translate(${d.x},${d.y})`);
-                });
-                
-                // Set up the simulation
-                simulation.nodes(allNodes);
-                simulation.force("link").links(relationships);
-                
-                // Store network data globally
-                network = {
-                    simulation: simulation,
-                    svg: svg,
-                    container: container,
-                    nodes: node,
-                    links: link,
-                    linkLabels: linkLabel
-                };
+        legendRow.append('text')
+            .attr('x', 25)
+            .attr('y', 10)
+            .text(label)
+            .style('font-size', '12px')
+            .attr('alignment-baseline', 'middle');
+    });
+}
 
-                // Touch event handling
-                let touchDistance = 0;
-                let touchZoomInitiated = false;
-
-                svg.on("touchstart", function() {
-                    const touches = d3.touches(this);
-                    if (touches.length === 2) {
-                        touchZoomInitiated = true;
-                        touchDistance = Math.hypot(
-                            touches[0][0] - touches[1][0],
-                            touches[0][1] - touches[1][1]
-                        );
-                    }
-                });
-
-                svg.on("touchmove", function() {
-                    if (!touchZoomInitiated) return;
-                    
-                    const touches = d3.touches(this);
-                    if (touches.length === 2) {
-                        const newDistance = Math.hypot(
-                            touches[0][0] - touches[1][0],
-                            touches[0][1] - touches[1][1]
-                        );
-                        
-                        const scale = newDistance / touchDistance;
-                        const transform = d3.zoomIdentity
-                            .translate(width/2, height/2)
-                            .scale(scale)
-                            .translate(-width/2, -height/2);
-                        
-                        svg.call(zoom.transform, transform);
-                        touchDistance = newDistance;
-                    }
-                });
-
-                svg.on("touchend", function() {
-                    touchZoomInitiated = false;
-                });
-                
-            } catch (error) {
-                console.error(error);
-                document.getElementById('status').style.backgroundColor = "#440000";
-                document.getElementById('status').textContent = "Error loading graph: " + error;
-            } finally {
-                await session.close();
-            }
-        }
-        
-        // Updated drag functions with zoom support
-        function dragstarted(d) {
-            if (!d3.event.active) simulation.alphaTarget(0.3).restart();
-            d.fx = currentTransform.invertX(d3.event.x);
-            d.fy = currentTransform.invertY(d3.event.y);
-        }
-        
-        function dragged(d) {
-            d.fx = currentTransform.invertX(d3.event.x);
-            d.fy = currentTransform.invertY(d3.event.y);
-        }
-        
-        function dragended(d) {
-            if (!d3.event.active) simulation.alphaTarget(0);
-            d.fx = null;
-            d.fy = null;
-        }
-
-        // Search functionality
-        let searchTimeout;
-        const searchInput = document.getElementById('search-input');
-
-        searchInput.addEventListener('input', function(e) {
-            const query = e.target.value.trim▍
+// Export configuration
+export { graphConfig, createLegend };
