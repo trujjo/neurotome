@@ -164,14 +164,3 @@ def internal_error(error):
 if __name__ == '__main__':
     port = int(os.getenv('PORT', 5000))
     app.run(host='0.0.0.0', port=port)
-
-with open('app.py', 'w') as f:
-    f.write(improved_code)
-
-print("Created improved app.py with your hardcoded credentials while keeping other improvements:")
-print("1. Added proper error handling")
-print("2. Added logging")
-print("3. Added input validation")
-print("4. Improved Neo4j query efficiency")
-print("5. Added error handler routes")
-print("6. Added better health check endpoint")
