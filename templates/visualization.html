@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <html>
 <head>
-    <title>Neo4j Network Visualization</title>
+    <title>Neural Network Visualization</title>
     <script src="https://d3js.org/d3.v5.min.js"></script>
     <style>
         body {
@@ -9,7 +9,7 @@
             padding: 20px;
             background-color: #1a1a1a;
             color: white;
-            font-family: Arial, sans-serif;
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
         }
         #graph {
             width: 100%;
@@ -17,138 +17,201 @@
             min-height: 700px;
             background-color: #1a1a1a;
             border: 1px solid #404040;
-            border-radius: 4px;
+            border-radius: 12px;
+            margin-top: 20px;
         }
         .filter-section {
             margin: 20px 0;
-            padding: 10px;
+            padding: 20px;
             background-color: #2a2a2a;
-            border-radius: 4px;
+            border-radius: 12px;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
         }
         .filter-group {
-            margin-bottom: 15px;
+            margin-bottom: 25px;
         }
         .filter-label {
-            color: #888;
-            margin-bottom: 8px;
-            font-weight: bold;
+            color: #fff;
+            margin-bottom: 15px;
+            font-weight: 600;
+            font-size: 1.1em;
+            letter-spacing: 0.5px;
+        }
+        .location-group {
+            margin-bottom: 15px;
+            padding: 15px;
+            background-color: #333;
+            border-radius: 8px;
+        }
+        .location-label {
+            color: #2196F3;
+            font-weight: 600;
+            margin-bottom: 10px;
+            font-size: 1em;
         }
         .button-container {
             display: flex;
             flex-wrap: wrap;
-            gap: 10px;
+            gap: 12px;
+            padding: 5px;
+        }
+        .sublocation-container {
+            margin-left: 15px;
+            margin-top: 10px;
         }
         .filter-button {
-            padding: 8px 16px;
-            background-color: #404040;
-            color: white;
-            border: none;
-            border-radius: 4px;
+            padding: 10px 20px;
+            background-color: #333;
+            color: #fff;
+            border: 1px solid #444;
+            border-radius: 8px;
             cursor: pointer;
             transition: all 0.3s ease;
+            font-size: 14px;
+            font-weight: 500;
+            text-transform: capitalize;
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
         }
         .filter-button:hover {
-            background-color: #505050;
+            background-color: #444;
+            transform: translateY(-1px);
+            box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
         }
         .filter-button.active {
-            background-color: #007bff;
+            background-color: #2196F3;
+            border-color: #1976D2;
+            color: white;
+        }
+        .location-button {
+            background-color: #2c3e50;
+        }
+        .sublocation-button {
+            background-color: #34495e;
+            font-size: 13px;
+        }
+        .node {
+            cursor: pointer;
+        }
+        .link {
+            stroke: #666;
+            stroke-width: 1.5px;
         }
     </style>
 </head>
 <body>
     <div class="filter-section">
+        <!-- Node Types -->
         <div class="filter-group">
             <div class="filter-label">Node Types</div>
-            <div id="node-type-buttons" class="button-container"></div>
+            <div id="node-type-buttons" class="button-container">
+                <button class="filter-button" onclick="toggleFilter(this, 'nerve', 'nodeTypes')">nerve</button>
+                <button class="filter-button" onclick="toggleFilter(this, 'bone', 'nodeTypes')">bone</button>
+                <button class="filter-button" onclick="toggleFilter(this, 'neuro', 'nodeTypes')">neuro</button>
+                <button class="filter-button" onclick="toggleFilter(this, 'region', 'nodeTypes')">region</button>
+                <button class="filter-button" onclick="toggleFilter(this, 'viscera', 'nodeTypes')">viscera</button>
+                <button class="filter-button" onclick="toggleFilter(this, 'muscle', 'nodeTypes')">muscle</button>
+                <button class="filter-button" onclick="toggleFilter(this, 'sense', 'nodeTypes')">sense</button>
+                <button class="filter-button" onclick="toggleFilter(this, 'vein', 'nodeTypes')">vein</button>
+                <button class="filter-button" onclick="toggleFilter(this, 'artery', 'nodeTypes')">artery</button>
+                <button class="filter-button" onclick="toggleFilter(this, 'cv', 'nodeTypes')">cv</button>
+                <button class="filter-button" onclick="toggleFilter(this, 'function', 'nodeTypes')">function</button>
+                <button class="filter-button" onclick="toggleFilter(this, 'sensory', 'nodeTypes')">sensory</button>
+                <button class="filter-button" onclick="toggleFilter(this, 'gland', 'nodeTypes')">gland</button>
+                <button class="filter-button" onclick="toggleFilter(this, 'lymph', 'nodeTypes')">lymph</button>
+                <button class="filter-button" onclick="toggleFilter(this, 'head', 'nodeTypes')">head</button>
+                <button class="filter-button" onclick="toggleFilter(this, 'organ', 'nodeTypes')">organ</button>
+                <button class="filter-button" onclick="toggleFilter(this, 'sensation', 'nodeTypes')">sensation</button>
+                <button class="filter-button" onclick="toggleFilter(this, 'skin', 'nodeTypes')">skin</button>
+            </div>
         </div>
+
+        <!-- Locations and Sublocations -->
         <div class="filter-group">
-            <div class="filter-label">Locations</div>
-            <div id="location-buttons" class="button-container"></div>
-        </div>
-        <div class="filter-group">
-            <div class="filter-label">Sublocations</div>
-            <div id="sublocation-buttons" class="button-container"></div>
-        </div>
-    </div>
-    <div id="graph"></div>
-
-    <script>
-        let activeFilters = {
-            nodeTypes: new Set(),
-            locations: new Set(),
-            sublocations: new Set()
-        };
-
-        function initializeButtons(data) {
-            console.log('Initializing buttons with data:', data); // Debug log
-
-            // Clear existing buttons
-            document.getElementById('node-type-buttons').innerHTML = '';
-            document.getElementById('location-buttons').innerHTML = '';
-            document.getElementById('sublocation-buttons').innerHTML = '';
-
-            // Create node type buttons
-            if (data.nodeTypes && Array.isArray(data.nodeTypes)) {
-                data.nodeTypes.forEach(type => {
-                    if (type) {
-                        const button = createFilterButton(type, 'nodeTypes');
-                        document.getElementById('node-type-buttons').appendChild(button);
-                    }
-                });
-            }
-
-            // Create location buttons
-            if (data.locations && Array.isArray(data.locations)) {
-                data.locations.forEach(location => {
-                    if (location) {
-                        const button = createFilterButton(location, 'locations');
-                        document.getElementById('location-buttons').appendChild(button);
-                    }
-                });
-            }
-
-            // Create sublocation buttons
-            if (data.sublocations && Array.isArray(data.sublocations)) {
-                data.sublocations.forEach(sublocation => {
-                    if (sublocation) {
-                        const button = createFilterButton(sublocation, 'sublocations');
-                        document.getElementById('sublocation-buttons').appendChild(button);
-                    }
-                });
-            }
-        }
-
-        function createFilterButton(value, filterType) {
-            const button = document.createElement('button');
-            button.textContent = value;
-            button.className = 'filter-button';
-            button.onclick = () => toggleFilter(button, value, filterType);
-            return button;
-        }
-
-        function toggleFilter(button, value, filterType) {
-            button.classList.toggle('active');
+            <div class="filter-label">Anatomical Regions</div>
             
-            if (button.classList.contains('active')) {
-                activeFilters[filterType].add(value);
-            } else {
-                activeFilters[filterType].delete(value);
-            }
-            
-            updateNodeVisibility();
-        }
+            <!-- Head -->
+            <div class="location-group">
+                <div class="location-label">Head</div>
+                <button class="filter-button location-button" onclick="toggleFilter(this, 'head', 'locations')">Head</button>
+                <div class="sublocation-container">
+                    <button class="filter-button sublocation-button" onclick="toggleFilter(this, 'brain', 'sublocations')">Brain</button>
+                    <button class="filter-button sublocation-button" onclick="toggleFilter(this, 'eye', 'sublocations')">Eye</button>
+                    <button class="filter-button sublocation-button" onclick="toggleFilter(this, 'face', 'sublocations')">Face</button>
+                    <button class="filter-button sublocation-button" onclick="toggleFilter(this, 'ear', 'sublocations')">Ear</button>
+                    <button class="filter-button sublocation-button" onclick="toggleFilter(this, 'nose', 'sublocations')">Nose</button>
+                    <button class="filter-button sublocation-button" onclick="toggleFilter(this, 'skull', 'sublocations')">Skull</button>
+                    <button class="filter-button sublocation-button" onclick="toggleFilter(this, 'mouth', 'sublocations')">Mouth</button>
+                </div>
+            </div>
 
-        // Load and initialize the visualization
-        fetch('/graph')
-            .then(response => response.json())
-            .then(data => {
-                console.log('Received data:', data); // Debug log
-                initializeButtons(data);
-                // Initialize your visualization here
-            })
-            .catch(error => {
-                console.error('Error:', error);
-            });
-    </script>
-</body>
-</html>
+            <!-- Neck -->
+            <div class="location-group">
+                <div class="location-label">Neck</div>
+                <button class="filter-button location-button" onclick="toggleFilter(this, 'neck', 'locations')">Neck</button>
+                <div class="sublocation-container">
+                    <button class="filter-button sublocation-button" onclick="toggleFilter(this, 'cervical spine', 'sublocations')">Cervical Spine</button>
+                    <button class="filter-button sublocation-button" onclick="toggleFilter(this, 'visceral', 'sublocations')">Visceral</button>
+                    <button class="filter-button sublocation-button" onclick="toggleFilter(this, 'vascular', 'sublocations')">Vascular</button>
+                </div>
+            </div>
+
+            <!-- Upper Limb -->
+            <div class="location-group">
+                <div class="location-label">Upper Limb</div>
+                <button class="filter-button location-button" onclick="toggleFilter(this, 'upper limb', 'locations')">Upper Limb</button>
+                <div class="sublocation-container">
+                    <button class="filter-button sublocation-button" onclick="toggleFilter(this, 'wrist', 'sublocations')">Wrist</button>
+                    <button class="filter-button sublocation-button" onclick="toggleFilter(this, 'hand', 'sublocations')">Hand</button>
+                    <button class="filter-button sublocation-button" onclick="toggleFilter(this, 'fingers', 'sublocations')">Fingers</button>
+                    <button class="filter-button sublocation-button" onclick="toggleFilter(this, 'arm', 'sublocations')">Arm</button>
+                    <button class="filter-button sublocation-button" onclick="toggleFilter(this, 'forearm', 'sublocations')">Forearm</button>
+                    <button class="filter-button sublocation-button" onclick="toggleFilter(this, 'elbow', 'sublocations')">Elbow</button>
+                    <button class="filter-button sublocation-button" onclick="toggleFilter(this, 'shoulder', 'sublocations')">Shoulder</button>
+                </div>
+            </div>
+
+            <!-- Thorax -->
+            <div class="location-group">
+                <div class="location-label">Thorax</div>
+                <button class="filter-button location-button" onclick="toggleFilter(this, 'thorax', 'locations')">Thorax</button>
+                <div class="sublocation-container">
+                    <button class="filter-button sublocation-button" onclick="toggleFilter(this, 'thoracic spine', 'sublocations')">Thoracic Spine</button>
+                    <button class="filter-button sublocation-button" onclick="toggleFilter(this, 'ribcage', 'sublocations')">Ribcage</button>
+                    <button class="filter-button sublocation-button" onclick="toggleFilter(this, 'heart', 'sublocations')">Heart</button>
+                    <button class="filter-button sublocation-button" onclick="toggleFilter(this, 'lung', 'sublocations')">Lung</button>
+                </div>
+            </div>
+
+            <!-- Abdomen -->
+            <div class="location-group">
+                <div class="location-label">Abdomen</div>
+                <button class="filter-button location-button" onclick="toggleFilter(this, 'abdomen', 'locations')">Abdomen</button>
+                <div class="sublocation-container">
+                    <button class="filter-button sublocation-button" onclick="toggleFilter(this, 'lumbar spine', 'sublocations')">Lumbar Spine</button>
+                    <button class="filter-button sublocation-button" onclick="toggleFilter(this, 'right upper quadrant', 'sublocations')">Right Upper Quadrant</button>
+                    <button class="filter-button sublocation-button" onclick="toggleFilter(this, 'left upper quadrant', 'sublocations')">Left Upper Quadrant</button>
+                    <button class="filter-button sublocation-button" onclick="toggleFilter(this, 'right lower quadrant', 'sublocations')">Right Lower Quadrant</button>
+                    <button class="filter-button sublocation-button" onclick="toggleFilter(this, 'left lower quadrant', 'sublocations')">Left Lower Quadrant</button>
+                </div>
+            </div>
+
+            <!-- Spine -->
+            <div class="location-group">
+                <div class="location-label">Spine</div>
+                <button class="filter-button location-button" onclick="toggleFilter(this, 'spine', 'locations')">Spine</button>
+                <div class="sublocation-container">
+                    <button class="filter-button sublocation-button" onclick="toggleFilter(this, 'spinal cord', 'sublocations')">Spinal Cord</button>
+                    <button class="filter-button sublocation-button" onclick="toggleFilter(this, 'vertebral', 'sublocations')">Vertebral</button>
+                    <button class="filter-button sublocation-button" onclick="toggleFilter(this, 'tracts', 'sublocations')">Tracts</button>
+                    <button class="filter-button sublocation-button" onclick="toggleFilter(this, 'sacral spine', 'sublocations')">Sacral Spine</button>
+                </div>
+            </div>
+
+            <!-- Pelvis -->
+            <div class="location-group">
+                <div class="location-label">Pelvis</div>
+                <button class="filter-button location-button" onclick="toggleFilter(this, 'pelvis', 'locations')">Pelvis</button>
+                <div class="sublocation-container">
+                    <button class="filter-button sublocation-button" onclick="toggleFilter(this, 'sacral spine', 'sublocations')">Sacral Spine</button>
+                    <button class="filter-button sublocation-button" onclick="toggleFilter(this, 'greater pelvis', 'sublocations')">Greater Pelvis</button>
+                    <button
