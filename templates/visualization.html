@@ -1,10 +1,11 @@
 <!DOCTYPE html>
 <html>
 <head>
-    <title>neo4j force graph</title>
+    <title>Neo4j Force Graph</title>
+    <script src="https://unpkg.com/neo4j-driver@5.15.0"></script>
     <script src="https://d3js.org/d3.v5.min.js"></script>
     <style>
-        body { 
+        body {
             margin: 0;
             padding: 20px;
             background-color: #1a1a1a;
@@ -19,14 +20,17 @@
             border: 1px solid #404040;
             border-radius: 4px;
         }
-        #controls {
+        .filter-section {
             margin: 20px 0;
             padding: 10px;
             background-color: #2a2a2a;
             border-radius: 4px;
+        }
+        #location-buttons, #sublocation-buttons {
             display: flex;
             gap: 10px;
             flex-wrap: wrap;
+            margin: 10px 0;
         }
         .filter-button {
             padding: 8px 16px;
@@ -36,7 +40,6 @@
             border-radius: 4px;
             cursor: pointer;
             transition: all 0.3s ease;
-            min-width: 100px;
             text-transform: lowercase;
         }
         .filter-button:hover {
@@ -44,6 +47,10 @@
         }
         .filter-button.active {
             background-color: #007bff;
+        }
+        .filter-button.disabled {
+            opacity: 0.5;
+            pointer-events: none;
         }
         #search-container {
             margin-bottom: 20px;
@@ -56,6 +63,10 @@
             border-radius: 4px;
             color: white;
         }
+        h4 {
+            margin: 10px 0;
+            color: #888;
+        }
     </style>
 </head>
 <body>
@@ -63,268 +74,167 @@
         <input type="text" id="search-input" placeholder="search nodes...">
     </div>
     
-    <div id="controls">
-        <button class="filter-button" onclick="filterNodes('skin')">skin</button>
-        <button class="filter-button" onclick="filterNodes('nerve')">nerve</button>
-        <button class="filter-button" onclick="filterNodes('bone')">bone</button>
-        <button class="filter-button" onclick="filterNodes('neuro')">neuro</button>
-        <button class="filter-button" onclick="filterNodes('region')">region</button>
-        <button class="filter-button" onclick="filterNodes('viscera')">viscera</button>
-        <button class="filter-button" onclick="filterNodes('muscle')">muscle</button>
-        <button class="filter-button" onclick="filterNodes('sense')">sense</button>
-        <button class="filter-button" onclick="filterNodes('vein')">vein</button>
-        <button class="filter-button" onclick="filterNodes('artery')">artery</button>
-        <button class="filter-button" onclick="filterNodes('cv')">cv</button>
-        <button class="filter-button" onclick="filterNodes('function')">function</button>
-        <button class="filter-button" onclick="filterNodes('sensory')">sensory</button>
-        <button class="filter-button" onclick="filterNodes('gland')">gland</button>
-        <button class="filter-button" onclick="filterNodes('lymph')">lymph</button>
-        <button class="filter-button" onclick="filterNodes('head')">head</button>
-        <button class="filter-button" onclick="filterNodes('organ')">organ</button>
-        <button class="filter-button" onclick="filterNodes('sensation')">sensation</button>
-        <button class="filter-button active" onclick="showAll()">show all</button>
+    <div class="filter-section">
+        <h4>Location</h4>
+        <div id="location-buttons"></div>
+        <h4>Sublocation</h4>
+        <div id="sublocation-buttons"></div>
     </div>
 
     <div id="graph"></div>
 
     <script>
+        // Location-sublocation mapping
+        const locationMap = {
+            'head': ['brain', 'eye', 'face', 'ear', 'nose', 'skull', 'mouth', 'head'],
+            'neck': ['cervical spine', 'visceral', 'vascular'],
+            'upper limb': ['wrist', 'hand', 'fingers', 'arm', 'forearm', 'elbow', 'shoulder'],
+            'thorax': ['thoracic spine', 'ribcage', 'heart', 'lung'],
+            'abdomen': ['lumbar spine', 'right upper quadrant', 'left upper quadrant', 'right lower quadrant', 'left lower quadrant'],
+            'spine': ['spinal cord', 'vertebral', 'tracts', 'sacral spine'],
+            'pelvis': ['sacral spine', 'greater pelvis', 'lesser pelvis'],
+            'lower limb': ['foot', 'thigh', 'knee', 'leg', 'ankle', 'toes']
+        };
+
+        let allNodes = [];
+        let allRelationships = [];
+        let currentLocation = null;
+        
+        // Set up the SVG
         const width = document.getElementById('graph').clientWidth;
         const height = document.getElementById('graph').clientHeight;
         
-        const svg = d3.select("#graph")
-            .append("svg")
-            .attr("width", width)
-            .attr("height", height);
+        const svg = d3.select('#graph')
+            .append('svg')
+            .attr('width', width)
+            .attr('height', height);
 
-        const g = svg.append("g");
+        // Create location buttons
+        const locationButtons = document.getElementById('location-buttons');
+        Object.keys(locationMap).forEach(location => {
+            const button = document.createElement('button');
+            button.className = 'filter-button';
+            button.textContent = location;
+            button.onclick = () => selectLocation(location);
+            locationButtons.appendChild(button);
+        });
 
-        // Add zoom behavior
-        const zoom = d3.zoom()
-            .scaleExtent([0.1, 4])
-            .on("zoom", () => {
-                g.attr("transform", d3.event.transform);
-            });
-
-        svg.call(zoom);
-
-        function getNodeColor(label) {
-            const colors = {
-                'Nerve': '#ff7f0e',
-                'Bone': '#2ca02c',
-                'Region': '#d62728',
-                'Muscle': '#9467bd',
-                'Vessel': '#8c564b',
-                'Organ': '#e377c2',
-                'Function': '#7f7f7f',
-                'Sensation': '#bcbd22'
-            };
-            return colors[label] || '#1f77b4';
-        }
-
-        function updateVisualization(nodes, relationships) {
-            g.selectAll("*").remove();
-
-            // Draw relationships
-            const links = g.selectAll(".link")
-                .data(relationships)
-                .enter()
-                .append("line")
-                .attr("class", "link")
-                .style("stroke", "#404040")
-                .style("stroke-width", 1)
-                .attr("x1", d => {
-                    const source = nodes.find(n => n.id === d.source);
-                    return source ? source.x : 0;
-                })
-                .attr("y1", d => {
-                    const source = nodes.find(n => n.id === d.source);
-                    return source ? source.y : 0;
-                })
-                .attr("x2", d => {
-                    const target = nodes.find(n => n.id === d.target);
-                    return target ? target.x : 0;
-                })
-                .attr("y2", d => {
-                    const target = nodes.find(n => n.id === d.target);
-                    return target ? target.y : 0;
-                });
-
-            // Draw nodes
-            const nodes_g = g.selectAll(".node")
-                .data(nodes)
-                .enter()
-                .append("g")
-                .attr("class", "node")
-                .attr("transform", d => `translate(${d.x},${d.y})`);
-
-            nodes_g.append("circle")
-                .attr("r", 5)
-                .style("fill", d => getNodeColor(d.labels[0]));
-
-            nodes_g.append("text")
-                .attr("dx", 12)
-                .attr("dy", ".35em")
-                .text(d => (d.properties.name || d.id).toLowerCase())
-                .style("fill", "white")
-                .style("font-size", "12px");
-        }
-
-        // Load initial data
-        fetch('/graph')
-            .then(response => response.json())
-            .then(data => {
-                updateVisualization(data.nodes, data.relationships);
-            })
-            .catch(error => {
-                console.error('Error:', error);
-            });
-
-        function filterNodes(type) {
-            document.querySelectorAll('.filter-button').forEach(btn => {
+        function selectLocation(location) {
+            // Reset all location buttons
+            document.querySelectorAll('#location-buttons .filter-button').forEach(btn => {
                 btn.classList.remove('active');
-                if (btn.textContent === type) {
-                    btn.classList.add('active');
-                }
             });
-
-            fetch('/graph')
-                .then(response => response.json())
-                .then(data => {
-                    const filteredNodes = data.nodes.filter(node => 
-                        node.labels.some(label => label.toLowerCase() === type.toLowerCase())
-                    );
-                    const nodeIds = new Set(filteredNodes.map(n => n.id));
-                    const filteredRelationships = data.relationships.filter(rel =>
-                        nodeIds.has(rel.source) && nodeIds.has(rel.target)
-                    );
-                    updateVisualization(filteredNodes, filteredRelationships);
-                })
-                .catch(error => {
-                    console.error('Error:', error);
-                });
+            
+            // Activate selected location button
+            document.querySelector(`#location-buttons .filter-button[data-location="${location}"]`).classList.add('active');
+            
+            currentLocation = location;
+            updateSublocationButtons(location);
+            filterByLocation(location);
         }
 
-        function showAll() {
-            document.querySelectorAll('.filter-button').forEach(btn => {
-                btn.classList.remove('active');
-                if (btn.textContent === 'show all') {
-                    btn.classList.add('active');
-                }
+        function updateSublocationButtons(location) {
+            const sublocationButtons = document.getElementById('sublocation-buttons');
+            sublocationButtons.innerHTML = '';
+            
+            locationMap[location].forEach(sublocation => {
+                const button = document.createElement('button');
+                button.className = 'filter-button';
+                button.textContent = sublocation;
+                button.onclick = () => filterBySublocation(sublocation);
+                sublocationButtons.appendChild(button);
             });
+        }
 
-            fetch('/graph')
+        function filterByLocation(location) {
+            fetch(`/filter?location=${encodeURIComponent(location)}`)
                 .then(response => response.json())
                 .then(data => {
                     updateVisualization(data.nodes, data.relationships);
                 })
-                .catch(error => {
-                    console.error('Error:', error);
-                });
+                .catch(error => console.error('Error:', error));
         }
 
-// Add this to your visualization.html
+        function filterBySublocation(sublocation) {
+            document.querySelectorAll('#sublocation-buttons .filter-button').forEach(btn => {
+                btn.classList.remove('active');
+            });
+            document.querySelector(`#sublocation-buttons .filter-button[data-sublocation="${sublocation}"]`).classList.add('active');
+            
+            fetch(`/filter?location=${encodeURIComponent(currentLocation)}&sublocation=${encodeURIComponent(sublocation)}`)
+                .then(response => response.json())
+                .then(data => {
+                    updateVisualization(data.nodes, data.relationships);
+                })
+                .catch(error => console.error('Error:', error));
+        }
 
-<div id="location-filters">
-  <h4>Location</h4>
-  <div id="location-buttons"></div>
-  <h4>Sublocation</h4>
-  <div id="sublocation-buttons"></div>
-</div>
+        function updateVisualization(nodes, relationships) {
+            svg.selectAll('*').remove();
+            
+            const g = svg.append('g');
+            
+            // Add zoom behavior
+            const zoom = d3.zoom()
+                .scaleExtent([0.1, 4])
+                .on('zoom', () => {
+                    g.attr('transform', d3.event.transform);
+                });
+            
+            svg.call(zoom);
 
-<script>
-// Location-sublocation mapping
-const locationMap = {
-    'head': ['brain', 'eye', 'face', 'ear', 'nose', 'skull', 'mouth', 'head'],
-    'neck': ['cervical spine', 'visceral', 'vascular'],
-    'upper limb': ['wrist', 'hand', 'fingers', 'arm', 'forearm', 'elbow', 'shoulder'],
-    'thorax': ['thoracic spine', 'ribcage', 'heart', 'lung'],
-    'abdomen': ['lumbar spine', 'right upper quadrant', 'left upper quadrant', 'right lower quadrant', 'left lower quadrant'],
-    'spine': ['spinal cord', 'vertebral', 'tracts', 'sacral spine'],
-    'pelvis': ['sacral spine', 'greater pelvis', 'lesser pelvis'],
-    'lower limb': ['foot', 'thigh', 'knee', 'leg', 'ankle', 'toes']
-};
+            // Draw relationships
+            const links = g.selectAll('.link')
+                .data(relationships)
+                .enter()
+                .append('line')
+                .attr('class', 'link')
+                .style('stroke', '#404040')
+                .style('stroke-width', 1)
+                .attr('x1', d => nodes.find(n => n.id === d.source).x)
+                .attr('y1', d => nodes.find(n => n.id === d.source).y)
+                .attr('x2', d => nodes.find(n => n.id === d.target).x)
+                .attr('y2', d => nodes.find(n => n.id === d.target).y);
 
-// Create location buttons
-const locationButtons = document.getElementById('location-buttons');
-Object.keys(locationMap).forEach(location => {
-    const button = document.createElement('button');
-    button.className = 'filter-button';
-    button.textContent = location;
-    button.onclick = () => selectLocation(location);
-    locationButtons.appendChild(button);
-});
+            // Draw nodes
+            const nodeGroups = g.selectAll('.node')
+                .data(nodes)
+                .enter()
+                .append('g')
+                .attr('class', 'node')
+                .attr('transform', d => `translate(${d.x},${d.y})`);
 
-let currentLocation = null;
+            nodeGroups.append('circle')
+                .attr('r', 5)
+                .style('fill', d => getNodeColor(d.labels[0]));
 
-function selectLocation(location) {
-    currentLocation = location;
-    
-    // Update location button states
-    document.querySelectorAll('#location-buttons .filter-button').forEach(btn => {
-        btn.classList.toggle('active', btn.textContent === location);
-    });
-    
-    // Update sublocation buttons
-    updateSublocationButtons(location);
-    
-    // Filter graph based on location
-    filterByLocation(location);
-}
+            nodeGroups.append('text')
+                .attr('dx', 12)
+                .attr('dy', '.35em')
+                .text(d => d.properties.name || d.id)
+                .style('fill', 'white')
+                .style('font-size', '12px');
+        }
 
-function updateSublocationButtons(location) {
-    const sublocationButtons = document.getElementById('sublocation-buttons');
-    sublocationButtons.innerHTML = '';
-    
-    locationMap[location].forEach(sublocation => {
-        const button = document.createElement('button');
-        button.className = 'filter-button';
-        button.textContent = sublocation;
-        button.onclick = () => filterBySublocation(sublocation);
-        sublocationButtons.appendChild(button);
-    });
-}
+        function getNodeColor(label) {
+            const colors = {
+                'Location': '#ff7f0e',
+                'Sublocation': '#1f77b4',
+                'default': '#2ca02c'
+            };
+            return colors[label] || colors.default;
+        }
 
-function filterByLocation(location) {
-    const filteredNodes = allNodes.filter(node => 
-        node.properties.location === location
-    );
-    const filteredRelationships = allRelationships.filter(rel =>
-        filteredNodes.some(n => n.id === rel.source) &&
-        filteredNodes.some(n => n.id === rel.target)
-    );
-    updateVisualization(filteredNodes, filteredRelationships);
-}
+        // Initial load
+        fetch('/graph')
+            .then(response => response.json())
+            .then(data => {
+                allNodes = data.nodes;
+                allRelationships = data.relationships;
+                updateVisualization(data.nodes, data.relationships);
+            })
+            .catch(error => console.error('Error:', error));
 
-function filterBySublocation(sublocation) {
-    document.querySelectorAll('#sublocation-buttons .filter-button').forEach(btn => {
-        btn.classList.toggle('active', btn.textContent === sublocation);
-    });
-    
-    const filteredNodes = allNodes.filter(node => 
-        node.properties.sublocation === sublocation
-    );
-    const filteredRelationships = allRelationships.filter(rel =>
-        filteredNodes.some(n => n.id === rel.source) &&
-        filteredNodes.some(n => n.id === rel.target)
-    );
-    updateVisualization(filteredNodes, filteredRelationships);
-}
-
-// Add CSS styles
-<style>
-.filter-button {
-    opacity: 1;
-    transition: opacity 0.3s;
-}
-
-.filter-button.disabled {
-    opacity: 0.5;
-    pointer-events: none;
-}
-</style>
-
-
-        
         // Search functionality
         const searchInput = document.getElementById('search-input');
         let searchTimeout;
@@ -338,14 +248,12 @@ function filterBySublocation(sublocation) {
                     return;
                 }
                 
-                fetch('/search?q=' + encodeURIComponent(query))
+                fetch(`/search?q=${encodeURIComponent(query)}`)
                     .then(response => response.json())
                     .then(data => {
                         updateVisualization(data.nodes, data.relationships);
                     })
-                    .catch(error => {
-                        console.error('Error:', error);
-                    });
+                    .catch(error => console.error('Error:', error));
             }, 300);
         });
     </script>
