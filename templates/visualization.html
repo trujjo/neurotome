@@ -53,23 +53,13 @@
             transition: all 0.3s ease;
             text-transform: lowercase;
             font-size: 14px;
+            margin: 4px;
         }
         .filter-button:hover {
             background-color: #505050;
         }
         .filter-button.active {
             background-color: #007bff;
-        }
-        #search-container {
-            margin-bottom: 20px;
-        }
-        #search-input {
-            padding: 8px;
-            width: 200px;
-            background-color: #2a2a2a;
-            border: 1px solid #404040;
-            border-radius: 4px;
-            color: white;
         }
         .zoom-controls {
             position: absolute;
@@ -93,18 +83,15 @@
             align-items: center;
             justify-content: center;
         }
-        .zoom-button:hover {
-            background-color: #505050;
-        }
         .node {
-            transition: opacity 0.3s;
+            transition: opacity 0.3s ease;
         }
         .node.hidden {
             opacity: 0;
             pointer-events: none;
         }
         .link {
-            transition: opacity 0.3s;
+            transition: opacity 0.3s ease;
         }
         .link.hidden {
             opacity: 0;
@@ -119,7 +106,7 @@
     <div class="filter-section">
         <div class="filter-group">
             <div class="filter-label">Node Types</div>
-            <div id="node-type-buttons" class="button-container"></div>
+            <div id="type-buttons" class="button-container"></div>
         </div>
         
         <div class="filter-group">
@@ -167,6 +154,14 @@
 
         svg.call(zoom);
 
+        let allNodes = [];
+        let allRelationships = [];
+        let activeFilters = {
+            types: new Set(),
+            locations: new Set(),
+            sublocations: new Set()
+        };
+
         function zoomed() {
             g.attr('transform', d3.event.transform);
         }
@@ -179,82 +174,62 @@
             svg.transition().duration(300).call(zoom.scaleBy, 0.67);
         }
 
-        let allNodes = [];
-        let allRelationships = [];
-        let activeFilters = {
-            types: new Set(),
-            locations: new Set(),
-            sublocations: new Set()
-        };
-
-        function initializeButtons() {
-            // Get unique values
-            const nodeTypes = [...new Set(allNodes.map(n => n.labels[0]))];
-            const locations = [...new Set(allNodes.map(n => n.properties.location).filter(Boolean))];
-            const sublocations = [...new Set(allNodes.map(n => n.properties.sublocation).filter(Boolean))];
-
-            // Create buttons for each type
-            const typeContainer = document.getElementById('node-type-buttons');
-            nodeTypes.forEach(type => {
-                const button = document.createElement('button');
-                button.className = 'filter-button';
-                button.textContent = type;
-                button.onclick = () => toggleFilter('types', type);
-                typeContainer.appendChild(button);
-            });
-
-            // Create buttons for locations
-            const locationContainer = document.getElementById('location-buttons');
-            locations.forEach(location => {
-                const button = document.createElement('button');
-                button.className = 'filter-button';
-                button.textContent = location;
-                button.onclick = () => toggleFilter('locations', location);
-                locationContainer.appendChild(button);
-            });
-
-            // Create buttons for sublocations
-            const sublocationContainer = document.getElementById('sublocation-buttons');
-            sublocations.forEach(sublocation => {
-                const button = document.createElement('button');
-                button.className = 'filter-button';
-                button.textContent = sublocation;
-                button.onclick = () => toggleFilter('sublocations', sublocation);
-                sublocationContainer.appendChild(button);
-            });
+        function createButton(container, text, type) {
+            const button = document.createElement('button');
+            button.className = 'filter-button';
+            button.textContent = text;
+            button.addEventListener('click', () => toggleFilter(button, text, type));
+            container.appendChild(button);
+            return button;
         }
 
-        function toggleFilter(filterType, value) {
-            const filterSet = activeFilters[filterType];
-            const button = event.target;
-            
-            if (filterSet.has(value)) {
-                filterSet.delete(value);
-                button.classList.remove('active');
+        function toggleFilter(button, value, type) {
+            button.classList.toggle('active');
+            if (button.classList.contains('active')) {
+                activeFilters[type].add(value);
             } else {
-                filterSet.add(value);
-                button.classList.add('active');
+                activeFilters[type].delete(value);
             }
-            
             updateNodeVisibility();
+        }
+
+        function initializeButtons() {
+            const typeContainer = document.getElementById('type-buttons');
+            const locationContainer = document.getElementById('location-buttons');
+            const sublocationContainer = document.getElementById('sublocation-buttons');
+
+            // Clear existing buttons
+            typeContainer.innerHTML = '';
+            locationContainer.innerHTML = '';
+            sublocationContainer.innerHTML = '';
+
+            // Get unique values
+            const types = new Set(allNodes.flatMap(node => node.labels));
+            const locations = new Set(allNodes.map(node => node.properties.location).filter(Boolean));
+            const sublocations = new Set(allNodes.map(node => node.properties.sublocation).filter(Boolean));
+
+            // Create buttons
+            types.forEach(type => createButton(typeContainer, type, 'types'));
+            locations.forEach(location => createButton(locationContainer, location, 'locations'));
+            sublocations.forEach(sublocation => createButton(sublocationContainer, sublocation, 'sublocations'));
         }
 
         function updateNodeVisibility() {
             const nodes = d3.selectAll('.node');
             const links = d3.selectAll('.link');
-            
+
             nodes.each(function(d) {
                 const nodeType = d.labels[0];
                 const nodeLocation = d.properties.location;
                 const nodeSublocation = d.properties.sublocation;
-                
+
                 const isVisible = (activeFilters.types.size === 0 || activeFilters.types.has(nodeType)) &&
                                 (activeFilters.locations.size === 0 || activeFilters.locations.has(nodeLocation)) &&
                                 (activeFilters.sublocations.size === 0 || activeFilters.sublocations.has(nodeSublocation));
                 
                 d3.select(this).classed('hidden', !isVisible);
             });
-            
+
             links.each(function(d) {
                 const sourceVisible = !d3.select(`.node[data-id="${d.source}"]`).classed('hidden');
                 const targetVisible = !d3.select(`.node[data-id="${d.target}"]`).classed('hidden');
@@ -295,7 +270,6 @@
                     const node = d3.select(this);
                     let fontSize = 14;
                     const maxWidth = 28;
-                    
                     while (this.getComputedTextLength() > maxWidth && fontSize > 6) {
                         fontSize--;
                         node.style('font-size', `${fontSize}px`);
@@ -321,6 +295,18 @@
             return colors[label] || '#ff7f0e';
         }
 
+        // Initial load
+        fetch('/graph')
+            .then(response => response.json())
+            .then(data => {
+                allNodes = data.nodes;
+                allRelationships = data.relationships;
+                initializeButtons();
+                updateVisualization(allNodes, allRelationships);
+            })
+            .catch(error => console.error('Error:', error));
+
+        // Search functionality
         const searchInput = document.getElementById('search-input');
         let searchTimeout;
 
@@ -346,17 +332,6 @@
                     .catch(error => console.error('Error:', error));
             }, 300);
         });
-
-        // Initial load
-        fetch('/graph')
-            .then(response => response.json())
-            .then(data => {
-                allNodes = data.nodes;
-                allRelationships = data.relationships;
-                initializeButtons();
-                updateVisualization(allNodes, allRelationships);
-            })
-            .catch(error => console.error('Error:', error));
     </script>
 </body>
 </html>
