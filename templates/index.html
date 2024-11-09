@@ -1,13 +1,19 @@
-
 <!DOCTYPE html>
 <html>
 <head>
+    <title>Neural Network Visualization</title>
+    <script src="https://d3js.org/d3.v7.min.js"></script>
     <style>
         body {
             background-color: #1e1e1e;
             color: #f0f0f0;
             font-family: Arial, sans-serif;
+            margin: 0;
+            padding: 0;
+            overflow: hidden;
         }
+
+        /* Your existing filter styles */
         .filter-tabs {
             display: flex;
             gap: 10px;
@@ -87,195 +93,201 @@
             background: #D35400;
             border-color: #D35400;
         }
+        .stats {
+            color: #888;
+            font-size: 0.9em;
+            margin-top: 5px;
+        }
         .clear-btn {
-            padding: 4px 8px;
-            border: 1px solid #ff4444;
-            border-radius: 12px;
             background: transparent;
-            color: #ff4444;
+            border: none;
+            color: #888;
             cursor: pointer;
-            font-size: 12px;
+            font-size: 0.9em;
+            padding: 2px 5px;
+            border-radius: 4px;
         }
         .clear-btn:hover {
-            background: #ff4444;
-            color: white;
+            background: #4a4a4a;
         }
-        .filter-stats {
-            color: #808080;
-            font-size: 14px;
-            padding: 10px 20px;
+
+        /* New visualization styles */
+        #visualization-container {
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            bottom: 20px;
+            left: 320px;
+            background: #1e1e1e;
+            border-radius: 8px;
+            overflow: hidden;
+        }
+        
+        #filters {
+            position: fixed;
+            top: 20px;
+            left: 20px;
+            width: 280px;
+            bottom: 20px;
+            overflow-y: auto;
+            background: #2a2a2a;
+            border-radius: 8px;
+            padding: 20px;
+        }
+
+        .node {
+            stroke: #fff;
+            stroke-width: 1.5px;
+        }
+        
+        .link {
+            stroke: #999;
+            stroke-opacity: 0.6;
+            stroke-width: 1px;
+        }
+        
+        .node text {
+            fill: #fff;
+            font-size: 12px;
+            pointer-events: none;
+        }
+        
+        .tooltip {
+            position: absolute;
+            background: rgba(0, 0, 0, 0.8);
+            color: white;
+            padding: 10px;
+            border-radius: 5px;
+            font-size: 12px;
+            pointer-events: none;
+            z-index: 1000;
+        }
+
+        /* Loading indicator */
+        .loading {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            color: #888;
+            font-size: 1.2em;
         }
     </style>
 </head>
 <body>
-    <div class="filter-tabs">
-        <button class="tab-button active" data-tab="node-types">Node Types</button>
-        <button class="tab-button" data-tab="locations">Locations</button>
-    </div>
+    <div id="filters">
+        <div class="filter-tabs">
+            <button class="tab-button active" data-tab="node-types">Node Types</button>
+            <button class="tab-button" data-tab="locations">Locations</button>
+        </div>
 
-    <div id="node-types" class="filter-section active">
-        <div class="filter-container">
+        <div id="node-types" class="filter-section active">
             <div class="filter-group">
                 <div class="filter-group-title">
-                    <h3>Node Types</h3>
+                    <span>Node Types</span>
                     <button class="clear-btn" onclick="filterManager.clearNodeTypes()">Clear</button>
                 </div>
-                <div class="filter-buttons" id="nodeTypeFilters">
-                    <button class="filter-btn" data-type="nerve">nerve</button>
-                    <button class="filter-btn" data-type="bone">bone</button>
-                    <button class="filter-btn" data-type="neuro">neuro</button>
-                    <button class="filter-btn" data-type="region">region</button>
-                    <button class="filter-btn" data-type="viscera">viscera</button>
-                    <button class="filter-btn" data-type="muscle">muscle</button>
-                    <button class="filter-btn" data-type="sense">sense</button>
-                    <button class="filter-btn" data-type="vein">vein</button>
-                    <button class="filter-btn" data-type="artery">artery</button>
-                    <button class="filter-btn" data-type="cv">cv</button>
-                    <button class="filter-btn" data-type="function">function</button>
-                    <button class="filter-btn" data-type="sensory">sensory</button>
-                    <button class="filter-btn" data-type="gland">gland</button>
-                    <button class="filter-btn" data-type="lymph">lymph</button>
-                    <button class="filter-btn" data-type="head">head</button>
-                    <button class="filter-btn" data-type="organ">organ</button>
-                    <button class="filter-btn" data-type="sensation">sensation</button>
-                    <button class="filter-btn" data-type="skin">skin</button>
+                <div class="filter-buttons">
+                    <button class="filter-btn" data-type="nerve">Nerve</button>
+                    <button class="filter-btn" data-type="muscle">Muscle</button>
+                    <button class="filter-btn" data-type="bone">Bone</button>
+                    <button class="filter-btn" data-type="region">Region</button>
+                    <button class="filter-btn" data-type="vessel">Vessel</button>
                 </div>
+                <div class="stats" id="nodeTypeStats">0 node types selected</div>
             </div>
         </div>
-        <div class="filter-stats" id="nodeTypeStats"></div>
-    </div>
 
-    <div id="locations" class="filter-section">
-        <div class="filter-container" id="locationGroups">
-            <!-- Location groups will be inserted here by JavaScript -->
+        <div id="locations" class="filter-section">
+            <div class="filter-group">
+                <div class="filter-group-title">
+                    <span>Head</span>
+                    <button class="clear-btn" onclick="filterManager.clearLocationGroup('head')">Clear</button>
+                </div>
+                <div class="filter-buttons">
+                    <button class="filter-btn" data-location="head" data-sublocation="skull">Skull</button>
+                    <button class="filter-btn" data-location="head" data-sublocation="brain">Brain</button>
+                    <button class="filter-btn" data-location="head" data-sublocation="face">Face</button>
+                </div>
+            </div>
+
+            <div class="filter-group">
+                <div class="filter-group-title">
+                    <span>Neck</span>
+                    <button class="clear-btn" onclick="filterManager.clearLocationGroup('neck')">Clear</button>
+                </div>
+                <div class="filter-buttons">
+                    <button class="filter-btn" data-location="neck" data-sublocation="throat">Throat</button>
+                    <button class="filter-btn" data-location="neck" data-sublocation="spine">Spine</button>
+                </div>
+            </div>
+
+            <div class="stats" id="locationStats">0 locations selected</div>
         </div>
-        <div class="filter-stats" id="locationStats"></div>
     </div>
 
-    <script>
-        const locationData = {
-            'head': ['brain', 'eye', 'face', 'ear', 'nose', 'skull', 'mouth', 'head'],
-            'neck': ['cervical spine', 'visceral', 'vascular'],
-            'upper limb': ['wrist', 'hand', 'fingers', 'arm', 'forearm', 'elbow', 'shoulder'],
-            'thorax': ['thoracic spine', 'ribcage', 'heart', 'lung'],
-            'abdomen': ['lumbar spine', 'right upper quadrant', 'left upper quadrant', 'right lower quadrant', 'left lower quadrant'],
-            'spine': ['spinal cord', 'vertebral', 'tracts', 'sacral spine'],
-            'pelvis': ['sacral spine', 'greater pelvis', 'lesser pelvis'],
-            'lower limb': ['foot', 'thigh', 'knee', 'leg', 'ankle', 'toes']
-        };
+    <!-- Visualization container -->
+    <div id="visualization-container">
+        <div class="loading">Loading visualization...</div>
+    </div>
+
+    <script type="module">
+        import { NeoViz } from './static/visualization_config.js';
 
         class FilterManager {
             constructor() {
                 this.activeNodeTypes = new Set();
                 this.activeLocations = new Set();
                 this.activeSublocations = new Set();
-                this.initializeTabs();
-                this.initializeLocationGroups();
-                this.initializeEventListeners();
-                this.updateStats();
-            }
+                
+                // Initialize visualization
+                this.viz = new NeoViz('#visualization-container');
 
-            initializeTabs() {
+                // Initialize tab switching
                 document.querySelectorAll('.tab-button').forEach(button => {
-                    button.addEventListener('click', () => {
-                        document.querySelectorAll('.tab-button').forEach(b => b.classList.remove('active'));
-                        document.querySelectorAll('.filter-section').forEach(s => s.classList.remove('active'));
-                        button.classList.add('active');
-                        document.getElementById(button.dataset.tab).classList.add('active');
-                    });
+                    button.addEventListener('click', () => this.switchTab(button.dataset.tab));
                 });
-            }
 
-            initializeLocationGroups() {
-                const container = document.getElementById('locationGroups');
-                Object.entries(locationData).forEach(([location, sublocations]) => {
-                    const group = document.createElement('div');
-                    group.className = 'filter-group';
-                    
-                    const header = document.createElement('div');
-                    header.className = 'filter-group-title';
-                    
-                    const locationHeader = document.createElement('h3');
-                    locationHeader.className = 'location-header';
-                    locationHeader.textContent = location;
-                    locationHeader.onclick = () => this.toggleLocationGroup(location);
-                    
-                    const clearBtn = document.createElement('button');
-                    clearBtn.className = 'clear-btn';
-                    clearBtn.textContent = 'Clear';
-                    clearBtn.onclick = (e) => {
-                        e.stopPropagation();
-                        this.clearLocationGroup(location);
-                    };
-                    
-                    header.appendChild(locationHeader);
-                    header.appendChild(clearBtn);
-                    
-                    const buttons = document.createElement('div');
-                    buttons.className = 'filter-buttons';
-                    
-                    sublocations.forEach(sublocation => {
-                        const button = document.createElement('button');
-                        button.className = 'filter-btn';
-                        button.setAttribute('data-location', location);
-                        button.setAttribute('data-sublocation', sublocation);
-                        button.textContent = sublocation;
-                        button.onclick = () => this.toggleSublocation(button);
-                        buttons.appendChild(button);
-                    });
-                    
-                    group.appendChild(header);
-                    group.appendChild(buttons);
-                    container.appendChild(group);
-                });
-            }
-
-            toggleLocationGroup(location) {
-                const buttons = document.querySelectorAll(`[data-location="${location}"]`);
-                const allActive = Array.from(buttons).every(btn => btn.classList.contains('active'));
-                
-                buttons.forEach(button => {
-                    const sublocation = button.dataset.sublocation;
-                    if (allActive) {
-                        this.activeSublocations.delete(sublocation);
-                        button.classList.remove('active');
-                    } else {
-                        this.activeSublocations.add(sublocation);
-                        button.classList.add('active');
-                    }
-                });
-                
-                if (allActive) {
-                    this.activeLocations.delete(location);
-                } else {
-                    this.activeLocations.add(location);
-                }
-                
-                this.updateVisualization();
-                this.updateStats();
-            }
-
-            initializeEventListeners() {
+                // Initialize node type filters
                 document.querySelectorAll('#node-types .filter-btn').forEach(button => {
                     button.addEventListener('click', () => this.toggleNodeType(button));
+                });
+
+                // Initialize location filters
+                document.querySelectorAll('#locations .filter-btn').forEach(button => {
+                    button.addEventListener('click', () => this.toggleLocation(button));
+                });
+
+                // Initial visualization load
+                this.updateVisualization();
+            }
+
+            switchTab(tabId) {
+                document.querySelectorAll('.tab-button').forEach(button => {
+                    button.classList.toggle('active', button.dataset.tab === tabId);
+                });
+                document.querySelectorAll('.filter-section').forEach(section => {
+                    section.classList.toggle('active', section.id === tabId);
                 });
             }
 
             toggleNodeType(button) {
+                const nodeType = button.dataset.type;
                 if (button.classList.contains('active')) {
-                    this.activeNodeTypes.delete(button.dataset.type);
+                    this.activeNodeTypes.delete(nodeType);
                     button.classList.remove('active');
                 } else {
-                    this.activeNodeTypes.add(button.dataset.type);
+                    this.activeNodeTypes.add(nodeType);
                     button.classList.add('active');
                 }
                 this.updateVisualization();
                 this.updateStats();
             }
 
-            toggleSublocation(button) {
+            toggleLocation(button) {
                 const location = button.dataset.location;
                 const sublocation = button.dataset.sublocation;
+                
                 if (button.classList.contains('active')) {
                     this.activeSublocations.delete(sublocation);
                     button.classList.remove('active');
@@ -325,12 +337,37 @@
                     locations: Array.from(this.activeLocations),
                     sublocations: Array.from(this.activeSublocations)
                 };
-                console.log('Active filters:', filters);
+
+                // Show loading indicator
+                document.querySelector('.loading').style.display = 'block';
+                
+                // Fetch filtered data from API
+                const queryParams = new URLSearchParams();
+                filters.nodeTypes.forEach(type => queryParams.append('nodeTypes[]', type));
+                filters.locations.forEach(location => queryParams.append('locations[]', location));
+                
+                fetch('/api/graph/filtered?' + queryParams.toString())
+                    .then(response => response.json())
+                    .then(data => {
+                        this.viz.updateData(data);
+                        // Hide loading indicator
+                        document.querySelector('.loading').style.display = 'none';
+                    })
+                    .catch(error => {
+                        console.error('Error fetching graph data:', error);
+                        // Hide loading indicator and show error
+                        document.querySelector('.loading').textContent = 'Error loading visualization';
+                    });
             }
         }
 
-        // Initialize the filter manager
-        const filterManager = new FilterManager();
+        // Initialize the filter manager and make it globally available
+        window.filterManager = new FilterManager();
+
+        // Handle window resize
+        window.addEventListener('resize', () => {
+            filterManager.viz.resize();
+        });
     </script>
 </body>
 </html>
