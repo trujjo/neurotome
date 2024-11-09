@@ -109,26 +109,23 @@ def get_filtered_graph():
         locations = request.args.getlist('locations[]')
         sublocations = request.args.getlist('sublocations[]')
 
-        # Log the received filters
         logger.info(f"Received filters - Node Types: {node_types}, Locations: {locations}, Sublocations: {sublocations}")
 
-        # Validate node types
-        if node_types and any(node_type not in VALID_LABELS for node_type in node_types):
-            logger.error("Invalid node type provided")
-            return jsonify({"error": "Invalid node type provided"}), 400
-
-        # Build the Cypher query
+        # Build the base query
         query_parts = []
         where_conditions = []
         params = {}
 
-        # Start with base MATCH clause
-        query_parts.append("MATCH (n)")
-
-        # Add label filter if node types are specified
+        # Handle node type filtering
         if node_types:
-            where_conditions.append("any(label IN labels(n) WHERE label IN $nodeTypes)")
-            params['nodeTypes'] = node_types
+            # Modified to properly handle label filtering
+            label_conditions = []
+            for label in node_types:
+                label_conditions.append(f":{label}")
+            label_pattern = "".join(label_conditions)
+            query_parts.append(f"MATCH (n{label_pattern})")
+        else:
+            query_parts.append("MATCH (n)")
 
         # Add location filters
         if locations:
@@ -139,11 +136,11 @@ def get_filtered_graph():
             where_conditions.append("n.sublocation IN $sublocations")
             params['sublocations'] = sublocations
 
-        # Combine WHERE conditions if any exist
+        # Add WHERE clause if there are conditions
         if where_conditions:
             query_parts.append("WHERE " + " AND ".join(where_conditions))
 
-        # Add relationship pattern and return statement
+        # Get related nodes and relationships
         query_parts.extend([
             "WITH COLLECT(n) as nodes",
             "UNWIND nodes as n",
@@ -152,7 +149,6 @@ def get_filtered_graph():
             "RETURN COLLECT(DISTINCT n) as nodes, COLLECT(DISTINCT r) as rels"
         ])
 
-        # Combine query parts
         final_query = " ".join(query_parts)
         logger.info(f"Executing query: {final_query}")
         logger.info(f"With parameters: {params}")
@@ -170,6 +166,9 @@ def get_filtered_graph():
             nodes = []
             nodes_set = set()
             for node in record['nodes']:
+                if node is None:
+                    continue
+                    
                 node_dict = dict(node)
                 node_id = node_dict.get('name', str(node.id))
                 
@@ -177,32 +176,25 @@ def get_filtered_graph():
                     nodes_set.add(node_id)
                     node_dict['id'] = node_id
                     node_dict['labels'] = list(node.labels)
-                    
-                    # Safely convert coordinates
-                    for coord in ['x', 'y']:
-                        if coord in node_dict:
-                            try:
-                                node_dict[coord] = float(node_dict[coord])
-                            except (ValueError, TypeError):
-                                node_dict[coord] = 0.0
-                    
                     nodes.append(node_dict)
 
             # Process relationships
             relationships = []
             for rel in record['rels']:
-                if rel is not None:  # Check if relationship exists
-                    source_node = dict(rel.start_node)
-                    target_node = dict(rel.end_node)
-                    source_id = source_node.get('name', str(rel.start_node.id))
-                    target_id = target_node.get('name', str(rel.end_node.id))
+                if rel is None:
+                    continue
+                    
+                source_node = dict(rel.start_node)
+                target_node = dict(rel.end_node)
+                source_id = source_node.get('name', str(rel.start_node.id))
+                target_id = target_node.get('name', str(rel.end_node.id))
 
-                    relationships.append({
-                        'source': source_id,
-                        'target': target_id,
-                        'type': rel.type,
-                        'properties': dict(rel)
-                    })
+                relationships.append({
+                    'source': source_id,
+                    'target': target_id,
+                    'type': rel.type,
+                    'properties': dict(rel)
+                })
 
             response_data = {
                 'nodes': nodes,
@@ -212,12 +204,9 @@ def get_filtered_graph():
             logger.info(f"Returning {len(nodes)} nodes and {len(relationships)} relationships")
             return jsonify(response_data)
 
-    except exceptions.ServiceUnavailable as e:
-        logger.error(f"Database connection error: {str(e)}")
-        return jsonify({"error": "Database connection failed"}), 503
     except Exception as e:
         logger.error(f"Error in get_filtered_graph: {str(e)}")
-        return jsonify({"error": "Failed to fetch graph data"}), 500
+        return jsonify({"error": str(e)}), 500
 
 @app.route('/health')
 def health_check():
