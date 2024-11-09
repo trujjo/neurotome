@@ -4,9 +4,9 @@ from neo4j import GraphDatabase
 app = Flask(__name__)
 
 # Hardcoded Neo4j credentials
-uri = os.getenv("NEO4J_URI")
-user = os.getenv("NEO4J_USER")
-password = os.getenv("NEO4J_PASSWORD")
+uri = "neo4j+s://4e5eeae5.databases.neo4j.io:7687"
+user = "neo4j"
+password = "Poconoco16!"
 
 driver = GraphDatabase.driver(uri, auth=(user, password))
 
@@ -63,7 +63,6 @@ def search():
             MATCH (n)
             WHERE any(prop in keys(n) WHERE toString(n[prop]) CONTAINS $query)
             OPTIONAL MATCH (n)-[r]->(m)
-            WHERE any(prop in keys(m) WHERE toString(m[prop]) CONTAINS $query)
             RETURN {
                 nodes: collect(distinct {
                     id: id(n),
