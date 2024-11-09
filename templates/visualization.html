@@ -1,121 +1,365 @@
+visualization.html
 <!DOCTYPE html>
 <html>
-<!-- ... previous head and style sections ... -->
+<head>
+    <title>Neo4j Force Graph</title>
+    <script src="https://unpkg.com/neo4j-driver@5.15.0"></script>
+    <script src="https://d3js.org/d3.v5.min.js"></script>
+    <style>
+        body { 
+            margin: 0;
+            padding: 20px;
+            background-color: #1a1a1a;
+            color: white;
+            font-family: Arial, sans-serif;
+        }
+        #graph {
+            width: 100%;
+            height: 800px;
+            background-color: #1a1a1a;
+            border: 1px solid #404040;
+            border-radius: 4px;
+        }
+        #status {
+            margin: 10px 0;
+            padding: 10px;
+            border-radius: 4px;
+        }
+        .button {
+            padding: 10px 20px;
+            background-color: #cc5500;
+            color: white;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            margin-bottom: 20px;
+        }
+        .button:hover {
+            background-color: #ff6a00;
+        }
+        .node-label {
+            font-size: 12px;
+            text-anchor: middle;
+            pointer-events: none;
+            fill: white;
+        }
+        .link {
+            stroke: #808080;
+            stroke-opacity: 0.6;
+        }
+        .link-label {
+            font-size: 10px;
+            fill: #cccccc;
+        }
+        .form-control {
+            padding: 8px 12px;
+            background-color: #2a2a2a;
+            color: white;
+            border: 1px solid #404040;
+            border-radius: 4px;
+            margin-bottom: 20px;
+            width: 300px;
+            font-size: 14px;
+        }
+        .form-control::placeholder {
+            color: #808080;
+        }
+        .form-control:focus {
+            outline: none;
+            border-color: #cc5500;
+        }
+        svg {
+            touch-action: none; /* Prevents default touch behaviors */
+        }
+        .zoom-container {
+            pointer-events: all;
+        }
+    </style>
+</head>
 <body>
-    <div class="filter-section">
-        <!-- Node Types -->
-        <div class="filter-group">
-            <div class="filter-label">node types</div>
-            <div class="button-container">
-                <button class="filter-button" onclick="toggleFilter(this, 'nerve', 'nodeTypes')">nerve</button>
-                <button class="filter-button" onclick="toggleFilter(this, 'bone', 'nodeTypes')">bone</button>
-                <button class="filter-button" onclick="toggleFilter(this, 'neuro', 'nodeTypes')">neuro</button>
-                <button class="filter-button" onclick="toggleFilter(this, 'region', 'nodeTypes')">region</button>
-                <button class="filter-button" onclick="toggleFilter(this, 'viscera', 'nodeTypes')">viscera</button>
-                <button class="filter-button" onclick="toggleFilter(this, 'muscle', 'nodeTypes')">muscle</button>
-                <button class="filter-button" onclick="toggleFilter(this, 'sense', 'nodeTypes')">sense</button>
-                <button class="filter-button" onclick="toggleFilter(this, 'vein', 'nodeTypes')">vein</button>
-                <button class="filter-button" onclick="toggleFilter(this, 'artery', 'nodeTypes')">artery</button>
-                <button class="filter-button" onclick="toggleFilter(this, 'cv', 'nodeTypes')">cv</button>
-                <button class="filter-button" onclick="toggleFilter(this, 'function', 'nodeTypes')">function</button>
-                <button class="filter-button" onclick="toggleFilter(this, 'sensory', 'nodeTypes')">sensory</button>
-                <button class="filter-button" onclick="toggleFilter(this, 'gland', 'nodeTypes')">gland</button>
-                <button class="filter-button" onclick="toggleFilter(this, 'lymph', 'nodeTypes')">lymph</button>
-                <button class="filter-button" onclick="toggleFilter(this, 'head', 'nodeTypes')">head</button>
-                <button class="filter-button" onclick="toggleFilter(this, 'organ', 'nodeTypes')">organ</button>
-                <button class="filter-button" onclick="toggleFilter(this, 'sensation', 'nodeTypes')">sensation</button>
-                <button class="filter-button" onclick="toggleFilter(this, 'skin', 'nodeTypes')">skin</button>
-            </div>
-        </div>
-        <!-- ... other filter groups ... -->
-    </div>
-
+    <!-- Search input -->
+    <input type="text" id="search-input" class="form-control" placeholder="Search nodes...">
+    
+    <button class="button" onclick="showRandomNodesWithRelationships()">Show Random Connected Nodes</button>
+    <div id="status">Ready to connect...</div>
     <div id="graph"></div>
 
     <script>
-        // Initialize filter sets
-        const activeFilters = {
-            nodeTypes: new Set(),
-            locations: new Set(),
-            sublocations: new Set()
-        };
-
-        function toggleFilter(button, value, filterType) {
-            button.classList.toggle('active');
-            
-            if (button.classList.contains('active')) {
-                activeFilters[filterType].add(value.toLowerCase());
-            } else {
-                activeFilters[filterType].delete(value.toLowerCase());
-            }
-            
-            updateNodeVisibility();
-        }
-
-        function updateNodeVisibility() {
-            const nodes = d3.selectAll('.node');
-            const links = d3.selectAll('.link');
-
-            nodes.each(function(d) {
-                // Get the node's labels (type)
-                const nodeTypes = Array.isArray(d.labels) ? d.labels.map(l => l.toLowerCase()) : [];
-                const nodeLocation = (d.properties?.location || '').toLowerCase();
-                const nodeSublocation = (d.properties?.sublocation || '').toLowerCase();
-
-                // Check if node matches any active filters
-                const matchesType = activeFilters.nodeTypes.size === 0 || 
-                                  nodeTypes.some(type => activeFilters.nodeTypes.has(type));
-                const matchesLocation = activeFilters.locations.size === 0 || 
-                                      activeFilters.locations.has(nodeLocation);
-                const matchesSublocation = activeFilters.sublocations.size === 0 || 
-                                         activeFilters.sublocations.has(nodeSublocation);
-
-                // Node is visible if it matches at least one active filter category
-                const isVisible = matchesType && 
-                                (activeFilters.locations.size === 0 || matchesLocation) && 
-                                (activeFilters.sublocations.size === 0 || matchesSublocation);
-
-                d3.select(this)
-                    .style('opacity', isVisible ? 1 : 0.1)
-                    .style('pointer-events', isVisible ? 'all' : 'none');
-            });
-
-            // Update link visibility
-            links.each(function(d) {
-                const sourceVisible = d3.select(`.node[data-id="${d.source.id}"]`).style('opacity') === '1';
-                const targetVisible = d3.select(`.node[data-id="${d.target.id}"]`).style('opacity') === '1';
+        let driver;
+        let network;
+        let zoom; // For zoom behavior
+        let currentTransform = d3.zoomIdentity; // Keep track of zoom state
+        
+        async function initDriver() {
+            try {
+                driver = neo4j.driver(
+                    "neo4j+s://4e5eeae5.databases.neo4j.io:7687",
+                    neo4j.auth.basic("neo4j", "Poconoco16!")
+                );
                 
-                d3.select(this)
-                    .style('opacity', (sourceVisible && targetVisible) ? 0.6 : 0.1)
-                    .style('pointer-events', (sourceVisible && targetVisible) ? 'all' : 'none');
-            });
+                const session = driver.session();
+                await session.run("RETURN 1");
+                await session.close();
+                
+                document.getElementById('status').style.backgroundColor = "#004400";
+                document.getElementById('status').textContent = "Connected to Neo4j!";
+                
+                await showRandomNodesWithRelationships();
+            } catch (error) {
+                console.error(error);
+                document.getElementById('status').style.backgroundColor = "#440000";
+                document.getElementById('status').textContent = "Failed to connect: " + error;
+            }
         }
 
-        // Debug function to help see what's happening
-        function logNodeData() {
-            const nodes = d3.selectAll('.node');
-            console.log('Active Filters:', activeFilters);
-            nodes.each(function(d) {
-                console.log('Node:', {
-                    labels: d.labels,
-                    properties: d.properties,
-                    visible: d3.select(this).style('opacity') === '1'
+        async function showRandomNodesWithRelationships() {
+            if (!driver) return;
+            
+            const session = driver.session();
+            try {
+                const result = await session.run(`
+                    MATCH (n)-[r]-(m)
+                    WITH n, r, m, rand() as random
+                    ORDER BY random
+                    LIMIT 50
+                    RETURN collect(DISTINCT n) as nodes, collect(DISTINCT r) as rels, collect(DISTINCT m) as connected
+                `);
+                
+                const record = result.records[0];
+                const nodes = record.get('nodes');
+                const relationships = record.get('rels');
+                const connectedNodes = record.get('connected');
+                
+                const allNodes = [...nodes, ...connectedNodes];
+                
+                const width = document.getElementById('graph').clientWidth;
+                const height = document.getElementById('graph').clientHeight;
+                
+                const svg = d3.select("#graph")
+                    .html("") // Clear previous content
+                    .append("svg")
+                    .attr("width", width)
+                    .attr("height", height);
+
+                // Create container group for zoom
+                const container = svg.append("g")
+                    .attr("class", "zoom-container");
+
+                // Set up zoom behavior
+                zoom = d3.zoom()
+                    .scaleExtent([0.1, 4]) // Min and max zoom scale
+                    .on("zoom", zoomed);
+
+                // Apply zoom behavior to SVG
+                svg.call(zoom)
+                    .call(zoom.transform, d3.zoomIdentity);
+
+                // Zoom function
+                function zoomed() {
+                    currentTransform = d3.event.transform;
+                    container.attr("transform", currentTransform);
+                }
+
+                // Add double-click to reset zoom
+                svg.on("dblclick.zoom", function() {
+                    svg.transition()
+                        .duration(750)
+                        .call(zoom.transform, d3.zoomIdentity);
                 });
-            });
+                
+                // Create arrow marker
+                svg.append("defs").append("marker")
+                    .attr("id", "arrowhead")
+                    .attr("viewBox", "-0 -5 10 10")
+                    .attr("refX", 20)
+                    .attr("refY", 0)
+                    .attr("orient", "auto")
+                    .attr("markerWidth", 6)
+                    .attr("markerHeight", 6)
+                    .attr("xoverflow", "visible")
+                    .append("svg:path")
+                    .attr("d", "M 0,-5 L 10 ,0 L 0,5")
+                    .attr("fill", "#808080")
+                    .style("stroke", "none");
+                
+                const simulation = d3.forceSimulation()
+                    .force("link", d3.forceLink().id(d => d.identity.low))
+                    .force("charge", d3.forceManyBody().strength(-1000))
+                    .force("center", d3.forceCenter(width / 2, height / 2))
+                    .force("collision", d3.forceCollide().radius(50));
+                
+                // Create links in container
+                const link = container.append("g")
+                    .selectAll("line")
+                    .data(relationships)
+                    .enter().append("line")
+                    .attr("class", "link")
+                    .attr("marker-end", "url(#arrowhead)");
+                
+                // Add relationship labels in container
+                const linkLabel = container.append("g")
+                    .selectAll("text")
+                    .data(relationships)
+                    .enter().append("text")
+                    .attr("class", "link-label")
+                    .text(d => d.type);
+                
+                // Create nodes in container
+                const node = container.append("g")
+                    .selectAll("g")
+                    .data(allNodes)
+                    .enter().append("g");
+                
+                // Add circles for nodes
+                node.append("circle")
+                    .attr("r", 20)
+                    .style("fill", d => {
+                        const label = d.labels[0];
+                        let hash = 0;
+                        for (let i = 0; i < label.length; i++) {
+                            hash = label.charCodeAt(i) + ((hash << 5) - hash);
+                        }
+                        const hue = hash % 360;
+                        return `hsl(${hue}, 70%, 50%)`;
+                    });
+                
+                // Add labels for nodes
+                node.append("text")
+                    .attr("class", "node-label")
+                    .attr("dy", 30)
+                    .text(d => {
+                        const props = d.properties;
+                        return props.name || props.title || d.labels[0];
+                    })
+                    .each(function(d) {
+                        const text = d3.select(this);
+                        const words = text.text().split(/\s+/);
+                        text.text('');
+                        
+                        const lineHeight = 1.1;
+                        const dy = parseFloat(text.attr("dy"));
+                        let line = [];
+                        let lineNumber = 0;
+                        let tspan = text.append("tspan").attr("x", 0).attr("y", 0).attr("dy", dy + "px");
+                        
+                        words.forEach(word => {
+                            line.push(word);
+                            tspan.text(line.join(" "));
+                            if (tspan.node().getComputedTextLength() > 50) {
+                                line.pop();
+                                tspan.text(line.join(" "));
+                                line = [word];
+                                tspan = text.append("tspan").attr("x", 0).attr("y", 0).attr("dy", ++lineNumber * lineHeight + dy + "em").text(word);
+                            }
+                        });
+                    });
+            
+                // Add drag behavior with zoom support
+                node.call(d3.drag()
+                    .on("start", dragstarted)
+                    .on("drag", dragged)
+                    .on("end", dragended));
+                
+                // Update positions on each tick
+                simulation.on("tick", () => {
+                    link
+                        .attr("x1", d => d.source.x)
+                        .attr("y1", d => d.source.y)
+                        .attr("x2", d => d.target.x)
+                        .attr("y2", d => d.target.y);
+                    
+                    linkLabel
+                        .attr("x", d => (d.source.x + d.target.x) / 2)
+                        .attr("y", d => (d.source.y + d.target.y) / 2);
+                    
+                    node
+                        .attr("transform", d => `translate(${d.x},${d.y})`);
+                });
+                
+                // Set up the simulation
+                simulation.nodes(allNodes);
+                simulation.force("link").links(relationships);
+                
+                // Store network data globally
+                network = {
+                    simulation: simulation,
+                    svg: svg,
+                    container: container,
+                    nodes: node,
+                    links: link,
+                    linkLabels: linkLabel
+                };
+
+                // Touch event handling
+                let touchDistance = 0;
+                let touchZoomInitiated = false;
+
+                svg.on("touchstart", function() {
+                    const touches = d3.touches(this);
+                    if (touches.length === 2) {
+                        touchZoomInitiated = true;
+                        touchDistance = Math.hypot(
+                            touches[0][0] - touches[1][0],
+                            touches[0][1] - touches[1][1]
+                        );
+                    }
+                });
+
+                svg.on("touchmove", function() {
+                    if (!touchZoomInitiated) return;
+                    
+                    const touches = d3.touches(this);
+                    if (touches.length === 2) {
+                        const newDistance = Math.hypot(
+                            touches[0][0] - touches[1][0],
+                            touches[0][1] - touches[1][1]
+                        );
+                        
+                        const scale = newDistance / touchDistance;
+                        const transform = d3.zoomIdentity
+                            .translate(width/2, height/2)
+                            .scale(scale)
+                            .translate(-width/2, -height/2);
+                        
+                        svg.call(zoom.transform, transform);
+                        touchDistance = newDistance;
+                    }
+                });
+
+                svg.on("touchend", function() {
+                    touchZoomInitiated = false;
+                });
+                
+            } catch (error) {
+                console.error(error);
+                document.getElementById('status').style.backgroundColor = "#440000";
+                document.getElementById('status').textContent = "Error loading graph: " + error;
+            } finally {
+                await session.close();
+            }
+        }
+        
+        // Updated drag functions with zoom support
+        function dragstarted(d) {
+            if (!d3.event.active) simulation.alphaTarget(0.3).restart();
+            d.fx = currentTransform.invertX(d3.event.x);
+            d.fy = currentTransform.invertY(d3.event.y);
+        }
+        
+        function dragged(d) {
+            d.fx = currentTransform.invertX(d3.event.x);
+            d.fy = currentTransform.invertY(d3.event.y);
+        }
+        
+        function dragended(d) {
+            if (!d3.event.active) simulation.alphaTarget(0);
+            d.fx = null;
+            d.fy = null;
         }
 
-        // Load and initialize the visualization
-        fetch('/graph')
-            .then(response => response.json())
-            .then(data => {
-                console.log('Graph data:', data);
-                initializeVisualization(data);
-                // Add click handler to log data for debugging
-                document.addEventListener('keypress', function(e) {
-                    if (e.key === 'd') logNodeData();
-                });
-            })
-            .catch(error => console.error('Error loading graph:', error));
-    </script>
-</body>
-</html>
+        // Search functionality
+        let searchTimeout;
+        const searchInput = document.getElementById('search-input');
+
+        searchInput.addEventListener('input', function(e) {
+            const query = e.target.value.trim▍
