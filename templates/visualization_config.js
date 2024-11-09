@@ -1,3 +1,4 @@
+# Create the complete frontend code
 // visualization_config.js
 class NeoViz {
     constructor(containerId) {
@@ -30,6 +31,7 @@ class NeoViz {
         this.initializeSVG();
         this.initializeSimulation();
         this.initializeTooltip();
+        this.setupFilterListeners();
     }
 
     initializeSVG() {
@@ -55,77 +57,86 @@ class NeoViz {
             .force('link', d3.forceLink().id(d => d.id).distance(100))
             .force('charge', d3.forceManyBody().strength(-300))
             .force('center', d3.forceCenter(this.width / 2, this.height / 2))
-            .force('collision', d3.forceCollide().radius(30));
+            .on('tick', () => this.ticked());
     }
 
     initializeTooltip() {
-        this.tooltip = this.container.append('div')
+        this.tooltip = d3.select('body').append('div')
             .attr('class', 'tooltip')
             .style('opacity', 0)
             .style('position', 'absolute')
-            .style('background-color', 'rgba(0, 0, 0, 0.8)')
-            .style('color', 'white')
+            .style('pointer-events', 'none')
+            .style('background', 'white')
             .style('padding', '5px')
-            .style('border-radius', '5px')
-            .style('pointer-events', 'none');
+            .style('border', '1px solid #ccc')
+            .style('border-radius', '5px');
     }
 
-    updateData(data) {
+    setupFilterListeners() {
+        // Set up event listeners for filters
+        ['nodeTypeFilter', 'locationFilter', 'sublocationFilter'].forEach(filterId => {
+            const filter = document.getElementById(filterId);
+            if (filter) {
+                filter.addEventListener('change', () => this.updateFilters());
+            }
+        });
+    }
+
+    updateData(nodes, relationships) {
+        // Stop the current simulation
+        if (this.simulation) {
+            this.simulation.stop();
+        }
+
         // Clear existing elements
         this.graphGroup.selectAll('*').remove();
 
-        // Create links
+        // Create the links
         this.links = this.graphGroup.append('g')
             .selectAll('line')
-            .data(data.relationships)
+            .data(relationships)
             .enter()
             .append('line')
-            .attr('class', 'link')
             .attr('stroke', '#999')
             .attr('stroke-opacity', 0.6);
 
-        // Create nodes
+        // Create the nodes
         this.nodes = this.graphGroup.append('g')
-            .selectAll('g')
-            .data(data.nodes)
+            .selectAll('circle')
+            .data(nodes)
             .enter()
-            .append('g')
-            .attr('class', 'node')
+            .append('circle')
+            .attr('r', 5)
+            .attr('fill', d => this.getNodeColor(d))
             .call(d3.drag()
                 .on('start', (event, d) => this.dragstarted(event, d))
                 .on('drag', (event, d) => this.dragged(event, d))
-                .on('end', (event, d) => this.dragended(event, d)));
-
-        // Add circles to nodes
-        this.nodes.append('circle')
-            .attr('r', 10)
-            .attr('fill', d => this.getNodeColor(d))
-            .attr('stroke', '#fff')
-            .attr('stroke-width', 1.5);
-
-        // Add labels to nodes
-        this.nodes.append('text')
-            .attr('dx', 12)
-            .attr('dy', '.35em')
-            .text(d => d.properties.name || d.labels[0])
-            .style('fill', '#fff')
-            .style('font-size', '12px');
-
-        // Add hover interactions
-        this.nodes
+                .on('end', (event, d) => this.dragended(event, d)))
             .on('mouseover', (event, d) => this.showTooltip(event, d))
             .on('mouseout', () => this.hideTooltip());
 
         // Update simulation
-        this.simulation
-            .nodes(data.nodes)
-            .on('tick', () => this.ticked());
-
-        this.simulation.force('link')
-            .links(data.relationships);
-
-        // Restart simulation
+        this.simulation.nodes(nodes);
+        this.simulation.force('link').links(relationships);
         this.simulation.alpha(1).restart();
+    }
+
+    updateFilters() {
+        const selectedNodeTypes = Array.from(document.querySelectorAll('#nodeTypeFilter option:checked')).map(opt => opt.value);
+        const selectedLocations = Array.from(document.querySelectorAll('#locationFilter option:checked')).map(opt => opt.value);
+        const selectedSublocations = Array.from(document.querySelectorAll('#sublocationFilter option:checked')).map(opt => opt.value);
+
+        const params = new URLSearchParams();
+        selectedNodeTypes.forEach(type => params.append('nodeTypes[]', type));
+        selectedLocations.forEach(location => params.append('locations[]', location));
+        selectedSublocations.forEach(sublocation => params.append('sublocations[]', sublocation));
+
+        fetch(`/api/graph/filtered?${params.toString()}`)
+            .then(response => response.json())
+            .then(data => {
+                this.updateData(data.nodes, data.relationships);
+            })
+            .catch(error => console.error('Error updating filters:', error));
     }
 
     getNodeColor(node) {
@@ -134,14 +145,19 @@ class NeoViz {
     }
 
     ticked() {
-        this.links
-            .attr('x1', d => d.source.x)
-            .attr('y1', d => d.source.y)
-            .attr('x2', d => d.target.x)
-            .attr('y2', d => d.target.y);
+        if (this.links) {
+            this.links
+                .attr('x1', d => d.source.x)
+                .attr('y1', d => d.source.y)
+                .attr('x2', d => d.target.x)
+                .attr('y2', d => d.target.y);
+        }
 
-        this.nodes
-            .attr('transform', d => `translate(${d.x},${d.y})`);
+        if (this.nodes) {
+            this.nodes
+                .attr('cx', d => d.x)
+                .attr('cy', d => d.y);
+        }
     }
 
     dragstarted(event, d) {
@@ -162,7 +178,7 @@ class NeoViz {
     }
 
     showTooltip(event, d) {
-        const properties = Object.entries(d.properties)
+        const properties = Object.entries(d.properties || {})
             .map(([key, value]) => `${key}: ${value}`)
             .join('<br>');
 
@@ -197,6 +213,66 @@ class NeoViz {
     }
 }
 
-// Create and export the visualization instance
-const viz = new NeoViz('#visualization');
-export { viz };
+// Initialize filters when the page loads
+document.addEventListener('DOMContentLoaded', () => {
+    // Create visualization instance
+    window.viz = new NeoViz('#visualization');
+    
+    // Populate filters
+    populateFilters();
+});
+
+function populateFilters() {
+    // Fetch all distinct node types
+    fetch('/api/nodes/types')
+        .then(response => response.json())
+        .then(types => {
+            const typeFilter = document.getElementById('nodeTypeFilter');
+            types.forEach(type => {
+                const option = document.createElement('option');
+                option.value = type;
+                option.textContent = type;
+                typeFilter.appendChild(option);
+            });
+        })
+        .catch(error => console.error('Error loading node types:', error));
+
+    // Fetch all distinct locations
+    fetch('/api/nodes/locations')
+        .then(response => response.json())
+        .then(locations => {
+            const locationFilter = document.getElementById('locationFilter');
+            locations.forEach(location => {
+                const option = document.createElement('option');
+                option.value = location;
+                option.textContent = location;
+                locationFilter.appendChild(option);
+            });
+        })
+        .catch(error => console.error('Error loading locations:', error));
+
+    // Fetch all distinct sublocations
+    fetch('/api/nodes/sublocations')
+        .then(response => response.json())
+        .then(sublocations => {
+            const sublocationFilter = document.getElementById('sublocationFilter');
+            sublocations.forEach(sublocation => {
+                const option = document.createElement('option');
+                option.value = sublocation;
+                option.textContent = sublocation;
+                sublocationFilter.appendChild(option);
+            });
+        })
+        .catch(error => console.error('Error loading sublocations:', error));
+}
+
+with open('visualization_config.js', 'w') as f:
+    f.write(frontend_code)
+
+print("Created updated visualization_config.js with the following improvements:")
+print("1. Added complete NeoViz class implementation")
+print("2. Added proper error handling for API calls")
+print("3. Added filter setup and initialization")
+print("4. Added proper event handling for filters")
+print("5. Added resize handling")
+print("6. Added proper tooltip implementation")
