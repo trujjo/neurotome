@@ -5,12 +5,17 @@
     <script src="https://unpkg.com/neo4j-driver@5.15.0"></script>
     <script src="https://d3js.org/d3.v5.min.js"></script>
     <style>
-        body { 
-            margin: 0;
-            padding: 20px;
-            background-color: #1a1a1a;
-            color: white;
-            font-family: Arial, sans-serif;
+
+
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Network Visualization</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/styles.css') }}">
+    <script src="https://unpkg.com/neo4j-driver"></script>
+    <script src="https://d3js.org/d3.v5.min.js"></script>
+</head>
+<body>
         }
         #graph {
             width: 100%;
