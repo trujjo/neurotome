@@ -6,161 +6,127 @@
             background-color: #1e1e1e;
             color: #f0f0f0;
             font-family: Arial, sans-serif;
-            margin: 0;
-            padding: 20px;
         }
-
-        /* Filter Container Styles */
-        .filter-container {
+        .filter-tabs {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 15px;
+            border-bottom: 1px solid #404040;
+            padding: 0 20px;
+        }
+        .tab-button {
+            padding: 10px 20px;
             background: #2a2a2a;
+            border: none;
+            color: #f0f0f0;
+            cursor: pointer;
+            border-radius: 8px 8px 0 0;
+            transition: background 0.3s;
+        }
+        .tab-button.active {
+            background: #D35400;
+        }
+        .filter-section {
             padding: 20px;
-            border-radius: 8px;
+            background: #2a2a2a;
+            display: none;
+            border-radius: 0 0 8px 8px;
+        }
+        .filter-section.active {
+            display: block;
+        }
+        .filter-container {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 10px;
             margin-bottom: 20px;
         }
-
         .filter-group {
             background: #3a3a3a;
-            padding: 15px;
+            padding: 10px;
             border-radius: 8px;
-            margin-bottom: 15px;
+            min-width: 180px;
+            flex: 1;
         }
-
         .filter-group-title {
             color: #f0f0f0;
-            margin: 0 0 10px 0;
-            font-size: 1.1em;
+            margin: 0 0 5px 0;
             display: flex;
             justify-content: space-between;
             align-items: center;
         }
-
-        /* Button Styles */
-        .filter-button {
-            padding: 8px 16px;
-            margin: 5px;
-            border: 1px solid #4a4a4a;
-            border-radius: 4px;
-            background: #2a2a2a;
+        .filter-btn {
+            padding: 4px 10px;
+            border: 1px solid #404040;
+            border-radius: 15px;
+            background: transparent;
             color: #f0f0f0;
             cursor: pointer;
-            transition: all 0.3s ease;
+            transition: all 0.2s;
         }
-
-        .filter-button:hover {
+        .filter-btn:hover {
             background: #4a4a4a;
-            transform: translateY(-1px);
         }
-
-        .filter-button.selected {
+        .filter-btn.active {
             background: #D35400;
-            border-color: #E67E22;
-            color: white;
+            border-color: #D35400;
         }
-
-        /* Reset Button */
-        .reset-button {
-            padding: 10px 20px;
-            background: #c0392b;
-            color: white;
-            border: none;
-            border-radius: 4px;
+        .clear-group {
+            font-size: 0.8em;
+            color: #888;
             cursor: pointer;
-            transition: all 0.3s ease;
-            margin-top: 10px;
+            padding: 2px 5px;
+            border-radius: 3px;
         }
-
-        .reset-button:hover {
-            background: #e74c3c;
+        .clear-group:hover {
+            color: #f0f0f0;
+            background: #4a4a4a;
         }
-
-        /* Stats Display */
-        .filter-stats {
-            background: #2a2a2a;
-            padding: 10px;
-            border-radius: 4px;
-            margin-top: 10px;
+        #stats {
+            color: #888;
             font-size: 0.9em;
-        }
-
-        /* Graph Container */
-        #graph-container {
-            width: 100%;
-            height: calc(100vh - 300px);
-            background: #2a2a2a;
-            border-radius: 8px;
-            overflow: hidden;
-        }
-
-        /* Node Styles */
-        .node {
-            transition: opacity 0.3s ease, fill 0.3s ease;
-        }
-
-        .node.highlighted {
-            stroke: #D35400;
-            stroke-width: 2px;
-        }
-
-        .node.faded {
-            opacity: 0.2;
-        }
-
-        /* Error Message */
-        .error-message {
-            position: fixed;
-            top: 20px;
-            right: 20px;
-            background: #c0392b;
-            color: white;
-            padding: 15px;
-            border-radius: 4px;
-            box-shadow: 0 2px 10px rgba(0,0,0,0.3);
-            z-index: 1000;
-            animation: slideIn 0.3s ease-out;
-        }
-
-        @keyframes slideIn {
-            from {
-                transform: translateX(100%);
-                opacity: 0;
-            }
-            to {
-                transform: translateX(0);
-                opacity: 1;
-            }
+            margin-top: 10px;
         }
     </style>
 </head>
 <body>
-    <div class="filter-container">
-        <div class="filter-group">
-            <h3 class="filter-group-title">
-                Node Types
-                <span id="nodeTypeStats">0 selected</span>
-            </h3>
-            <div id="node-type-filters" class="filter-buttons"></div>
-        </div>
-
-        <div class="filter-group">
-            <h3 class="filter-group-title">
-                Locations
-                <span id="locationStats">0 selected</span>
-            </h3>
-            <div id="location-filters" class="filter-buttons"></div>
-        </div>
-
-        <div class="filter-group">
-            <h3 class="filter-group-title">
-                Sublocations
-                <span id="sublocationStats">0 selected</span>
-            </h3>
-            <div id="sublocation-filters" class="filter-buttons"></div>
-        </div>
-
-        <button id="reset-filters" class="reset-button">Reset All Filters</button>
+    <div class="filter-tabs">
+        <button class="tab-button active" data-tab="node-types">Node Types</button>
+        <button class="tab-button" data-tab="locations">Locations</button>
     </div>
 
-    <div id="graph-container"></div>
+    <div class="filter-section active" id="node-types">
+        <div class="filter-container">
+            <div class="filter-group">
+                <div class="filter-group-title">
+                    Node Types
+                    <span class="clear-group" onclick="filterManager.clearNodeTypes()">Clear</span>
+                </div>
+                <div id="node-type-filters" class="filter-buttons"></div>
+            </div>
+        </div>
+    </div>
+
+    <div class="filter-section" id="locations">
+        <div class="filter-container">
+            <div class="filter-group">
+                <div class="filter-group-title">
+                    Locations
+                    <span id="locationStats">0 selected</span>
+                </div>
+                <div id="location-filters" class="filter-buttons"></div>
+            </div>
+            <div class="filter-group">
+                <div class="filter-group-title">
+                    Sublocations
+                    <span id="sublocationStats">0 selected</span>
+                </div>
+                <div id="sublocation-filters" class="filter-buttons"></div>
+            </div>
+        </div>
+    </div>
+
+    <div id="stats"></div>
 
     <script type="module">
         import { FilterManager } from './filters.js';
@@ -170,11 +136,18 @@
         const viz = new NeoViz('#graph-container');
         
         // Initialize filter manager with visualization instance
-        const filterManager = new FilterManager(viz);
+        window.filterManager = new FilterManager(viz);
 
-        // Add reset button functionality
-        document.getElementById('reset-filters').addEventListener('click', () => {
-            filterManager.resetFilters();
+        // Tab switching logic
+        document.querySelectorAll('.tab-button').forEach(button => {
+            button.addEventListener('click', () => {
+                document.querySelectorAll('.tab-button').forEach(b => b.classList.remove('active'));
+                document.querySelectorAll('.filter-section').forEach(s => s.classList.remove('active'));
+                
+                button.classList.add('active');
+                const tabId = button.dataset.tab;
+                document.getElementById(tabId).classList.add('active');
+            });
         });
     </script>
 </body>
