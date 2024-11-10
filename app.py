@@ -1,357 +1,373 @@
-from flask import Flask, render_template, render_template_string, jsonify
-from neo4j import GraphDatabase
-import logging
-from neo4j.exceptions import ServiceUnavailable
+from flask import Flask, render_template_string
 
 app = Flask(__name__)
-logging.basicConfig(level=logging.INFO)
-logger = logging.getLogger(__name__)
 
-# Neo4j connection configuration
-NEO4J_URI = "bolt://4e5eeae5.databases.neo4j.io:7687"
-NEO4J_USER = "neo4j"
-NEO4J_PASSWORD = "Poconoco16!"
-
-class Neo4jConnection:
-    def __init__(self):
-        self._driver = None
-        self.connect()
-
-    def connect(self):
-        try:
-            self._driver = GraphDatabase.driver(
-                NEO4J_URI,
-                auth=(NEO4J_USER, NEO4J_PASSWORD),
-                max_connection_lifetime=3600,
-                max_connection_pool_size=50,
-                connection_timeout=5
-            )
-            # Test the connection
-            with self._driver.session() as session:
-                session.run("RETURN 1").single()
-            logger.info("Successfully connected to Neo4j database")
-        except Exception as e:
-            logger.error(f"Failed to connect to Neo4j: {str(e)}")
-            self._driver = None
-            raise
-
-    def close(self):
-        if self._driver is not None:
-            self._driver.close()
-            self._driver = None
-
-    def get_session(self):
-        if not self._driver:
-            self.connect()
-        return self._driver.session()
-
-class UI_Design:
-    def __init__(self):
-        self.db = Neo4jConnection()
-
-    def get_initial_data(self):
-        try:
-            with self.db.get_session() as session:
-                # Get all anatomical regions for the dropdown
-                locations_query = """
-                    MATCH (n)
-                    WITH DISTINCT n.location as location
-                    WHERE location IS NOT NULL
-                    RETURN location
-                    ORDER BY location
-                """
-                locations = session.run(locations_query).values()
-                
-                # Get all node types for filtering
-                types_query = """
-                    MATCH (n)
-                    WITH DISTINCT labels(n)[0] as type
-                    RETURN type
-                    ORDER BY type
-                """
-                node_types = session.run(types_query).values()
-                
-                # Get relationship types
-                rels_query = """
-                    MATCH ()-[r]->()
-                    WITH DISTINCT type(r) as type
-                    RETURN type
-                    ORDER BY type
-                """
-                rel_types = session.run(rels_query).values()
-                
-                return {
-                    'locations': [loc[0] for loc in locations],
-                    'node_types': [type[0] for type in node_types],
-                    'relationship_types': [rel[0] for rel in rel_types]
-                }
-        except ServiceUnavailable as e:
-            logger.error(f"Database connection error: {str(e)}")
-            return {'error': 'Database connection error', 'locations': [], 'node_types': [], 'relationship_types': []}
-        except Exception as e:
-            logger.error(f"Error getting initial data: {str(e)}")
-            return {'error': 'Internal server error', 'locations': [], 'node_types': [], 'relationship_types': []}
-
-    def close(self):
-        self.db.close()
-
-# HTML template (your existing template code here)
-html_template = """
+# HTML template with embedded CSS and JavaScript
+TEMPLATE = '''
 <!DOCTYPE html>
 <html>
 <head>
-    <title>Anatomical Pathway Explorer</title>
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/vis-network/9.1.2/dist/dist/vis-network.min.css">
-    <script type="text/javascript" src="https://cdnjs.cloudflare.com/ajax/libs/vis-network/9.1.2/dist/vis-network.min.js"></script>
     <style>
         body {
+            background-color: #1a1a1a;
+            color: white;
             font-family: Arial, sans-serif;
-            margin: 0;
             padding: 20px;
-            background-color: #f5f5f5;
         }
-        .container {
+        .type-buttons {
             display: grid;
-            grid-template-columns: 300px 1fr;
-            gap: 20px;
+            grid-template-rows: repeat(2, 1fr);
+            grid-template-columns: repeat(9, 1fr);
+            gap: 6px;
+            margin-bottom: 12px;
+            padding: 12px;
+            background-color: #2d2d2d;
+            border-radius: 4px;
+            width: calc(100% - 24px);
         }
-        .sidebar {
-            background: white;
-            padding: 20px;
-            border-radius: 8px;
-            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
-        }
-        .main-content {
-            background: white;
-            padding: 20px;
-            border-radius: 8px;
-            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
-        }
-        .network-container {
+        .type-button {
+            padding: 4px 8px;
+            background-color: #cc5500;
+            color: white;
+            border: none;
+            border-radius: 3px;
+            cursor: pointer;
+            font-size: 10px;
+            text-align: center;
             width: 100%;
-            height: 600px;
-            border: 1px solid #ddd;
+            min-width: 60px;
+            height: 25px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            text-transform: lowercase;
         }
-        .search-box {
-            margin-bottom: 15px;
+        .type-button:hover {
+            background-color: #ff6a00;
         }
-        .filter-section {
-            margin-bottom: 20px;
+        .type-button.active {
+            background-color: #ff6a00;
+            border: 2px solid #ffffff;
+        }
+        .controls {
+            display: flex;
+            gap: 8px;
+            align-items: center;
+            margin: 12px;
+            background-color: #2d2d2d;
+            padding: 12px;
+            border-radius: 4px;
         }
         .button {
-            background-color: #CC5500;
+            background-color: #cc5500;
             color: white;
-            padding: 10px 20px;
             border: none;
-            border-radius: 4px;
+            border-radius: 3px;
+            padding: 6px 12px;
             cursor: pointer;
-            width: 100%;
-            margin-bottom: 10px;
+            height: 25px;
+            font-size: 10px;
+            text-transform: lowercase;
         }
-        .button:hover {
-            background-color: #A34400;
+        #searchBox {
+            padding: 6px;
+            border-radius: 3px;
+            border: 1px solid #666;
+            background-color: #333;
+            color: white;
+            width: 180px;
+            height: 25px;
+            box-sizing: border-box;
+            font-size: 10px;
         }
-        select, input {
-            width: 100%;
-            padding: 8px;
-            margin-bottom: 10px;
-            border: 1px solid #ddd;
-            border-radius: 4px;
-        }
-        .error-message {
-            color: red;
+        #status {
             padding: 10px;
             margin: 10px 0;
-            background-color: #ffebee;
             border-radius: 4px;
-            display: none;
+        }
+        #graph {
+            width: 100%;
+            height: 600px;
+            background-color: #2d2d2d;
+            border-radius: 4px;
         }
     </style>
 </head>
 <body>
-    <div class="container">
-        <div class="sidebar">
-            <div class="search-box">
-                <h3>Source Node</h3>
-                <input type="text" id="source-search" placeholder="Search source node...">
-                <select id="source-type">
-                    <option value="">Select Type</option>
-                    {% for type in node_types %}
-                    <option value="{{ type }}">{{ type }}</option>
-                    {% endfor %}
-                </select>
-                <select id="source-location">
-                    <option value="">Select Location</option>
-                    {% for location in locations %}
-                    <option value="{{ location }}">{{ location }}</option>
-                    {% endfor %}
-                </select>
-            </div>
-            
-            <div class="search-box">
-                <h3>Target Node</h3>
-                <input type="text" id="target-search" placeholder="Search target node...">
-                <select id="target-type">
-                    <option value="">Select Type</option>
-                    {% for type in node_types %}
-                    <option value="{{ type }}">{{ type }}</option>
-                    {% endfor %}
-                </select>
-                <select id="target-location">
-                    <option value="">Select Location</option>
-                    {% for location in locations %}
-                    <option value="{{ location }}">{{ location }}</option>
-                    {% endfor %}
-                </select>
-            </div>
-            
-            <div class="filter-section">
-                <h3>Relationship Types</h3>
-                <select id="relationship-types" multiple>
-                    {% for rel_type in relationship_types %}
-                    <option value="{{ rel_type }}">{{ rel_type }}</option>
-                    {% endfor %}
-                </select>
-            </div>
-            
-            <button class="button" onclick="findPath()">Find Pathway</button>
-            <button class="button" onclick="clearVisualization()">Clear</button>
-        </div>
+    <div class="type-buttons">
+        <button class="type-button" onclick="showNodesByType('nerve')">nerve</button>
+        <button class="type-button" onclick="showNodesByType('bone')">bone</button>
+        <button class="type-button" onclick="showNodesByType('neuro')">neuro</button>
+        <button class="type-button" onclick="showNodesByType('region')">region</button>
+        <button class="type-button" onclick="showNodesByType('viscera')">viscera</button>
+        <button class="type-button" onclick="showNodesByType('muscle')">muscle</button>
+        <button class="type-button" onclick="showNodesByType('sense')">sense</button>
+        <button class="type-button" onclick="showNodesByType('vein')">vein</button>
+        <button class="type-button" onclick="showNodesByType('artery')">artery</button>
         
-        <div class="main-content">
-            <div id="error-message" class="error-message"></div>
-            <div id="network-container" class="network-container"></div>
-            <div id="path-details"></div>
-        </div>
+        <button class="type-button" onclick="showNodesByType('cv')">cv</button>
+        <button class="type-button" onclick="showNodesByType('function')">function</button>
+        <button class="type-button" onclick="showNodesByType('sensory')">sensory</button>
+        <button class="type-button" onclick="showNodesByType('gland')">gland</button>
+        <button class="type-button" onclick="showNodesByType('lymph')">lymph</button>
+        <button class="type-button" onclick="showNodesByType('head')">head</button>
+        <button class="type-button" onclick="showNodesByType('organ')">organ</button>
+        <button class="type-button" onclick="showNodesByType('sensation')">sensation</button>
+        <button class="type-button" onclick="showNodesByType('skin')">skin</button>
     </div>
+    
+    <div class="controls">
+        <button class="button" onclick="showRandomNodesWithRelationships()">show random connected nodes</button>
+        <input type="text" id="searchBox" placeholder="search nodes...">
+    </div>
+    
+    <div id="status"></div>
+    <div id="graph"></div>
 
+    <script src="https://unpkg.com/neo4j-driver"></script>
+    <script src="https://d3js.org/d3.v5.min.js"></script>
     <script>
-        // Initialize network visualization
-        var container = document.getElementById('network-container');
-        var data = {
-            nodes: new vis.DataSet([]),
-            edges: new vis.DataSet([])
-        };
-        var options = {
-            nodes: {
-                shape: 'dot',
-                size: 16
-            },
-            edges: {
-                arrows: 'to'
-            },
-            physics: {
-                enabled: true,
-                solver: 'forceAtlas2Based',
-                forceAtlas2Based: {
-                    gravitationalConstant: -26,
-                    centralGravity: 0.005,
-                    springLength: 230,
-                    springConstant: 0.18
-                },
-                maxVelocity: 146,
-                minVelocity: 0.75,
-                timestep: 0.5
-            }
-        };
-        var network = new vis.Network(container, data, options);
+        const driver = neo4j.driver(
+            'neo4j+s://your-neo4j-uri:7687',
+            neo4j.auth.basic('neo4j', 'your-password')
+        );
 
-        function showError(message) {
-            const errorDiv = document.getElementById('error-message');
-            errorDiv.textContent = message;
-            errorDiv.style.display = 'block';
-        }
-
-        function hideError() {
-            document.getElementById('error-message').style.display = 'none';
-        }
-
-        function findPath() {
-            hideError();
-            const sourceNode = document.getElementById('source-search').value;
-            const targetNode = document.getElementById('target-search').value;
-            
-            if (!sourceNode || !targetNode) {
-                showError('Please select both source and target nodes');
-                return;
-            }
-
-            // Add API call to backend here
-            fetch('/api/find_path', {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                },
-                body: JSON.stringify({
-                    source: sourceNode,
-                    target: targetNode,
-                    relationshipTypes: Array.from(document.getElementById('relationship-types').selectedOptions).map(opt => opt.value)
-                })
-            })
-            .then(response => response.json())
-            .then(data => {
-                if (data.error) {
-                    showError(data.error);
+        let searchTimeout;
+        let currentNodes = [];
+        let simulation;
+        
+        function initializeSearch() {
+            const searchBox = document.getElementById('searchBox');
+            searchBox.addEventListener('input', function(e) {
+                clearTimeout(searchTimeout);
+                const searchTerm = e.target.value;
+                
+                if (searchTerm.length >= 3) {
+                    searchTimeout = setTimeout(() => {
+                        searchNodes(searchTerm);
+                    }, 300);
                 } else {
-                    updateVisualization(data);
+                    const searchResults = document.getElementById('searchResults');
+                    if (searchResults) {
+                        searchResults.innerHTML = '';
+                    }
                 }
-            })
-            .catch(error => {
-                showError('Error finding pathway: ' + error.message);
             });
         }
 
-        function clearVisualization() {
-            data.nodes.clear();
-            data.edges.clear();
-            document.getElementById('path-details').innerHTML = '';
-            hideError();
+        async function searchNodes(searchTerm) {
+            if (!driver) {
+                document.getElementById('status').style.backgroundColor = '#dc3545';
+                document.getElementById('status').innerHTML = 'Not connected to database';
+                return;
+            }
+
+            const session = driver.session();
+            try {
+                const result = await session.run(`
+                    MATCH (n)
+                    WHERE toLower(n.name) CONTAINS toLower($searchTerm)
+                    WITH n
+                    OPTIONAL MATCH (n)-[r]-(m)
+                    RETURN DISTINCT n, r, m
+                    LIMIT 50
+                `, { searchTerm });
+
+                const nodes = new Map();
+                const links = [];
+
+                result.records.forEach(record => {
+                    const source = record.get('n');
+                    const target = record.get('m');
+                    const relationship = record.get('r');
+
+                    if (source && !nodes.has(source.identity.toString())) {
+                        nodes.set(source.identity.toString(), {
+                            id: source.identity.toString(),
+                            label: source.labels[0],
+                            name: source.properties.name || 'Unnamed'
+                        });
+                    }
+
+                    if (target && !nodes.has(target.identity.toString())) {
+                        nodes.set(target.identity.toString(), {
+                            id: target.identity.toString(),
+                            label: target.labels[0],
+                            name: target.properties.name || 'Unnamed'
+                        });
+                    }
+
+                    if (source && target && relationship) {
+                        links.push({
+                            source: source.identity.toString(),
+                            target: target.identity.toString(),
+                            type: relationship.type
+                        });
+                    }
+                });
+
+                currentNodes = Array.from(nodes.values());
+                createForceGraph(currentNodes, links);
+                
+                document.getElementById('status').style.backgroundColor = '#28a745';
+                document.getElementById('status').innerHTML = `Found ${currentNodes.length} matching nodes`;
+
+            } catch (error) {
+                document.getElementById('status').style.backgroundColor = '#dc3545';
+                document.getElementById('status').innerHTML = 'Error: ' + error.message;
+                console.error('Error:', error);
+            } finally {
+                await session.close();
+            }
         }
 
-        function updateVisualization(pathData) {
-            // Implementation for updating the visualization
-            // This will be implemented when we add the backend path finding logic
+        async function showRandomNodesWithRelationships() {
+            if (!driver) {
+                document.getElementById('status').style.backgroundColor = '#dc3545';
+                document.getElementById('status').innerHTML = 'Not connected to database';
+                return;
+            }
+
+            const session = driver.session();
+            document.getElementById('status').innerHTML = 'Fetching random nodes...';
+            
+            try {
+                const result = await session.run(`
+                    MATCH (n)
+                    WITH n, rand() as r
+                    ORDER BY r
+                    LIMIT 10
+                    WITH COLLECT(n) as nodes
+                    UNWIND nodes as n
+                    OPTIONAL MATCH (n)-[r]-(m)
+                    WHERE m IN nodes
+                    RETURN DISTINCT n, r, m
+                `);
+                
+                const nodes = new Map();
+                const links = [];
+                
+                result.records.forEach(record => {
+                    const source = record.get('n');
+                    const target = record.get('m');
+                    const relationship = record.get('r');
+                    
+                    if (source && !nodes.has(source.identity.toString())) {
+                        nodes.set(source.identity.toString(), {
+                            id: source.identity.toString(),
+                            label: source.labels[0],
+                            name: source.properties.name || 'Unnamed'
+                        });
+                    }
+                    
+                    if (target && !nodes.has(target.identity.toString())) {
+                        nodes.set(target.identity.toString(), {
+                            id: target.identity.toString(),
+                            label: target.labels[0],
+                            name: target.properties.name || 'Unnamed'
+                        });
+                    }
+                    
+                    if (source && target && relationship) {
+                        links.push({
+                            source: source.identity.toString(),
+                            target: target.identity.toString(),
+                            type: relationship.type
+                        });
+                    }
+                });
+                
+                currentNodes = Array.from(nodes.values());
+                createForceGraph(currentNodes, links);
+                
+                document.getElementById('status').style.backgroundColor = '#28a745';
+                document.getElementById('status').innerHTML = 'Showing random connected nodes';
+                
+            } catch (error) {
+                document.getElementById('status').style.backgroundColor = '#dc3545';
+                document.getElementById('status').innerHTML = 'Error: ' + error.message;
+                console.error('Error:', error);
+            } finally {
+                await session.close();
+            }
         }
-    </script>
-</body>
-</html>
-"""
 
-@app.route('/')
-def index():
-    try:
-        ui = UI_Design()
-        data = ui.get_initial_data()
-        ui.close()
-        
-        if 'error' in data:
-            logger.error(f"Error in index route: {data['error']}")
-            return render_template_string(html_template, 
-                                       locations=[], 
-                                       node_types=[], 
-                                       relationship_types=[],
-                                       error=data['error'])
-        
-        return render_template_string(html_template, **data)
-    except Exception as e:
-        logger.error(f"Error in index route: {str(e)}")
-        return render_template_string(html_template, 
-                                   locations=[], 
-                                   node_types=[], 
-                                   relationship_types=[],
-                                   error="Failed to connect to database")
+        async function showNodesByType(nodeType) {
+            if (!driver) {
+                document.getElementById('status').style.backgroundColor = '#dc3545';
+                document.getElementById('status').innerHTML = 'Not connected to database';
+                return;
+            }
 
-@app.route('/api/find_path', methods=['POST'])
-def find_path():
-    try:
-        data = request.json
-        ui = UI_Design()
-        # Implement path finding logic here
-        ui.close()
-        return jsonify({'success': True})
-    except Exception as e:
-        logger.error(f"Error finding path: {str(e)}")
-        return jsonify({'error': str(e)}), 500
+            // Update active button
+            document.querySelectorAll('.type-button').forEach(btn => {
+                if (btn.textContent === nodeType) {
+                    btn.classList.add('active');
+                } else {
+                    btn.classList.remove('active');
+                }
+            });
 
-if __name__ == '__main__':
-    app.run(debug=True)
+            const session = driver.session();
+            document.getElementById('status').innerHTML = 'Fetching ' + nodeType + ' nodes...';
+            
+            try {
+                const result = await session.run(`
+                    MATCH (n:${nodeType})
+                    WITH n
+                    OPTIONAL MATCH (n)-[r]-(m)
+                    RETURN DISTINCT n, r, m
+                    LIMIT 50
+                `);
+                
+                const nodes = new Map();
+                const links = [];
+                
+                result.records.forEach(record => {
+                    const source = record.get('n');
+                    const target = record.get('m');
+                    const relationship = record.get('r');
+                    
+                    if (source && !nodes.has(source.identity.toString())) {
+                        nodes.set(source.identity.toString(), {
+                            id: source.identity.toString(),
+                            label: source.labels[0],
+                            name: source.properties.name || 'Unnamed'
+                        });
+                    }
+                    
+                    if (target && !nodes.has(target.identity.toString())) {
+                        nodes.set(target.identity.toString(), {
+                            id: target.identity.toString(),
+                            label: target.labels[0],
+                            name: target.properties.name || 'Unnamed'
+                        });
+                    }
+                    
+                    if (source && target && relationship) {
+                        links.push({
+                            source: source.identity.toString(),
+                            target: target.identity.toString(),
+                            type: relationship.type
+                        });
+                    }
+                });
+                
+                currentNodes = Array.from(nodes.values());
+                createForceGraph(currentNodes, links);
+                
+                document.getElementById('status').style.backgroundColor = '#28a745';
+                document.getElementById('status').innerHTML = `Showing ${nodeType} nodes`;
+                
+            } catch (error) {
+                document.getElementById('status').style.backgroundColor = '#dc3545';
+                document.getElementById('status').innerHTML = 'Error: ' + error.message;
+                console.error('Error:', error);
+            } finally {
+                await session.close();
+            }
+        }
+
+        function createForceGraph(nodes, links) {
+            const width = document.getElementById('graph').clientWidth;
+            const height = document.getElementById('graph
