@@ -6,12 +6,12 @@ class FilterManager {
         this.selectedLocations = new Set();
         this.selectedSublocations = new Set();
         
-        // Add configuration options
+        // Configuration options
         this.config = {
             highlightOpacity: 1,
             fadeOpacity: 0.2,
             transitionDuration: 300,
-            highlightColor: '#ff9900',
+            highlightColor: '#D35400',
             defaultColor: '#67a9cf'
         };
         
@@ -25,85 +25,119 @@ class FilterManager {
                 this.loadLocations(),
                 this.loadSublocations()
             ]);
-            
-            this.setupFilterButtons();
-            this.setupResetButton();
-            await this.applyFilters();
+            this.updateStats();
         } catch (error) {
             console.error('Error initializing filters:', error);
             this.showErrorMessage('Failed to initialize filters');
         }
     }
 
-    setupResetButton() {
-        const resetButton = document.createElement('button');
-        resetButton.textContent = 'Reset Filters';
-        resetButton.className = 'reset-button';
-        resetButton.onclick = () => this.resetFilters();
-        
-        const filterContainer = document.querySelector('.filter-container');
-        filterContainer.appendChild(resetButton);
+    async loadNodeTypes() {
+        try {
+            const response = await fetch('/api/nodes/types');
+            if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
+            const nodeTypes = await response.json();
+            this.createFilterButtons('node-type-filters', nodeTypes, this.selectedNodeTypes);
+        } catch (error) {
+            console.error('Error loading node types:', error);
+        }
     }
 
-    resetFilters() {
-        this.selectedNodeTypes.clear();
-        this.selectedLocations.clear();
-        this.selectedSublocations.clear();
-        
-        // Reset button styles
-        document.querySelectorAll('.filter-button').forEach(button => {
-            button.classList.remove('selected');
-        });
-        
-        this.applyFilters();
+    async loadLocations() {
+        try {
+            const response = await fetch('/api/nodes/locations');
+            if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
+            const locations = await response.json();
+            this.createFilterButtons('location-filters', locations, this.selectedLocations);
+        } catch (error) {
+            console.error('Error loading locations:', error);
+        }
+    }
+
+    async loadSublocations() {
+        try {
+            const response = await fetch('/api/nodes/sublocations');
+            if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
+            const sublocations = await response.json();
+            this.createFilterButtons('sublocation-filters', sublocations, this.selectedSublocations);
+        } catch (error) {
+            console.error('Error loading sublocations:', error);
+        }
     }
 
     createFilterButtons(containerId, items, selectedSet) {
         const container = document.getElementById(containerId);
         if (!container) return;
-        
-        container.innerHTML = ''; // Clear existing buttons
-        
+
         items.forEach(item => {
             const button = document.createElement('button');
             button.textContent = item;
-            button.className = 'filter-button';
-            button.id = `filter-${containerId}-${item}`;
-            
-            // Add tooltip
-            button.title = `Filter by ${item}`;
-            
-            button.onclick = () => this.toggleFilter(item, selectedSet, button);
+            button.className = 'filter-btn';
+            button.addEventListener('click', () => this.toggleFilter(button, item, selectedSet));
             container.appendChild(button);
         });
     }
 
-    toggleFilter(item, selectedSet, button) {
+    toggleFilter(button, item, selectedSet) {
         if (selectedSet.has(item)) {
             selectedSet.delete(item);
-            button.classList.remove('selected');
+            button.classList.remove('active');
         } else {
             selectedSet.add(item);
-            button.classList.add('selected');
+            button.classList.add('active');
         }
         
-        this.applyFilters();
+        this.updateVisualization();
+        this.updateStats();
     }
 
-    async applyFilters() {
-        const nodes = this.viz.graph.nodes();
-        const links = this.viz.graph.links();
-        
-        // If no filters are selected, reset everything
-        if (this.selectedNodeTypes.size === 0 && 
-            this.selectedLocations.size === 0 && 
-            this.selectedSublocations.size === 0) {
-            
-            this.resetVisualization(nodes, links);
-            return;
-        }
+    updateStats() {
+        const stats = {
+            nodeTypes: this.selectedNodeTypes.size,
+            locations: this.selectedLocations.size,
+            sublocations: this.selectedSublocations.size
+        };
 
-        // Apply filters to nodes
+        document.getElementById('nodeTypeStats').textContent = 
+            `${stats.nodeTypes} selected`;
+        document.getElementById('locationStats').textContent = 
+            `${stats.locations} selected`;
+        document.getElementById('sublocationStats').textContent = 
+            `${stats.sublocations} selected`;
+    }
+
+    async updateVisualization() {
+        try {
+            const params = new URLSearchParams();
+            
+            this.selectedNodeTypes.forEach(type => params.append('nodeTypes[]', type));
+            this.selectedLocations.forEach(loc => params.append('locations[]', loc));
+            this.selectedSublocations.forEach(subloc => params.append('sublocations[]', subloc));
+            
+            const url = `/api/graph/filtered?${params.toString()}`;
+            const response = await fetch(url);
+            
+            if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
+            const data = await response.json();
+            
+            // Update the visualization
+            this.viz.updateData(data);
+            
+            // Apply visual filtering effects
+            this.applyVisualFilters(data);
+            
+        } catch (error) {
+            console.error('Error updating visualization:', error);
+            this.showErrorMessage('Failed to update visualization');
+        }
+    }
+
+    applyVisualFilters(data) {
+        const nodes = this.viz.graph.nodes();
+        const hasActiveFilters = this.selectedNodeTypes.size > 0 || 
+                               this.selectedLocations.size > 0 || 
+                               this.selectedSublocations.size > 0;
+
         nodes.forEach(node => {
             const matchesType = this.selectedNodeTypes.size === 0 || 
                               this.selectedNodeTypes.has(node.labels[0]);
@@ -112,72 +146,18 @@ class FilterManager {
             const matchesSublocation = this.selectedSublocations.size === 0 || 
                                      this.selectedSublocations.has(node.properties.sublocation);
 
-            const isMatch = matchesType && matchesLocation && matchesSublocation;
-            
-            // Update node appearance
-            this.updateNodeAppearance(node, isMatch);
+            const matches = matchesType && matchesLocation && matchesSublocation;
+
+            // Apply visual effects
+            node.style = {
+                opacity: hasActiveFilters ? 
+                    (matches ? this.config.highlightOpacity : this.config.fadeOpacity) : 
+                    this.config.highlightOpacity,
+                fill: matches ? this.config.highlightColor : this.config.defaultColor
+            };
         });
 
-        // Update links visibility
-        this.updateLinksVisibility(links, nodes);
-
-        // Restart the simulation with new parameters
-        this.viz.simulation
-            .alpha(0.3)
-            .alphaTarget(0)
-            .restart();
-    }
-
-    updateNodeAppearance(node, isMatch) {
-        // Update node properties for visualization
-        node.opacity = isMatch ? this.config.highlightOpacity : this.config.fadeOpacity;
-        node.highlighted = isMatch;
-        
-        // Update visual properties
-        d3.select(node.element)
-            .transition()
-            .duration(this.config.transitionDuration)
-            .attr('opacity', node.opacity)
-            .style('fill', isMatch ? this.config.highlightColor : this.config.defaultColor);
-
-        // Bring matched nodes to front
-        if (isMatch) {
-            node.element.parentNode.appendChild(node.element);
-        }
-    }
-
-    updateLinksVisibility(links, nodes) {
-        links.forEach(link => {
-            const sourceVisible = nodes.find(n => n.id === link.source.id)?.highlighted;
-            const targetVisible = nodes.find(n => n.id === link.target.id)?.highlighted;
-            
-            d3.select(link.element)
-                .transition()
-                .duration(this.config.transitionDuration)
-                .attr('opacity', (sourceVisible && targetVisible) ? 1 : 0.1);
-        });
-    }
-
-    resetVisualization(nodes, links) {
-        // Reset nodes
-        nodes.forEach(node => {
-            node.opacity = 1;
-            node.highlighted = false;
-            
-            d3.select(node.element)
-                .transition()
-                .duration(this.config.transitionDuration)
-                .attr('opacity', 1)
-                .style('fill', this.config.defaultColor);
-        });
-
-        // Reset links
-        links.forEach(link => {
-            d3.select(link.element)
-                .transition()
-                .duration(this.config.transitionDuration)
-                .attr('opacity', 1);
-        });
+        this.viz.simulation.alpha(0.3).restart();
     }
 
     showErrorMessage(message) {
@@ -185,10 +165,28 @@ class FilterManager {
         errorDiv.className = 'error-message';
         errorDiv.textContent = message;
         document.body.appendChild(errorDiv);
-        
-        setTimeout(() => {
-            errorDiv.remove();
-        }, 5000);
+        setTimeout(() => errorDiv.remove(), 3000);
+    }
+
+    clearNodeTypes() {
+        this.selectedNodeTypes.clear();
+        document.querySelectorAll('#node-type-filters .filter-btn').forEach(button => {
+            button.classList.remove('active');
+        });
+        this.updateVisualization();
+        this.updateStats();
+    }
+
+    clearLocationGroup(location) {
+        const buttons = document.querySelectorAll(`[data-location="${location}"]`);
+        buttons.forEach(button => {
+            const sublocation = button.dataset.sublocation;
+            this.selectedSublocations.delete(sublocation);
+            button.classList.remove('active');
+        });
+        this.selectedLocations.delete(location);
+        this.updateVisualization();
+        this.updateStats();
     }
 }
 
