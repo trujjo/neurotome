@@ -69,127 +69,127 @@
         }
     }
 
-   async function showRandomNodesWithRelationships() {
-    if (!driver) {
-        document.getElementById('status').style.backgroundColor = '#dc3545';
-        document.getElementById('status').innerHTML = 'Not connected to database';
-        return;
+    async function showRandomNodesWithRelationships() {
+        if (!driver) {
+            document.getElementById('status').style.backgroundColor = '#dc3545';
+            document.getElementById('status').innerHTML = 'Not connected to database';
+            return;
+        }
+
+        const session = driver.session();
+        document.getElementById('status').innerHTML = 'Fetching data...';
+
+        try {
+            const labels = Array.from(activeTypes).map(type => `'${type}'`).join(',');
+            const result = await session.run(`
+                MATCH (n)
+                WHERE ${labels.length > 0 ? `n:${labels}` : 'true'}
+                WITH n, rand() as random
+                ORDER BY random
+                LIMIT 10
+                MATCH (n)-[rel]-(m)
+                RETURN DISTINCT n, rel, m
+                LIMIT 100
+            `);
+
+            document.getElementById('status').innerHTML = 'Processing data...';
+
+            const nodes = new Map();
+            const links = [];
+
+            result.records.forEach(record => {
+                const source = record.get('n');
+                const target = record.get('m');
+                const relationship = record.get('rel');
+
+                if (!nodes.has(source.identity.toString())) {
+                    nodes.set(source.identity.toString(), {
+                        id: source.identity.toString(),
+                        label: source.labels[0],
+                        name: source.properties.name || 'Unnamed'
+                    });
+                }
+
+                if (!nodes.has(target.identity.toString())) {
+                    nodes.set(target.identity.toString(), {
+                        id: target.identity.toString(),
+                        label: target.labels[0],
+                        name: target.properties.name || 'Unnamed'
+                    });
+                }
+
+                links.push({
+                    source: source.identity.toString(),
+                    target: target.identity.toString(),
+                    type: relationship.type
+                });
+            });
+
+            document.getElementById('status').innerHTML = 'Rendering graph...';
+            createForceGraph(Array.from(nodes.values()), links);
+            document.getElementById('status').style.backgroundColor = '#28a745';
+            document.getElementById('status').innerHTML = 'Graph rendered successfully';
+
+        } catch (error) {
+            document.getElementById('status').style.backgroundColor = '#dc3545';
+            document.getElementById('status').innerHTML = 'Error: ' + error.message;
+            console.error('Error:', error);
+        } finally {
+            await session.close();
+        }
     }
 
-    const session = driver.session();
-    document.getElementById('status').innerHTML = 'Fetching data...';
-
-    try {
-        const labels = Array.from(activeTypes).map(type => `'${type}'`).join(',');
-        const result = await session.run(`
-            MATCH (n)
-            WHERE ${labels.length > 0 ? `n:${labels}` : 'true'}
-            WITH n, rand() as random
-            ORDER BY random
-            LIMIT 10
-            MATCH (n)-[rel]-(m)
-            RETURN DISTINCT n, rel, m
-            LIMIT 100
-        `);
-
-        document.getElementById('status').innerHTML = 'Processing data...';
-
-        const nodes = new Map();
-        const links = [];
-
-        result.records.forEach(record => {
-            const source = record.get('n');
-            const target = record.get('m');
-            const relationship = record.get('rel');
-
-            if (!nodes.has(source.identity.toString())) {
-                nodes.set(source.identity.toString(), {
-                    id: source.identity.toString(),
-                    label: source.labels[0],
-                    name: source.properties.name || 'Unnamed'
-                });
+    function filterNodes() {
+        d3.select("#graph").selectAll(".node-label").each(function(d) {
+            if (activeTypes.has(d.label)) {
+                d3.select(this).style("display", "block");
+            } else {
+                d3.select(this).style("display", "none");
             }
-
-            if (!nodes.has(target.identity.toString())) {
-                nodes.set(target.identity.toString(), {
-                    id: target.identity.toString(),
-                    label: target.labels[0],
-                    name: target.properties.name || 'Unnamed'
-                });
-            }
-
-            links.push({
-                source: source.identity.toString(),
-                target: target.identity.toString(),
-                type: relationship.type
-            });
         });
 
-        document.getElementById('status').innerHTML = 'Rendering graph...';
-        createForceGraph(Array.from(nodes.values()), links);
-        document.getElementById('status').style.backgroundColor = '#28a745';
-        document.getElementById('status').innerHTML = 'Graph rendered successfully';
+        d3.select("#graph").selectAll("circle").each(function(d) {
+            if (activeTypes.has(d.label)) {
+                d3.select(this).style("display", "block");
+            } else {
+                d3.select(this).style("display", "none");
+            }
+        });
 
-    } catch (error) {
-        document.getElementById('status').style.backgroundColor = '#dc3545';
-        document.getElementById('status').innerHTML = 'Error: ' + error.message;
-        console.error('Error:', error);
-    } finally {
-        await session.close();
+        d3.select("#graph").selectAll(".link").each(function(d) {
+            if (activeTypes.has(d.source.label) && activeTypes.has(d.target.label)) {
+                d3.select(this).style("display", "block");
+            } else {
+                d3.select(this).style("display", "none");
+            }
+        });
+
+        d3.select("#graph").selectAll(".link-label").each(function(d) {
+            if (activeTypes.has(d.source.label) && activeTypes.has(d.target.label)) {
+                d3.select(this).style("display", "block");
+            } else {
+                d3.select(this).style("display", "none");
+            }
+        });
     }
-}
 
-function filterNodes() {
-    d3.select("#graph").selectAll(".node-label").each(function(d) {
-        if (activeTypes.has(d.label)) {
-            d3.select(this).style("display", "block");
-        } else {
+    function cleanUpRelationships() {
+        d3.select("#graph").selectAll(".link").each(function(d) {
             d3.select(this).style("display", "none");
-        }
-    });
+        });
 
-    d3.select("#graph").selectAll("circle").each(function(d) {
-        if (activeTypes.has(d.label)) {
-            d3.select(this).style("display", "block");
-        } else {
+        d3.select("#graph").selectAll(".link-label").each(function(d) {
             d3.select(this).style("display", "none");
-        }
-    });
-
-    d3.select("#graph").selectAll(".link").each(function(d) {
-        if (activeTypes.has(d.source.label) && activeTypes.has(d.target.label)) {
-            d3.select(this).style("display", "block");
-        } else {
-            d3.select(this).style("display", "none");
-        }
-    });
-
-    d3.select("#graph").selectAll(".link-label").each(function(d) {
-        if (activeTypes.has(d.source.label) && activeTypes.has(d.target.label)) {
-            d3.select(this).style("display", "block");
-        } else {
-            d3.select(this).style("display", "none");
-        }
-    });
-}
-
-function cleanUpRelationships() {
-    d3.select("#graph").selectAll(".link").each(function(d) {
-        d3.select(this).style("display", "none");
-    });
-
-    d3.select("#graph").selectAll(".link-label").each(function(d) {
-        d3.select(this).style("display", "none");
-    });
-}
-
-document.addEventListener('DOMContentLoaded', initDriver);
-
-window.onbeforeunload = () => {
-    if (driver) {
-        driver.close();
+        });
     }
-};
+
+    document.addEventListener('DOMContentLoaded', initDriver);
+
+    window.onbeforeunload = () => {
+        if (driver) {
+            driver.close();
+        }
+    };
 
     function createForceGraph(nodes, links) {
         d3.select("#graph").selectAll("*").remove();
@@ -231,7 +231,7 @@ window.onbeforeunload = () => {
             .append("g");
 
         node.append("circle")
-            .attr("r", 30)
+            .attr("r", 40)  // Enlarged node size
             .style("fill", "#cc5500")
             .style("stroke", "#ff6a00")
             .style("stroke-width", 2);
@@ -239,6 +239,7 @@ window.onbeforeunload = () => {
         node.append("text")
             .attr("class", "node-label")
             .attr("dy", ".35em")
+            .attr("font-size", "10px")  // Reduced font size
             .text(d => d.name)
             .each(function(d) {
                 let text = d3.select(this);
@@ -310,49 +311,39 @@ window.onbeforeunload = () => {
         cleanUpRelationships();
     }
 
-   function filterNodes() {
-    d3.select("#graph").selectAll(".node-label").each(function(d) {
-        if (activeTypes.has(d.label)) {
-            d3.select(this).style("display", "block");
-        } else {
-            d3.select(this).style("display", "none");
-        }
-    });
+    function filterNodes() {
+        d3.select("#graph").selectAll(".node-label").each(function(d) {
+            if (activeTypes.has(d.label)) {
+                d3.select(this).style("display", "block");
+            } else {
+                d3.select(this).style("display", "none");
+            }
+        });
 
-    d3.select("#graph").selectAll("circle").each(function(d) {
-        if (activeTypes.has(d.label)) {
-            d3.select(this).style("display", "block");
-        } else {
-            d3.select(this).style("display", "none");
-        }
-    });
+        d3.select("#graph").selectAll("circle").each(function(d) {
+            if (activeTypes.has(d.label)) {
+                d3.select(this).style("display", "block");
+            } else {
+                d3.select(this).style("display", "none");
+            }
+        });
 
-    d3.select("#graph").selectAll(".link").each(function(d) {
-        if (activeTypes.has(d.source.label) && activeTypes.has(d.target.label)) {
-            d3.select(this).style("display", "block");
-        } else {
-            d3.select(this).style("display", "none");
-        }
-    });
+        d3.select("#graph").selectAll(".link").each(function(d) {
+            if (activeTypes.has(d.source.label) && activeTypes.has(d.target.label)) {
+                d3.select(this).style("display", "block");
+            } else {
+                d3.select(this).style("display", "none");
+            }
+        });
 
-    d3.select("#graph").selectAll(".link-label").each(function(d) {
-        if (activeTypes.has(d.source.label) && activeTypes.has(d.target.label)) {
-            d3.select(this).style("display", "block");
-        } else {
-            d3.select(this).style("display", "none");
-        }
-    });
-};
-
-    // Hide or show relationship names based on node visibility
-    d3.select("#graph").selectAll(".link-label").each(function(d) {
-        if (activeTypes.has(d.source.label) && activeTypes.has(d.target.label)) {
-            d3.select(this).style("display", "block");
-        } else {
-            d3.select(this).style("display", "none");
-        }
-    });
-}
+        d3.select("#graph").selectAll(".link-label").each(function(d) {
+            if (activeTypes.has(d.source.label) && activeTypes.has(d.target.label)) {
+                d3.select(this).style("display", "block");
+            } else {
+                d3.select(this).style("display", "none");
+            }
+        });
+    }
 
     function clearNodeTypes() {
         activeTypes.clear();
@@ -360,23 +351,23 @@ window.onbeforeunload = () => {
         cleanUpRelationships();
     }
 
-  function cleanUpRelationships() {
-    d3.select("#graph").selectAll(".link").each(function(d) {
-        d3.select(this).style("display", "none");
-    });
+    function cleanUpRelationships() {
+        d3.select("#graph").selectAll(".link").each(function(d) {
+            d3.select(this).style("display", "none");
+        });
 
-    d3.select("#graph").selectAll(".link-label").each(function(d) {
-        d3.select(this).style("display", "none");
-    });
-}
-
-document.addEventListener('DOMContentLoaded', initDriver);
-
-window.onbeforeunload = () => {
-    if (driver) {
-        driver.close();
+        d3.select("#graph").selectAll(".link-label").each(function(d) {
+            d3.select(this).style("display", "none");
+        });
     }
-};
+
+    document.addEventListener('DOMContentLoaded', initDriver);
+
+    window.onbeforeunload = () => {
+        if (driver) {
+            driver.close();
+        }
+    };
 </script>
 </body>
 </html>
