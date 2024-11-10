@@ -288,11 +288,15 @@
         cleanUpRelationships();
     }
 
-    function cleanUpRelationships() {
-        d3.select("#graph").selectAll(".link").each(function(d) {
+  function cleanUpRelationships() {
+    d3.select("#graph").selectAll(".link").each(function(d) {
+        if (activeTypes.has(d.source.label) && activeTypes.has(d.target.label)) {
+            d3.select(this).style("display", "block");
+        } else {
             d3.select(this).style("display", "none");
-        });
-    }
+        }
+    });
+}
 
     document.addEventListener('DOMContentLoaded', initDriver);
 
