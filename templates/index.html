@@ -53,6 +53,45 @@
     </style>
 </head>
 <body>
+
+<div class="filter-container">
+    <div class="filter-section">
+        <div class="filter-group">
+            <div class="filter-group-title">
+                <h3>Node Types</h3>
+                <button class="clear-btn" onclick="clearNodeTypes()">Clear</button>
+            </div>
+            <div class="type-buttons">
+                <button class="type-button" onclick="showNodesByType('nerve')">nerve</button>
+                <button class="type-button" onclick="showNodesByType('bone')">bone</button>
+                <button class="type-button" onclick="showNodesByType('neuro')">neuro</button>
+                <button class="type-button" onclick="showNodesByType('region')">region</button>
+                <button class="type-button" onclick="showNodesByType('viscera')">viscera</button>
+                <button class="type-button" onclick="showNodesByType('muscle')">muscle</button>
+                <button class="type-button" onclick="showNodesByType('sense')">sense</button>
+                <button class="type-button" onclick="showNodesByType('vein')">vein</button>
+                <button class="type-button" onclick="showNodesByType('artery')">artery</button>
+                <button class="type-button" onclick="showNodesByType('cv')">cv</button>
+                <button class="type-button" onclick="showNodesByType('function')">function</button>
+                <button class="type-button" onclick="showNodesByType('sensory')">sensory</button>
+                <button class="type-button" onclick="showNodesByType('gland')">gland</button>
+                <button class="type-button" onclick="showNodesByType('lymph')">lymph</button>
+                <button class="type-button" onclick="showNodesByType('head')">head</button>
+                <button class="type-button" onclick="showNodesByType('organ')">organ</button>
+                <button class="type-button" onclick="showNodesByType('sensation')">sensation</button>
+                <button class="type-button" onclick="showNodesByType('skin')">skin</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="controls">
+    <button class="button" onclick="showRandomNodesWithRelationships()">show random connected nodes</button>
+    <input type="text" id="searchBox" placeholder="search nodes...">
+</div>
+<div id="status"></div>
+<div id="graph"></div>
+    
     <button class="button" onclick="showRandomNodesWithRelationships()">Show Random Connected Nodes</button>
     <div id="status">Ready to connect...</div>
     <div id="graph"></div>
