@@ -6,142 +6,189 @@ class FilterManager {
         this.selectedLocations = new Set();
         this.selectedSublocations = new Set();
         
-        this.initializeFilters();
+        // Add configuration options
+        this.config = {
+            highlightOpacity: 1,
+            fadeOpacity: 0.2,
+            transitionDuration: 300,
+            highlightColor: '#ff9900',
+            defaultColor: '#67a9cf'
+        };
         
-        // Debug logging
-        console.log('FilterManager initialized');
+        this.initializeFilters();
     }
 
     async initializeFilters() {
         try {
-            await this.loadNodeTypes();
-            await this.loadLocations();
-            await this.loadSublocations();
-            this.setupFilterButtons();
+            await Promise.all([
+                this.loadNodeTypes(),
+                this.loadLocations(),
+                this.loadSublocations()
+            ]);
             
-            // Load initial data
+            this.setupFilterButtons();
+            this.setupResetButton();
             await this.applyFilters();
         } catch (error) {
             console.error('Error initializing filters:', error);
+            this.showErrorMessage('Failed to initialize filters');
         }
     }
 
-    async loadNodeTypes() {
-        try {
-            const response = await fetch('/api/nodes/types');
-            if (!response.ok) {
-                throw new Error(`HTTP error! status: ${response.status}`);
-            }
-            const nodeTypes = await response.json();
-            console.log('Loaded node types:', nodeTypes);
-            this.createFilterButtons('node-type-filters', nodeTypes, this.selectedNodeTypes);
-        } catch (error) {
-            console.error('Error loading node types:', error);
-        }
-    }
-
-    async loadLocations() {
-        try {
-            const response = await fetch('/api/nodes/locations');
-            if (!response.ok) {
-                throw new Error(`HTTP error! status: ${response.status}`);
-            }
-            const locations = await response.json();
-            console.log('Loaded locations:', locations);
-            this.createFilterButtons('location-filters', locations, this.selectedLocations);
-        } catch (error) {
-            console.error('Error loading locations:', error);
-        }
-    }
-
-    async loadSublocations() {
-        try {
-            const response = await fetch('/api/nodes/sublocations');
-            if (!response.ok) {
-                throw new Error(`HTTP error! status: ${response.status}`);
-            }
-            const sublocations = await response.json();
-            console.log('Loaded sublocations:', sublocations);
-            this.createFilterButtons('sublocation-filters', sublocations, this.selectedSublocations);
-        } catch (error) {
-            console.error('Error loading sublocations:', error);
-        }
-    }
-
-    createFilterButtons(containerId, items, selectedSet) {
-        const container = document.getElementById(containerId);
-        if (!container) {
-            console.error(`Container ${containerId} not found`);
-            return;
-        }
+    setupResetButton() {
+        const resetButton = document.createElement('button');
+        resetButton.textContent = 'Reset Filters';
+        resetButton.className = 'reset-button';
+        resetButton.onclick = () => this.resetFilters();
         
-        container.innerHTML = ''; // Clear existing buttons
-
-        items.forEach(item => {
-            if (!item) return; // Skip null/undefined items
-            
-            const button = document.createElement('button');
-            button.textContent = item;
-            button.className = 'filter-button';
-            button.addEventListener('click', () => {
-                this.toggleFilter(button, item, selectedSet);
-                console.log(`Filter ${item} toggled:`, selectedSet);
-            });
-            container.appendChild(button);
-        });
+        const filterContainer = document.querySelector('.filter-container');
+        filterContainer.appendChild(resetButton);
     }
 
-    toggleFilter(button, item, selectedSet) {
-        if (selectedSet.has(item)) {
-            selectedSet.delete(item);
-            button.classList.remove('active');
-        } else {
-            selectedSet.add(item);
-            button.classList.add('active');
-        }
+    resetFilters() {
+        this.selectedNodeTypes.clear();
+        this.selectedLocations.clear();
+        this.selectedSublocations.clear();
         
-        // Log current filter state
-        console.log('Current filters:', {
-            nodeTypes: Array.from(this.selectedNodeTypes),
-            locations: Array.from(this.selectedLocations),
-            sublocations: Array.from(this.selectedSublocations)
+        // Reset button styles
+        document.querySelectorAll('.filter-button').forEach(button => {
+            button.classList.remove('selected');
         });
         
         this.applyFilters();
     }
 
-    async applyFilters() {
-        try {
-            const params = new URLSearchParams();
+    createFilterButtons(containerId, items, selectedSet) {
+        const container = document.getElementById(containerId);
+        if (!container) return;
+        
+        container.innerHTML = ''; // Clear existing buttons
+        
+        items.forEach(item => {
+            const button = document.createElement('button');
+            button.textContent = item;
+            button.className = 'filter-button';
+            button.id = `filter-${containerId}-${item}`;
             
-            // Add selected filters to params
-            this.selectedNodeTypes.forEach(type => params.append('nodeTypes[]', type));
-            this.selectedLocations.forEach(loc => params.append('locations[]', loc));
-            this.selectedSublocations.forEach(subloc => params.append('sublocations[]', subloc));
+            // Add tooltip
+            button.title = `Filter by ${item}`;
             
-            // Log the request URL
-            const url = `/api/graph/filtered?${params.toString()}`;
-            console.log('Fetching filtered data:', url);
+            button.onclick = () => this.toggleFilter(item, selectedSet, button);
+            container.appendChild(button);
+        });
+    }
 
-            const response = await fetch(url);
-            if (!response.ok) {
-                throw new Error(`HTTP error! status: ${response.status}`);
-            }
-            
-            const data = await response.json();
-            console.log('Received filtered data:', data);
-            
-            if (data.error) {
-                console.error('Error in filter response:', data.error);
-                return;
-            }
-
-            // Update visualization with new data
-            this.viz.updateData(data);
-            
-        } catch (error) {
-            console.error('Error applying filters:', error);
+    toggleFilter(item, selectedSet, button) {
+        if (selectedSet.has(item)) {
+            selectedSet.delete(item);
+            button.classList.remove('selected');
+        } else {
+            selectedSet.add(item);
+            button.classList.add('selected');
         }
+        
+        this.applyFilters();
+    }
+
+    async applyFilters() {
+        const nodes = this.viz.graph.nodes();
+        const links = this.viz.graph.links();
+        
+        // If no filters are selected, reset everything
+        if (this.selectedNodeTypes.size === 0 && 
+            this.selectedLocations.size === 0 && 
+            this.selectedSublocations.size === 0) {
+            
+            this.resetVisualization(nodes, links);
+            return;
+        }
+
+        // Apply filters to nodes
+        nodes.forEach(node => {
+            const matchesType = this.selectedNodeTypes.size === 0 || 
+                              this.selectedNodeTypes.has(node.labels[0]);
+            const matchesLocation = this.selectedLocations.size === 0 || 
+                                  this.selectedLocations.has(node.properties.location);
+            const matchesSublocation = this.selectedSublocations.size === 0 || 
+                                     this.selectedSublocations.has(node.properties.sublocation);
+
+            const isMatch = matchesType && matchesLocation && matchesSublocation;
+            
+            // Update node appearance
+            this.updateNodeAppearance(node, isMatch);
+        });
+
+        // Update links visibility
+        this.updateLinksVisibility(links, nodes);
+
+        // Restart the simulation with new parameters
+        this.viz.simulation
+            .alpha(0.3)
+            .alphaTarget(0)
+            .restart();
+    }
+
+    updateNodeAppearance(node, isMatch) {
+        // Update node properties for visualization
+        node.opacity = isMatch ? this.config.highlightOpacity : this.config.fadeOpacity;
+        node.highlighted = isMatch;
+        
+        // Update visual properties
+        d3.select(node.element)
+            .transition()
+            .duration(this.config.transitionDuration)
+            .attr('opacity', node.opacity)
+            .style('fill', isMatch ? this.config.highlightColor : this.config.defaultColor);
+
+        // Bring matched nodes to front
+        if (isMatch) {
+            node.element.parentNode.appendChild(node.element);
+        }
+    }
+
+    updateLinksVisibility(links, nodes) {
+        links.forEach(link => {
+            const sourceVisible = nodes.find(n => n.id === link.source.id)?.highlighted;
+            const targetVisible = nodes.find(n => n.id === link.target.id)?.highlighted;
+            
+            d3.select(link.element)
+                .transition()
+                .duration(this.config.transitionDuration)
+                .attr('opacity', (sourceVisible && targetVisible) ? 1 : 0.1);
+        });
+    }
+
+    resetVisualization(nodes, links) {
+        // Reset nodes
+        nodes.forEach(node => {
+            node.opacity = 1;
+            node.highlighted = false;
+            
+            d3.select(node.element)
+                .transition()
+                .duration(this.config.transitionDuration)
+                .attr('opacity', 1)
+                .style('fill', this.config.defaultColor);
+        });
+
+        // Reset links
+        links.forEach(link => {
+            d3.select(link.element)
+                .transition()
+                .duration(this.config.transitionDuration)
+                .attr('opacity', 1);
+        });
+    }
+
+    showErrorMessage(message) {
+        const errorDiv = document.createElement('div');
+        errorDiv.className = 'error-message';
+        errorDiv.textContent = message;
+        document.body.appendChild(errorDiv);
+        
+        setTimeout(() => {
+            errorDiv.remove();
+        }, 5000);
     }
 }
 
