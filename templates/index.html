@@ -100,7 +100,7 @@
                     LIMIT 5
                     MATCH (n)-[rel]-(m)
                     RETURN DISTINCT n, rel, m
-                    LIMIT 15
+                    LIMIT 100
                 `);
                 
                 document.getElementById('status').innerHTML = 'Processing data...';
