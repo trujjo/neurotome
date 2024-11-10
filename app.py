@@ -3,7 +3,6 @@ from flask import Flask, render_template_string
 app = Flask(__name__)
 
 # HTML template with embedded CSS and JavaScript
-TEMPLATE = '''
 <!DOCTYPE html>
 <html>
 <head>
@@ -119,6 +118,7 @@ TEMPLATE = '''
     <div class="controls">
         <button class="button" onclick="showRandomNodesWithRelationships()">show random connected nodes</button>
         <input type="text" id="searchBox" placeholder="search nodes...">
+    
     </div>
     
     <div id="status"></div>
@@ -129,7 +129,7 @@ TEMPLATE = '''
     <script>
         const driver = neo4j.driver(
             'neo4j+s://your-neo4j-uri:7687',
-            neo4j.auth.basic('neo4j', 'your-password')
+            neo4j.auth.basic('neo4j', 'Poconoco16!')
         );
 
         let searchTimeout;
