@@ -90,3 +90,77 @@ body {
     background-color: #2d2d2d;
     border-radius: 4px;
 }
+
+
+.type-buttons {
+    display: grid;
+    grid-template-rows: repeat(2, 1fr);
+    grid-template-columns: repeat(9, 1fr);
+    gap: 6px;
+    margin-bottom: 12px;
+    padding: 12px;
+    background-color: #2d2d2d;
+    border-radius: 4px;
+    width: calc(100% - 24px);
+}
+
+.type-button {
+    padding: 4px 8px;
+    background-color: #cc5500;
+    color: white;
+    border: none;
+    border-radius: 3px;
+    cursor: pointer;
+    font-size: 10px;
+    text-align: center;
+    width: 100%;
+    min-width: 60px;
+    height: 25px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    text-transform: lowercase;
+}
+
+.type-button:hover {
+    background-color: #ff6a00;
+}
+
+.type-button.active {
+    background-color: #ff6a00;
+    border: 2px solid #ffffff;
+}
+
+.controls {
+    display: flex;
+    gap: 8px;
+    align-items: center;
+    margin: 12px;
+    background-color: #2d2d2d;
+    padding: 12px;
+    border-radius: 4px;
+}
+
+.button {
+    background-color: #cc5500;
+    color: white;
+    border: none;
+    border-radius: 3px;
+    padding: 6px 12px;
+    cursor: pointer;
+    height: 25px;
+    font-size: 10px;
+    text-transform: lowercase;
+}
+
+#searchBox {
+    padding: 6px;
+    border-radius: 3px;
+    border: 1px solid #666;
+    background-color: #333;
+    color: white;
+    width: 180px;
+    height: 25px;
+    box-sizing: border-box;
+    font-size: 10px;
+}
