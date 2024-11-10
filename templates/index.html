@@ -1,3 +1,6 @@
+Here is the updated `index.html` file with the incorporation of the filter tabs for "Node Types" and "Locations":
+
+```html
 <!DOCTYPE html>
 <html>
 <head>
@@ -5,97 +8,174 @@
     <link rel="stylesheet" type="text/css" href="../static/css/styles.css">
     <script src="https://unpkg.com/neo4j-driver"></script>
     <script src="https://d3js.org/d3.v5.min.js"></script>
+    <style>
+        .filter-tabs {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 15px;
+            border-bottom: 1px solid #404040;
+            padding: 0 20px;
+        }
+        .tab-button {
+            padding: 10px 20px;
+            background: #2a2a2a;
+            border: none;
+            color: #f0f0f0;
+            cursor: pointer;
+            border-radius: 8px 8px 0 0;
+            transition: background 0.3s;
+        }
+        .tab-button.active {
+            background: #D35400;
+        }
+        .filter-section {
+            padding: 20px;
+            background: #2a2a2a;
+            display: none;
+            border-radius: 0 0 8px 8px;
+        }
+        .filter-section.active {
+            display: block;
+        }
+        .filter-container {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 10px;
+            margin-bottom: 20px;
+        }
+        .filter-group {
+            background: #3a3a3a;
+            padding: 10px;
+            border-radius: 8px;
+            min-width: 180px;
+            flex: 1;
+        }
+        .filter-group-title {
+            color: #f0f0f0;
+            margin: 0 0 5px 0;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        .type-buttons, .location-buttons {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 4px;
+        }
+        .type-button, .location-button {
+            padding: 4px 10px;
+            border: 1px solid #404040;
+            border-radius: 15px;
+            background: transparent;
+            color: #f0f0f0;
+            cursor: pointer;
+            transition: all 0.2s;
+            font-size: 0.9em;
+        }
+        .type-button:hover, .location-button:hover {
+            background: #404040;
+        }
+        .type-button.active, .location-button.active {
+            background: #D35400;
+            border-color: #D35400;
+        }
+        .clear-btn {
+            padding: 4px 8px;
+            border: 1px solid #ff4444;
+            border-radius: 12px;
+            background: transparent;
+            color: #ff4444;
+            cursor: pointer;
+            font-size: 12px;
+        }
+        .clear-btn:hover {
+            background: #ff4444;
+            color: white;
+        }
+    </style>
 </head>
 <body>
-<div class="tab-container">
-    <button class="tab-button" onclick="openTab('nodeTypes')">Node Types</button>
+<div class="filter-tabs">
+    <button class="tab-button active" onclick="openTab('nodeTypes')">Node Types</button>
     <button class="tab-button" onclick="openTab('locations')">Locations</button>
 </div>
 
-<div id="nodeTypes" class="tab-content">
-    <div class="filter-container">
-        <div class="filter-section">
-            <div class="filter-group">
-                <div class="filter-group-title">
-                    <h3>Node Types</h3>
-                    <button class="clear-btn" onclick="clearNodeTypes()">Clear</button>
-                </div>
-                <div class="type-buttons">
-                    <button class="type-button" onclick="toggleNodesByType('nerve')">nerve</button>
-                    <button class="type-button" onclick="toggleNodesByType('bone')">bone</button>
-                    <button class="type-button" onclick="toggleNodesByType('neuro')">neuro</button>
-                    <button class="type-button" onclick="toggleNodesByType('region')">region</button>
-                    <button class="type-button" onclick="toggleNodesByType('viscera')">viscera</button>
-                    <button class="type-button" onclick="toggleNodesByType('muscle')">muscle</button>
-                    <button class="type-button" onclick="toggleNodesByType('sense')">sense</button>
-                    <button class="type-button" onclick="toggleNodesByType('vein')">vein</button>
-                    <button class="type-button" onclick="toggleNodesByType('artery')">artery</button>
-                    <button class="type-button" onclick="toggleNodesByType('cv')">cv</button>
-                    <button class="type-button" onclick="toggleNodesByType('function')">function</button>
-                    <button class="type-button" onclick="toggleNodesByType('sensory')">sensory</button>
-                    <button class="type-button" onclick="toggleNodesByType('gland')">gland</button>
-                    <button class="type-button" onclick="toggleNodesByType('lymph')">lymph</button>
-                    <button class="type-button" onclick="toggleNodesByType('head')">head</button>
-                    <button class="type-button" onclick="toggleNodesByType('organ')">organ</button>
-                    <button class="type-button" onclick="toggleNodesByType('sensation')">sensation</button>
-                    <button class="type-button" onclick="toggleNodesByType('skin')">skin</button>
-                </div>
-            </div>
+<div id="nodeTypes" class="filter-section active">
+    <div class="filter-group">
+        <div class="filter-group-title">
+            <h3>Node Types</h3>
+            <button class="clear-btn" onclick="clearNodeTypes()">Clear</button>
+        </div>
+        <div class="type-buttons">
+            <button class="type-button" onclick="toggleNodesByType('nerve')">nerve</button>
+            <button class="type-button" onclick="toggleNodesByType('bone')">bone</button>
+            <button class="type-button" onclick="toggleNodesByType('neuro')">neuro</button>
+            <button class="type-button" onclick="toggleNodesByType('region')">region</button>
+            <button class="type-button" onclick="toggleNodesByType('viscera')">viscera</button>
+            <button class="type-button" onclick="toggleNodesByType('muscle')">muscle</button>
+            <button class="type-button" onclick="toggleNodesByType('sense')">sense</button>
+            <button class="type-button" onclick="toggleNodesByType('vein')">vein</button>
+            <button class="type-button" onclick="toggleNodesByType('artery')">artery</button>
+            <button class="type-button" onclick="toggleNodesByType('cv')">cv</button>
+            <button class="type-button" onclick="toggleNodesByType('function')">function</button>
+            <button class="type-button" onclick="toggleNodesByType('sensory')">sensory</button>
+            <button class="type-button" onclick="toggleNodesByType('gland')">gland</button>
+            <button class="type-button" onclick="toggleNodesByType('lymph')">lymph</button>
+            <button class="type-button" onclick="toggleNodesByType('head')">head</button>
+            <button class="type-button" onclick="toggleNodesByType('organ')">organ</button>
+            <button class="type-button" onclick="toggleNodesByType('sensation')">sensation</button>
+            <button class="type-button" onclick="toggleNodesByType('skin')">skin</button>
         </div>
     </div>
 </div>
 
-<div id="locations" class="tab-content" style="display:none;">
-    <div class="filter-container">
-        <div class="filter-section">
-            <div class="filter-group">
-                <div class="filter-group-title">
-                    <h3>Locations</h3>
-                    <button class="clear-btn" onclick="clearLocations()">Clear</button>
-                </div>
-                <div class="type-buttons">
-                    <button class="type-button" onclick="toggleLocations('head', 'brain')">head - brain</button>
-                    <button class="type-button" onclick="toggleLocations('head', 'eye')">head - eye</button>
-                    <button class="type-button" onclick="toggleLocations('head', 'face')">head - face</button>
-                    <button class="type-button" onclick="toggleLocations('head', 'ear')">head - ear</button>
-                    <button class="type-button" onclick="toggleLocations('head', 'nose')">head - nose</button>
-                    <button class="type-button" onclick="toggleLocations('head', 'skull')">head - skull</button>
-                    <button class="type-button" onclick="toggleLocations('head', 'mouth')">head - mouth</button>
-                    <button class="type-button" onclick="toggleLocations('head', 'head')">head - head</button>
-                    <button class="type-button" onclick="toggleLocations('neck', 'cervical spine')">neck - cervical spine</button>
-                    <button class="type-button" onclick="toggleLocations('neck', 'visceral')">neck - visceral</button>
-                    <button class="type-button" onclick="toggleLocations('neck', 'vascular')">neck - vascular</button>
-                    <button class="type-button" onclick="toggleLocations('upper limb', 'wrist')">upper limb - wrist</button>
-                    <button class="type-button" onclick="toggleLocations('upper limb', 'hand')">upper limb - hand</button>
-                    <button class="type-button" onclick="toggleLocations('upper limb', 'fingers')">upper limb - fingers</button>
-                    <button class="type-button" onclick="toggleLocations('upper limb', 'arm')">upper limb - arm</button>
-                    <button class="type-button" onclick="toggleLocations('upper limb', 'forearm')">upper limb - forearm</button>
-                    <button class="type-button" onclick="toggleLocations('upper limb', 'elbow')">upper limb - elbow</button>
-                    <button class="type-button" onclick="toggleLocations('upper limb', 'shoulder')">upper limb - shoulder</button>
-                    <button class="type-button" onclick="toggleLocations('thorax', 'thoracic spine')">thorax - thoracic spine</button>
-                    <button class="type-button" onclick="toggleLocations('thorax', 'ribcage')">thorax - ribcage</button>
-                    <button class="type-button" onclick="toggleLocations('thorax', 'heart')">thorax - heart</button>
-                    <button class="type-button" onclick="toggleLocations('thorax', 'lung')">thorax - lung</button>
-                    <button class="type-button" onclick="toggleLocations('abdomen', 'lumbar spine')">abdomen - lumbar spine</button>
-                    <button class="type-button" onclick="toggleLocations('abdomen', 'right upper quadrant')">abdomen - right upper quadrant</button>
-                    <button class="type-button" onclick="toggleLocations('abdomen', 'left upper quadrant')">abdomen - left upper quadrant</button>
-                    <button class="type-button" onclick="toggleLocations('abdomen', 'right lower quadrant')">abdomen - right lower quadrant</button>
-                    <button class="type-button" onclick="toggleLocations('abdomen', 'left lower quadrant')">abdomen - left lower quadrant</button>
-                    <button class="type-button" onclick="toggleLocations('spine', 'spinal cord')">spine - spinal cord</button>
-                    <button class="type-button" onclick="toggleLocations('spine', 'vertebral')">spine - vertebral</button>
-                    <button class="type-button" onclick="toggleLocations('spine', 'tracts')">spine - tracts</button>
-                    <button class="type-button" onclick="toggleLocations('spine', 'sacral spine')">spine - sacral spine</button>
-                    <button class="type-button" onclick="toggleLocations('pelvis', 'sacral spine')">pelvis - sacral spine</button>
-                    <button class="type-button" onclick="toggleLocations('pelvis', 'greater pelvis')">pelvis - greater pelvis</button>
-                    <button class="type-button" onclick="toggleLocations('pelvis', 'lesser pelvis')">pelvis - lesser pelvis</button>
-                    <button class="type-button" onclick="toggleLocations('lower limb', 'foot')">lower limb - foot</button>
-                    <button class="type-button" onclick="toggleLocations('lower limb', 'thigh')">lower limb - thigh</button>
-                    <button class="type-button" onclick="toggleLocations('lower limb', 'knee')">lower limb - knee</button>
-                    <button class="type-button" onclick="toggleLocations('lower limb', 'leg')">lower limb - leg</button>
-                    <button class="type-button" onclick="toggleLocations('lower limb', 'ankle')">lower limb - ankle</button>
-                    <button class="type-button" onclick="toggleLocations('lower limb', 'toes')">lower limb - toes</button>
-                </div>
-            </div>
+<div id="locations" class="filter-section">
+    <div class="filter-group">
+        <div class="filter-group-title">
+            <h3>Locations</h3>
+            <button class="clear-btn" onclick="clearLocations()">Clear</button>
+        </div>
+        <div class="location-buttons">
+            <button class="location-button" onclick="toggleLocations('head', 'brain')">head - brain</button>
+            <button class="location-button" onclick="toggleLocations('head', 'eye')">head - eye</button>
+            <button class="location-button" onclick="toggleLocations('head', 'face')">head - face</button>
+            <button class="location-button" onclick="toggleLocations('head', 'ear')">head - ear</button>
+            <button class="location-button" onclick="toggleLocations('head', 'nose')">head - nose</button>
+            <button class="location-button" onclick="toggleLocations('head', 'skull')">head - skull</button>
+            <button class="location-button" onclick="toggleLocations('head', 'mouth')">head - mouth</button>
+            <button class="location-button" onclick="toggleLocations('head', 'head')">head - head</button>
+            <button class="location-button" onclick="toggleLocations('neck', 'cervical spine')">neck - cervical spine</button>
+            <button class="location-button" onclick="toggleLocations('neck', 'visceral')">neck - visceral</button>
+            <button class="location-button" onclick="toggleLocations('neck', 'vascular')">neck - vascular</button>
+            <button class="location-button" onclick="toggleLocations('upper limb', 'wrist')">upper limb - wrist</button>
+            <button class="location-button" onclick="toggleLocations('upper limb', 'hand')">upper limb - hand</button>
+            <button class="location-button" onclick="toggleLocations('upper limb', 'fingers')">upper limb - fingers</button>
+            <button class="location-button" onclick="toggleLocations('upper limb', 'arm')">upper limb - arm</button>
+            <button class="location-button" onclick="toggleLocations('upper limb', 'forearm')">upper limb - forearm</button>
+            <button class="location-button" onclick="toggleLocations('upper limb', 'elbow')">upper limb - elbow</button>
+            <button class="location-button" onclick="toggleLocations('upper limb', 'shoulder')">upper limb - shoulder</button>
+            <button class="location-button" onclick="toggleLocations('thorax', 'thoracic spine')">thorax - thoracic spine</button>
+            <button class="location-button" onclick="toggleLocations('thorax', 'ribcage')">thorax - ribcage</button>
+            <button class="location-button" onclick="toggleLocations('thorax', 'heart')">thorax - heart</button>
+            <button class="location-button" onclick="toggleLocations('thorax', 'lung')">thorax - lung</button>
+            <button class="location-button" onclick="toggleLocations('abdomen', 'lumbar spine')">abdomen - lumbar spine</button>
+            <button class="location-button" onclick="toggleLocations('abdomen', 'right upper quadrant')">abdomen - right upper quadrant</button>
+            <button class="location-button" onclick="toggleLocations('abdomen', 'left upper quadrant')">abdomen - left upper quadrant</button>
+            <button class="location-button" onclick="toggleLocations('abdomen', 'right lower quadrant')">abdomen - right lower quadrant</button>
+            <button class="location-button" onclick="toggleLocations('abdomen', 'left lower quadrant')">abdomen - left lower quadrant</button>
+            <button class="location-button" onclick="toggleLocations('spine', 'spinal cord')">spine - spinal cord</button>
+            <button class="location-button" onclick="toggleLocations('spine', 'vertebral')">spine - vertebral</button>
+            <button class="location-button" onclick="toggleLocations('spine', 'tracts')">spine - tracts</button>
+            <button class="location-button" onclick="toggleLocations('spine', 'sacral spine')">spine - sacral spine</button>
+            <button class="location-button" onclick="toggleLocations('pelvis', 'sacral spine')">pelvis - sacral spine</button>
+            <button class="location-button" onclick="toggleLocations('pelvis', 'greater pelvis')">pelvis - greater pelvis</button>
+            <button class="location-button" onclick="toggleLocations('pelvis', 'lesser pelvis')">pelvis - lesser pelvis</button>
+            <button class="location-button" onclick="toggleLocations('lower limb', 'foot')">lower limb - foot</button>
+            <button class="location-button" onclick="toggleLocations('lower limb', 'thigh')">lower limb - thigh</button>
+            <button class="location-button" onclick="toggleLocations('lower limb', 'knee')">lower limb - knee</button>
+            <button class="location-button" onclick="toggleLocations('lower limb', 'leg')">lower limb - leg</button>
+            <button class="location-button" onclick="toggleLocations('lower limb', 'ankle')">lower limb - ankle</button>
+            <button class="location-button" onclick="toggleLocations('lower limb', 'toes')">lower limb - toes</button>
         </div>
     </div>
 </div>
@@ -310,88 +390,10 @@
     }
 
     function openTab(tabName) {
-        const tabs = document.getElementsByClassName('tab-content');
+        const tabs = document.getElementsByClassName('filter-section');
         for (let i = 0; i < tabs.length; i++) {
-            tabs[i].style.display = 'none';
+            tabs[i].classList.remove('active');
         }
-        document.getElementById(tabName).style.display = 'block';
-    }
+        document.getElementById(tabName).classList.add('active');
 
-    function toggleNodesByType(type) {
-        if (activeTypes.has(type)) {
-            activeTypes.delete(type);
-        } else {
-            activeTypes.add(type);
-        }
-        filterNodes();
-        cleanUpRelationships();
-    }
-
-    function toggleLocations(location, sublocation) {
-        const type = `${location} - ${sublocation}`;
-        if (activeLocations.has(type)) {
-            activeLocations.delete(type);
-        } else {
-            activeLocations.add(type);
-        }
-        filterLocations();
-        cleanUpRelationships();
-    }
-
-    function filterNodes() {
-        d3.select("#graph").selectAll(".node-label").each(function(d) {
-            if (activeTypes.has(d.label)) {
-                d3.select(this).style("display", "block");
-            } else {
-                d3.select(this).style("display", "none");
-            }
-        });
-
-        d3.select("#graph").selectAll("circle").each(function(d) {
-            if (activeTypes.has(d.label)) {
-                d3.select(this).style("display", "block");
-            } else {
-                d3.select(this).style("display", "none");
-            }
-        });
-
-        d3.select("#graph").selectAll(".link").each(function(d) {
-            if (activeTypes.has(d.source.label) && activeTypes.has(d.target.label)) {
-                d3.select(this).style("display", "block");
-            } else {
-                d3.select(this).style("display", "none");
-            }
-        });
-    }
-
-    function filterLocations() {
-        d3.select("#graph").selectAll(".node-label").each(function(d) {
-            if (activeLocations.has(d.label)) {
-                d3.select(this).style("display", "block");
-            } else {
-                d3.select(this).style("display", "none");
-            }
-        });
-
-        d3.select("#graph").selectAll("circle").each(function(d) {
-            if (activeLocations.has(d.label)) {
-                d3.select(this).style("display", "block");
-            } else {
-                d3.select(this).style("display", "none");
-            }
-        });
-
-        d3.select("#graph").selectAll(".link").each(function(d) {
-            if (activeLocations.has(d.source.label) && activeLocations.has(d.target.label)) {
-                d3.select(this).style("display", "block");
-            } else {
-                d3.select(this).style("display", "none");
-            }
-        });
-    }
-
-    function clearNodeTypes() {
-        activeTypes.clear();
-        filterNodes();
-        cleanUpRelationships();
-    }
+        const tabButtons
