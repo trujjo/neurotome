@@ -2,20 +2,15 @@
 <html>
 <head>
     <title>Neo4j Force Graph</title>
-    <script src="https://unpkg.com/neo4j-driver@5.15.0"></script>
-    <script src="https://d3js.org/d3.v5.min.js"></script>
+    <script src=“https://unpkg.com/neo4j-driver@5.15.0”></script>
+    <script src=“https://d3js.org/d3.v5.min.js”></script>
     <style>
-
-
-<!DOCTYPE html>
-<html>
-<head>
-    <title>Network Visualization</title>
-    <link rel="stylesheet" href="{{ url_for('static', filename='css/styles.css') }}">
-    <script src="https://unpkg.com/neo4j-driver"></script>
-    <script src="https://d3js.org/d3.v5.min.js"></script>
-</head>
-<body>
+        body { 
+            margin: 0;
+            padding: 20px;
+            background-color: #1a1a1a;
+            color: white;
+            font-family: Arial, sans-serif;
         }
         #graph {
             width: 100%;
@@ -58,9 +53,9 @@
     </style>
 </head>
 <body>
-    <button class="button" onclick="showRandomNodesWithRelationships()">Show Random Connected Nodes</button>
-    <div id="status">Ready to connect...</div>
-    <div id="graph"></div>
+    <button class=“button” onclick=“showRandomNodesWithRelationships()”>Show Random Connected Nodes</button>
+    <div id=“status”>Ready to connect…</div>
+    <div id=“graph”></div>
 
     <script>
         let driver;
@@ -68,33 +63,33 @@
         async function initDriver() {
             try {
                 driver = neo4j.driver(
-                    "neo4j+s://4e5eeae5.databases.neo4j.io:7687",
-                    neo4j.auth.basic("neo4j", "Poconoco16!")
+                    “neo4j+s://4e5eeae5.databases.neo4j.io:7687”,
+                    neo4j.auth.basic(“neo4j”, “Poconoco16!”)
                 );
                 
                 // Test the connection
                 const session = driver.session();
-                await session.run("RETURN 1");
+                await session.run(“RETURN 1”);
                 await session.close();
                 
-                document.getElementById('status').style.backgroundColor = '#28a745';
-                document.getElementById('status').innerHTML = 'Connected to database';
+                document.getElementById(‘status’).style.backgroundColor = ‘#28a745’;
+                document.getElementById(‘status’).innerHTML = ‘Connected to database’;
             } catch (error) {
-                document.getElementById('status').style.backgroundColor = '#dc3545';
-                document.getElementById('status').innerHTML = 'Connection error: ' + error.message;
-                console.error('Connection error:', error);
+                document.getElementById(‘status’).style.backgroundColor = ‘#dc3545’;
+                document.getElementById(‘status’).innerHTML = ‘Connection error: ‘ + error.message;
+                console.error(‘Connection error:’, error);
             }
         }
 
         async function showRandomNodesWithRelationships() {
             if (!driver) {
-                document.getElementById('status').style.backgroundColor = '#dc3545';
-                document.getElementById('status').innerHTML = 'Not connected to database';
+                document.getElementById(‘status’).style.backgroundColor = ‘#dc3545’;
+                document.getElementById(‘status’).innerHTML = ‘Not connected to database’;
                 return;
             }
 
             const session = driver.session();
-            document.getElementById('status').innerHTML = 'Fetching data...';
+            document.getElementById(‘status’).innerHTML = ‘Fetching data…’;
             
             try {
                 // Fixed query with different variable name for random
@@ -108,23 +103,23 @@
                     LIMIT 15
                 `);
                 
-                document.getElementById('status').innerHTML = 'Processing data...';
+                document.getElementById(‘status’).innerHTML = ‘Processing data…’;
                 
                 // Process the data for D3
                 const nodes = new Map();
                 const links = [];
                 
                 result.records.forEach(record => {
-                    const source = record.get('n');
-                    const target = record.get('m');
-                    const relationship = record.get('rel');
+                    const source = record.get(’n’);
+                    const target = record.get(‘m’);
+                    const relationship = record.get(‘rel’);
                     
-                    // Add nodes if they don't exist
+                    // Add nodes if they don’t exist
                     if (!nodes.has(source.identity.toString())) {
                         nodes.set(source.identity.toString(), {
                             id: source.identity.toString(),
                             label: source.labels[0],
-                            name: source.properties.name || 'Unnamed'
+                            name: source.properties.name || ‘Unnamed’
                         });
                     }
                     
@@ -132,7 +127,7 @@
                         nodes.set(target.identity.toString(), {
                             id: target.identity.toString(),
                             label: target.labels[0],
-                            name: target.properties.name || 'Unnamed'
+                            name: target.properties.name || ‘Unnamed’
                         });
                     }
                     
@@ -144,15 +139,15 @@
                     });
                 });
                 
-                document.getElementById('status').innerHTML = 'Rendering graph...';
+                document.getElementById(‘status’).innerHTML = ‘Rendering graph…’;
                 createForceGraph(Array.from(nodes.values()), links);
-                document.getElementById('status').style.backgroundColor = '#28a745';
-                document.getElementById('status').innerHTML = 'Graph rendered successfully';
+                document.getElementById(‘status’).style.backgroundColor = ‘#28a745’;
+                document.getElementById(‘status’).innerHTML = ‘Graph rendered successfully’;
                 
             } catch (error) {
-                document.getElementById('status').style.backgroundColor = '#dc3545';
-                document.getElementById('status').innerHTML = 'Error: ' + error.message;
-                console.error('Error:', error);
+                document.getElementById(‘status’).style.backgroundColor = ‘#dc3545’;
+                document.getElementById(‘status’).innerHTML = ‘Error: ‘ + error.message;
+                console.error(‘Error:’, error);
             } finally {
                 await session.close();
             }
@@ -160,103 +155,103 @@
 
         function createForceGraph(nodes, links) {
             // Clear previous graph
-            d3.select("#graph").selectAll("*").remove();
+            d3.select(“#graph”).selectAll(“*”).remove();
             
-            const width = document.getElementById('graph').clientWidth;
-            const height = document.getElementById('graph').clientHeight;
+            const width = document.getElementById(‘graph’).clientWidth;
+            const height = document.getElementById(‘graph’).clientHeight;
             
-            const svg = d3.select("#graph")
-                .append("svg")
-                .attr("width", width)
-                .attr("height", height);
+            const svg = d3.select(“#graph”)
+                .append(“svg”)
+                .attr(“width”, width)
+                .attr(“height”, height);
             
             // Create force simulation
             const simulation = d3.forceSimulation(nodes)
-                .force("link", d3.forceLink(links).id(d => d.id).distance(200))
-                .force("charge", d3.forceManyBody().strength(-500))
-                .force("center", d3.forceCenter(width / 2, height / 2));
+                .force(“link”, d3.forceLink(links).id(d => d.id).distance(200))
+                .force(“charge”, d3.forceManyBody().strength(-500))
+                .force(“center”, d3.forceCenter(width / 2, height / 2));
             
             // Create links
-            const link = svg.append("g")
-                .selectAll("line")
+            const link = svg.append(“g”)
+                .selectAll(“line”)
                 .data(links)
                 .enter()
-                .append("line")
-                .attr("class", "link")
-                .style("stroke", "#808080")
-                .style("stroke-width", 2);
+                .append(“line”)
+                .attr(“class”, “link”)
+                .style(“stroke”, “#808080”)
+                .style(“stroke-width”, 2);
             
             // Create link labels
-            const linkLabel = svg.append("g")
-                .selectAll("text")
+            const linkLabel = svg.append(“g”)
+                .selectAll(“text”)
                 .data(links)
                 .enter()
-                .append("text")
-                .attr("class", "link-label")
+                .append(“text”)
+                .attr(“class”, “link-label”)
                 .text(d => d.type);
             
             // Create nodes
-            const node = svg.append("g")
-                .selectAll("g")
+            const node = svg.append(“g”)
+                .selectAll(“g”)
                 .data(nodes)
                 .enter()
-                .append("g");
+                .append(“g”);
             
             // Add circles to nodes
-            node.append("circle")
-                .attr("r", 30)
-                .style("fill", "#cc5500")
-                .style("stroke", "#ff6a00")
-                .style("stroke-width", 2);
+            node.append(“circle”)
+                .attr(“r”, 30)
+                .style(“fill”, “#cc5500”)
+                .style(“stroke”, “#ff6a00”)
+                .style(“stroke-width”, 2);
             
             // Add labels to nodes
-            node.append("text")
-                .attr("class", "node-label")
-                .attr("dy", ".35em")
+            node.append(“text”)
+                .attr(“class”, “node-label”)
+                .attr(“dy”, “.35em”)
                 .text(d => d.name)
                 .each(function(d) {
                     // Wrap text if too long
                     let text = d3.select(this);
-                    let words = d.name.split(' ');
+                    let words = d.name.split(‘ ‘);
                     let line = [];
                     let lineNumber = 0;
                     let lineHeight = 1.1;
-                    let y = text.attr("y");
-                    let dy = parseFloat(text.attr("dy"));
-                    let tspan = text.text(null).append("tspan").attr("x", 0).attr("y", y).attr("dy", dy + "em");
+                    let y = text.attr(“y”);
+                    let dy = parseFloat(text.attr(“dy”));
+                    let tspan = text.text(null).append(“tspan”).attr(“x”, 0).attr(“y”, y).attr(“dy”, dy + “em”);
                     
                     words.forEach(word => {
                         line.push(word);
-                        tspan.text(line.join(" "));
+                        tspan.text(line.join(“ “));
                         if (tspan.node().getComputedTextLength() > 50) {
                             line.pop();
-                            tspan.text(line.join(" "));
+                            tspan.text(line.join(“ “));
                             line = [word];
-                            tspan = text.append("tspan").attr("x", 0).attr("y", y).attr("dy", ++lineNumber * lineHeight + dy + "em").text(word);
+                            tspan = text.append(“tspan”).attr(“x”, 0).attr(“y”, y).attr(“dy”, ++lineNumber * lineHeight + dy + “em”).text(word);
                         }
                     });
                 });
             
             // Add drag behavior
             node.call(d3.drag()
-                .on("start", dragstarted)
-                .on("drag", dragged)
-                .on("end", dragended));
+                .on(“start”, dragstarted)
+                .on(“drag”, dragged)
+                .on(“end”, dragended));
             
             // Update positions on each tick
-            simulation.on("tick", () => {
+            simulation.on(“tick”, () => {
                 link
-                    .attr("x1", d => d.source.x)
-                    .attr("y1", d => d.source.y)
-                    .attr("x2", d => d.target.x)
-                    .attr("y2", d => d.target.y);
+                    .attr(“x1”, d => d.source.x)
+                    .attr(“y1”, d => d.source.y)
+                    .attr(“x2”, d => d.target.x)
+                    .attr(“y2”, d => d.target.y);
                 
                 linkLabel
-                    .attr("x", d => (d.source.x + d.target.x) / 2)
-                    .attr("y", d => (d.source.y + d.target.y) / 2);
+                    .attr(“x”, d => (d.source.x + d.target.x) / 2)
+                    .attr(“y”, d => (d.source.y + d.target.y) / 2);
                 
                 node
-                    .attr("transform", d => `translate(${d.x},${d.y})`);
+                    .attr(“transform”, d => `translate(${d.x},${d.y})`);
             });
             
             // Drag functions
@@ -279,7 +274,7 @@
         }
 
         // Initialize the driver when the page loads
-        document.addEventListener('DOMContentLoaded', initDriver);
+        document.addEventListener(‘DOMContentLoaded’, initDriver);
 
         // Clean up when the page is closed
         window.onbeforeunload = () => {
