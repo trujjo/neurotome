@@ -256,31 +256,40 @@
         cleanUpRelationships();
     }
 
-    function filterNodes() {
-        d3.select("#graph").selectAll(".node-label").each(function(d) {
-            if (activeTypes.has(d.label)) {
-                d3.select(this).style("display", "block");
-            } else {
-                d3.select(this).style("display", "none");
-            }
-        });
+   function filterNodes() {
+    d3.select("#graph").selectAll(".node-label").each(function(d) {
+        if (activeTypes.has(d.label)) {
+            d3.select(this).style("display", "block");
+        } else {
+            d3.select(this).style("display", "none");
+        }
+    });
 
-        d3.select("#graph").selectAll("circle").each(function(d) {
-            if (activeTypes.has(d.label)) {
-                d3.select(this).style("display", "block");
-            } else {
-                d3.select(this).style("display", "none");
-            }
-        });
+    d3.select("#graph").selectAll("circle").each(function(d) {
+        if (activeTypes.has(d.label)) {
+            d3.select(this).style("display", "block");
+        } else {
+            d3.select(this).style("display", "none");
+        }
+    });
 
-        d3.select("#graph").selectAll(".link").each(function(d) {
-            if (activeTypes.has(d.source.label) && activeTypes.has(d.target.label)) {
-                d3.select(this).style("display", "block");
-            } else {
-                d3.select(this).style("display", "none");
-            }
-        });
-    }
+    d3.select("#graph").selectAll(".link").each(function(d) {
+        if (activeTypes.has(d.source.label) && activeTypes.has(d.target.label)) {
+            d3.select(this).style("display", "block");
+        } else {
+            d3.select(this).style("display", "none");
+        }
+    });
+
+    // Hide or show relationship names based on node visibility
+    d3.select("#graph").selectAll(".link-label").each(function(d) {
+        if (activeTypes.has(d.source.label) && activeTypes.has(d.target.label)) {
+            d3.select(this).style("display", "block");
+        } else {
+            d3.select(this).style("display", "none");
+        }
+    });
+}
 
     function clearNodeTypes() {
         activeTypes.clear();
