@@ -253,6 +253,7 @@
             activeTypes.add(type);
         }
         filterNodes();
+        cleanUpRelationships();
     }
 
     function filterNodes() {
@@ -284,6 +285,13 @@
     function clearNodeTypes() {
         activeTypes.clear();
         filterNodes();
+        cleanUpRelationships();
+    }
+
+    function cleanUpRelationships() {
+        d3.select("#graph").selectAll(".link").each(function(d) {
+            d3.select(this).style("display", "none");
+        });
     }
 
     document.addEventListener('DOMContentLoaded', initDriver);
