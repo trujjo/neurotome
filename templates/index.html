@@ -39,6 +39,7 @@
             background: #2a2a2a;
             display: none;
             border-radius: 0 0 8px 8px;
+            margin-bottom: 20px;
         }
 
         .filter-section.active {
@@ -58,6 +59,7 @@
             border-radius: 8px;
             min-width: 180px;
             flex: 1;
+            margin-bottom: 10px;
         }
 
         .filter-group-title {
@@ -69,10 +71,12 @@
         }
 
         .location-header {
+            margin: 0;
             cursor: pointer;
             padding: 5px;
             border-radius: 4px;
             transition: background 0.2s;
+            user-select: none;
         }
 
         .location-header:hover {
@@ -272,18 +276,20 @@
 
             initializeLocationGroups() {
                 const container = document.getElementById('locationGroups');
+                container.innerHTML = ''; // Clear existing content
+                
                 Object.entries(locationData).forEach(([location, sublocations]) => {
                     const group = document.createElement('div');
                     group.className = 'filter-group';
-
+                    
                     const header = document.createElement('div');
                     header.className = 'filter-group-title';
-
-                    const locationHeader = document.createElement('h3');
-                    locationHeader.className = 'location-header';
-                    locationHeader.textContent = location;
-                    locationHeader.onclick = () => this.toggleLocationGroup(location);
-
+                    
+                    const title = document.createElement('h3');
+                    title.className = 'location-header';
+                    title.textContent = location;
+                    title.onclick = () => this.toggleLocationGroup(location);
+                    
                     const clearBtn = document.createElement('button');
                     clearBtn.className = 'clear-btn';
                     clearBtn.textContent = 'Clear';
@@ -291,13 +297,13 @@
                         e.stopPropagation();
                         this.clearLocationGroup(location);
                     };
-
-                    header.appendChild(locationHeader);
+                    
+                    header.appendChild(title);
                     header.appendChild(clearBtn);
-
+                    
                     const buttons = document.createElement('div');
                     buttons.className = 'filter-buttons';
-
+                    
                     sublocations.forEach(sublocation => {
                         const button = document.createElement('button');
                         button.className = 'filter-btn';
@@ -307,7 +313,7 @@
                         button.onclick = () => this.toggleSublocation(button);
                         buttons.appendChild(button);
                     });
-
+                    
                     group.appendChild(header);
                     group.appendChild(buttons);
                     container.appendChild(group);
@@ -335,7 +341,7 @@
             toggleLocationGroup(location) {
                 const buttons = document.querySelectorAll(`[data-location="${location}"]`);
                 const allActive = Array.from(buttons).every(btn => btn.classList.contains('active'));
-
+                
                 buttons.forEach(button => {
                     const sublocation = button.dataset.sublocation;
                     if (allActive) {
@@ -346,13 +352,13 @@
                         button.classList.add('active');
                     }
                 });
-
+                
                 if (allActive) {
                     this.activeLocations.delete(location);
                 } else {
                     this.activeLocations.add(location);
                 }
-
+                
                 this.updateVisualization();
                 this.updateStats();
             }
@@ -360,7 +366,7 @@
             toggleSublocation(button) {
                 const location = button.dataset.location;
                 const sublocation = button.dataset.sublocation;
-
+                
                 if (button.classList.contains('active')) {
                     this.activeSublocations.delete(sublocation);
                     button.classList.remove('active');
@@ -372,7 +378,7 @@
                     button.classList.add('active');
                     this.activeLocations.add(location);
                 }
-
+                
                 this.updateVisualization();
                 this.updateStats();
             }
@@ -414,11 +420,3 @@
                 this.viz.updateWithFilters(filters);
             }
         }
-
-        // Initialize the filter manager when the page loads
-        document.addEventListener('DOMContentLoaded', () => {
-            window.filterManager = new FilterManager();
-        });
-    </script>
-</body>
-</html>
