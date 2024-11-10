@@ -1,9 +1,5 @@
-# Read the paste.txt file and modify it
-with open('paste.txt', 'r') as file:
-    content = file.read()
-
 # Add the type buttons CSS
-type_buttons_css = """
+type_buttons_css = 
         .type-buttons {
             display: flex;
             flex-wrap: wrap;
@@ -29,7 +25,7 @@ type_buttons_css = """
             background-color: #ff6a00;
             border: 2px solid #ffffff;
         }
-"""
+
 
 # Reduce font size in existing CSS
 content = content.replace("font-size: 8px", "font-size: 6px")
@@ -60,7 +56,7 @@ content = content.replace("<body>", "<body>\
 " + type_buttons_html)
 
 # Add the showNodesByType function before the closing </script> tag
-show_nodes_function = """
+show_nodes_function = 
         async function showNodesByType(nodeType) {
             if (!driver) {
                 document.getElementById('status').style.backgroundColor = '#dc3545';
@@ -138,21 +134,7 @@ show_nodes_function = """
                 await session.close();
             }
         }
-"""
+
 
 content = content.replace("</script>", show_nodes_function + "\
     </script>")
-
-# Write the modified content to a new file
-with open('neo4j_graph_modified.html', 'w') as file:
-    file.write(content)
-
-print("Successfully created neo4j_graph_modified.html with all modifications:"
-      "\
-- Reduced font size to 6px"
-      "\
-- Added type buttons with styling"
-      "\
-- Added showNodesByType function"
-      "\
-- Integrated with existing visualization code")
