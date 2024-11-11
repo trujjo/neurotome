@@ -300,19 +300,77 @@
 
 
 
+
+
+
 <div class="tab-container">
-    <button class="tab-button" onclick="openTab(event, 'LabelType')">tissue</button>
+    <button class="tab-button" onclick="openTab(event, 'Tissue')">tissue</button>
     <button class="tab-button" onclick="openTab(event, 'Location')">location</button>
-    <button class="tab-button" onclick="openTab(event, 'relationship')">relationship</button>
+    <button class="tab-button" onclick="openTab(event, 'Relationship')">relationship</button>
 </div>
 
-<div id="LabelType" class="tab-content">
+
+
+<div id="Tissue" class="tab-content">
     <div class="filter-container">
         <div class="filter-section">
             <div class="filter-group">
                 <div class="filter-group-title">
-                    <h3>Node Types</h3>
-                    <button class="clear-btn" onclick="clearNodeTypes()">Clear</button>
+                    <h3>Tissue Types</h3>
+                    <button class="clear-btn" onclick="clearTissueTypes()">Clear</button>
+                </div>
+                <button class="type-button" data-type="nerve" onclick="toggleTissueType('nerve')">nerve</button>
+<button class="type-button" data-type="bone" onclick="toggleTissueType('bone')">bone</button>
+<button class="type-button" data-type="neuro" onclick="toggleTissueType('neuro')">neuro</button>
+<button class="type-button" data-type="region" onclick="toggleTissueType('region')">region</button>
+<button class="type-button" data-type="viscera" onclick="toggleTissueType('viscera')">viscera</button>
+<button class="type-button" data-type="muscle" onclick="toggleTissueType('muscle')">muscle</button>
+<button class="type-button" data-type="sense" onclick="toggleTissueType('sense')">sense</button>
+<button class="type-button" data-type="vein" onclick="toggleTissueType('vein')">vein</button>
+<button class="type-button" data-type="artery" onclick="toggleTissueType('artery')">artery</button>
+<button class="type-button" data-type="cv" onclick="toggleTissueType('cv')">cv</button>
+<button class="type-button" data-type="function" onclick="toggleTissueType('function')">function</button>
+<button class="type-button" data-type="sensory" onclick="toggleTissueType('sensory')">sensory</button>
+<button class="type-button" data-type="gland" onclick="toggleTissueType('gland')">gland</button>
+<button class="type-button" data-type="lymph" onclick="toggleTissueType('lymph')">lymph</button>
+<button class="type-button" data-type="head" onclick="toggleTissueType('head')">head</button>
+<button class="type-button" data-type="organ" onclick="toggleTissueType('organ')">organ</button>
+<button class="type-button" data-type="sensation" onclick="toggleTissueType('sensation')">sensation</button>
+<button class="type-button" data-type="skin" onclick="toggleTissueType('skin')">skin</button>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+
+<div id="Tissue" class="tab-content">
+    <div class="filter-container">
+        <div class="filter-section">
+            <div class="filter-group">
+                <div class="filter-group-title">
+                    <h3>Tissue Types</h3>
+                    <button class="clear-btn" onclick="clearTissueTypes()">Clear</button>
+                </div>
+                <div class="type-buttons">
+                    <button class="type-button" data-type="nerve" onclick="toggleTissueType('nerve')">nerve</button>
+                    <button class="type-button" data-type="bone" onclick="toggleTissueType('bone')">bone</button>
+                    <button class="type-button" data-type="neuro" onclick="toggleTissueType('neuro')">neuro</button>
+            
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+
+<div id="Tissue" class="tab-content">
+    <div class="filter-container">
+        <div class="filter-section">
+            <div class="filter-group">
+                <div class="filter-group-title">
+                    <h3>Tissue Types</h3>
+                     <button class="clear-btn" onclick="clearNodeTypes()">Clear</button>
                 </div>
                 <div class="type-buttons">
                     <button class="type-button" onclick="toggleNodesByType('nerve')">nerve</button>
@@ -353,6 +411,50 @@
     </div>
 </div>
 
+
+<div id="Relationship" class="tab-content">
+    <div class="filter-container">
+        <div class="filter-section">
+            <div class="filter-group">
+                <div class="filter-group-title">
+                    <h3>Relationships</h3>
+                    <button class="clear-btn" onclick="clearNodeTypes()">Clear</button>
+                </div>
+               <div class="relationship-buttons">
+         <button class="type-button" onclick="toggleRelationship('includes')">includes</button>
+<button class="type-button" onclick="toggleRelationship('perfuses')">perfuses</button>
+<button class="type-button" onclick="toggleRelationship('supplies_blood')">supplies_blood</button>
+<button class="type-button" onclick="toggleRelationship('branches')">branches</button>
+<button class="type-button" onclick="toggleRelationship('more_details')">more_details</button>
+<button class="type-button" onclick="toggleRelationship('drains_into')">drains_into</button>
+<button class="type-button" onclick="toggleRelationship('lymph_drains')">lymph_drains</button>
+<button class="type-button" onclick="toggleRelationship('innervates')">innervates</button>
+<button class="type-button" onclick="toggleRelationship('spinal_cord')">spinal_cord</button>
+<button class="type-button" onclick="toggleRelationship('exits_or_occupies')">exits_or_occupies</button>
+<button class="type-button" onclick="toggleRelationship('nerve_branches')">nerve_branches</button>
+<button class="type-button" onclick="toggleRelationship('spinothalamic_tract')">spinothalamic_tract</button>
+<button class="type-button" onclick="toggleRelationship('pumps_blood')">pumps_blood</button>
+<button class="type-button" onclick="toggleRelationship('senses')">senses</button>
+<button class="type-button" onclick="toggleRelationship('motor_innervation')">motor_innervation</button>
+<button class="type-button" onclick="toggleRelationship('ant_spinothalamic')">ant_spinothalamic</button>
+<button class="type-button" onclick="toggleRelationship('lat_spinothalamic')">lat_spinothalamic</button>
+<button class="type-button" onclick="toggleRelationship('dorsal_column')">dorsal_column</button>
+<button class="type-button" onclick="toggleRelationship('controls')">controls</button>
+<button class="type-button" onclick="toggleRelationship('csf_flow')">csf_flow</button>
+<button class="type-button" onclick="toggleRelationship('releases_hormones')">releases_hormones</button>
+<button class="type-button" onclick="toggleRelationship('sensory_input')">sensory_input</button>
+<button class="type-button" onclick="toggleRelationship('thalamocortical')">thalamocortical</button>
+<button class="type-button" onclick="toggleRelationship('corticospinal_descending')">corticospinal_descending</button>
+<button class="type-button" onclick="toggleRelationship('innervated_by')">innervated_by</button>
+<button class="type-button" onclick="toggleRelationship('spinothalamic_decussation')">spinothalamic_decussation</button>
+<button class="type-button" onclick="toggleRelationship('pyramidal_decussation')">pyramidal_decussation</button>
+<button class="type-button" onclick="toggleRelationship('corticospinal_termination')">corticospinal_termination</button>                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+    
 <div class="controls">
     <button class="button" onclick="showRandomNodesWithRelationships()">Show random connected nodes</button>
     <input type="text" id="searchBox" placeholder="search nodes...">
