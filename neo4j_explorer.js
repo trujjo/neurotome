@@ -2,18 +2,28 @@ let network = null;
 let driver = null;
 
 async function initializeDriver() {
-    const uri = "neo4j+s://4e5eeae5.databases.neo4j.io:7687";
-    const user = "neo4j";
-    const password = "Poconoco16!";
-    
     try {
-        driver = neo4j.driver(uri, neo4j.auth.basic(user, password));
+        driver = neo4j.driver(
+            NEO4J_CONFIG.uri,
+            neo4j.auth.basic(NEO4J_CONFIG.user, NEO4J_CONFIG.password)
+        );
+        
+        // Test connection
+        const session = driver.session();
+        await session.run("RETURN 1");
+        session.close();
+        
         await loadLabels();
+        updateStatus('Connected to database', 'success');
     } catch (error) {
-        document.getElementById('status').innerHTML = `
-            <div style="color: red;">Connection failed: ${error.message}</div>
-        `;
+        updateStatus('Connection failed: ' + error.message, 'danger');
     }
+}
+
+function updateStatus(message, type = 'info') {
+    const status = document.getElementById('status');
+    status.className = `alert alert-${type}`;
+    status.textContent = message;
 }
 
 async function loadLabels() {
@@ -21,6 +31,7 @@ async function loadLabels() {
     try {
         const result = await session.run("CALL db.labels()");
         const controls = document.getElementById('controls');
+        controls.innerHTML = ''; // Clear existing buttons
         
         result.records.forEach(record => {
             const label = record.get(0);
@@ -30,10 +41,6 @@ async function loadLabels() {
             button.onclick = () => loadNodesWithLabel(label);
             controls.appendChild(button);
         });
-        
-        document.getElementById('status').innerHTML = `
-            <div style="color: green;">✓ Connected to database</div>
-        `;
     } finally {
         await session.close();
     }
@@ -42,9 +49,8 @@ async function loadLabels() {
 async function loadNodesWithLabel(label) {
     const session = driver.session();
     try {
-        document.getElementById('status').innerHTML = `Loading ${label} nodes...`;
+        updateStatus(`Loading ${label} nodes...`);
         
-        // Query nodes and their relationships
         const result = await session.run(
             `MATCH (n:${label}) 
              OPTIONAL MATCH (n)-[r]-(m) 
@@ -52,7 +58,6 @@ async function loadNodesWithLabel(label) {
              LIMIT 100`
         );
 
-        // Create network datasets
         const nodes = new vis.DataSet();
         const edges = new vis.DataSet();
         const nodeMap = new Map();
@@ -62,24 +67,22 @@ async function loadNodesWithLabel(label) {
             const rel = record.get('r');
             const connectedNode = record.get('m');
 
-            // Add main node if not already added
             if (!nodeMap.has(node.identity.low)) {
                 nodes.add({
                     id: node.identity.low,
                     label: node.properties.name || label,
                     title: JSON.stringify(node.properties, null, 2),
-                    color: '#3498db'
+                    group: label
                 });
                 nodeMap.set(node.identity.low, true);
             }
 
-            // Add connected node and relationship if they exist
             if (connectedNode && !nodeMap.has(connectedNode.identity.low)) {
                 nodes.add({
                     id: connectedNode.identity.low,
                     label: connectedNode.properties.name || connectedNode.labels[0],
                     title: JSON.stringify(connectedNode.properties, null, 2),
-                    color: '#e74c3c'
+                    group: connectedNode.labels[0]
                 });
                 nodeMap.set(connectedNode.identity.low, true);
             }
@@ -94,13 +97,12 @@ async function loadNodesWithLabel(label) {
             }
         });
 
-        // Configure and create network
         const container = document.getElementById('graph');
         const data = { nodes, edges };
         const options = {
             nodes: {
                 shape: 'dot',
-                size: 10,
+                size: 16,
                 font: {
                     size: 12
                 }
@@ -110,45 +112,61 @@ async function loadNodesWithLabel(label) {
                     size: 10,
                     align: 'middle'
                 },
-                color: { color: '#848484' }
+                color: { color: '#848484' },
+                arrows: {
+                    to: { enabled: true, scaleFactor: 0.5 }
+                }
             },
             physics: {
                 enabled: true,
                 stabilization: {
                     iterations: 100
-                }
+                },
+                solver: 'forceAtlas2Based'
             }
         };
 
         network = new vis.Network(container, data, options);
         
-        // Add node click event
         network.on('click', function(params) {
             if (params.nodes.length > 0) {
                 const nodeId = params.nodes[0];
                 const node = nodes.get(nodeId);
-                const nodeInfo = document.getElementById('nodeInfo');
-                nodeInfo.innerHTML = `
-                    <h3>${node.label}</h3>
+                showNodeInfo(node);
+            } else {
+                hideNodeInfo();
+            }
+        });
 
-            `;
-            nodeInfo.style.display = 'block';
-        } else {
-            document.getElementById('nodeInfo').style.display = 'none';
-        }
-    });
-
-    document.getElementById('status').innerHTML = `
-        <div style="color: green;">✓ Loaded ${nodes.length} nodes and ${edges.length} relationships</div>
-    `;
-} catch (error) {
-    document.getElementById('status').innerHTML = `
-        <div style="color: red;">Error loading nodes: ${error.message}</div>
-    `;
-} finally {
-    await session.close();
+        updateStatus(`Loaded ${nodes.length} nodes and ${edges.length} relationships`, 'success');
+    } catch (error) {
+        updateStatus(`Error loading nodes: ${error.message}`, 'danger');
+    } finally {
+        await session.close();
+    }
 }
 
+function showNodeInfo(node) {
+    const nodeInfo = document.getElementById('nodeInfo');
+    const nodeDetails = document.getElementById('nodeDetails');
+    
+    let detailsHtml = '<div class="node-properties">';
+    for (const [key, value] of Object.entries(JSON.parse(node.title))) {
+        detailsHtml += `
+            <div class="node-property">
+                <strong>${key}:</strong> 
+                <span>${value}</span>
+            </div>`;
+    }
+    detailsHtml += '</div>';
+    
+    nodeDetails.innerHTML = detailsHtml;
+    nodeInfo.style.display = 'block';
+}
 
+function hideNodeInfo() {
+    document.getElementById('nodeInfo').style.display = 'none';
+}
 
-                    
+// Initialize when page loads
+document.addEventListener('DOMContentLoaded', initializeDriver);
