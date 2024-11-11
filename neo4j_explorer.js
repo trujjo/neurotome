@@ -130,4 +130,25 @@ async function loadNodesWithLabel(label) {
                 const nodeInfo = document.getElementById('nodeInfo');
                 nodeInfo.innerHTML = `
                     <h3>${node.label}</h3>
+
+            `;
+            nodeInfo.style.display = 'block';
+        } else {
+            document.getElementById('nodeInfo').style.display = 'none';
+        }
+    });
+
+    document.getElementById('status').innerHTML = `
+        <div style="color: green;">✓ Loaded ${nodes.length} nodes and ${edges.length} relationships</div>
+    `;
+} catch (error) {
+    document.getElementById('status').innerHTML = `
+        <div style="color: red;">Error loading nodes: ${error.message}</div>
+    `;
+} finally {
+    await session.close();
+}
+
+
+
                     
