@@ -1,67 +1,123 @@
 <!DOCTYPE html>
-<html>
+<html lang="en">
 <head>
-    <title>anatomy network viewer</title>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <link rel="stylesheet" href="static/styles.css">
+    <title>neuronetwork explorer</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
     <script type="text/javascript" src="https://unpkg.com/vis-network/standalone/umd/vis-network.min.js"></script>
+    <link rel="stylesheet" href="static/styles.css">
 </head>
 <body>
     <div class="container">
-        <div class="tabs">
-            <div class="tab active" data-tab="tissue">tissue</div>
-            <div class="tab" data-tab="location">location</div>
-            <div class="tab" data-tab="relationship">relationship</div>
-        </div>
+        <div class="sidebar">
+            <div class="logo">
+                <i class="fas fa-brain"></i>
+                <span>neuronetwork</span>
+            </div>
 
-        <div class="filter-section active" id="tissue-section">
-            <div class="filter-buttons">
-                <button class="filter-button">nerve</button>
-                <button class="filter-button">bone</button>
-                <button class="filter-button">artery</button>
-                <button class="filter-button">vein</button>
-                <button class="filter-button">muscle</button>
-                <button class="filter-button">organ</button>
-                <button class="filter-button">gland</button>
-                <button class="filter-button">lymph</button>
+            <div class="search-bar">
+                <i class="fas fa-search"></i>
+                <input type="text" placeholder="search structures...">
+            </div>
+
+            <div class="filter-section">
+                <h3>tissue types</h3>
+                <div class="filter-buttons" id="tissue-filters">
+                    <button class="filter-button" data-type="tissue">nerve</button>
+                    <button class="filter-button" data-type="tissue">muscle</button>
+                    <button class="filter-button" data-type="tissue">bone</button>
+                    <button class="filter-button" data-type="tissue">artery</button>
+                    <button class="filter-button" data-type="tissue">organ</button>
+                </div>
+            </div>
+
+            <div class="filter-section">
+                <h3>locations</h3>
+                <div class="filter-buttons" id="location-filters">
+                    <button class="filter-button" data-type="location">head</button>
+                    <button class="filter-button" data-type="location">spine</button>
+                    <button class="filter-button" data-type="location">thorax</button>
+                    <button class="filter-button" data-type="location">abdomen</button>
+                </div>
+            </div>
+
+            <div class="filter-section">
+                <h3>connections</h3>
+                <div class="filter-buttons" id="connection-filters">
+                    <button class="filter-button" data-type="connection">perfuses</button>
+                    <button class="filter-button" data-type="connection">mechanical</button>
+                    <button class="filter-button" data-type="connection">vascular</button>
+                </div>
+            </div>
+
+            <div class="selected-info">
+                <span id="selection-count">0</span> items selected
             </div>
         </div>
 
-        <div class="filter-section" id="location-section">
-            <div class="filter-buttons">
-                <button class="filter-button">head</button>
-                <button class="filter-button">neck</button>
-                <button class="filter-button">thorax</button>
-                <button class="filter-button">abdomen</button>
-                <button class="filter-button">pelvis</button>
-                <button class="filter-button">arm</button>
-                <button class="filter-button">leg</button>
+        <div class="main-content">
+            <div class="toolbar">
+                <div class="tool-group">
+                    <button class="tool-button active" data-tool="pan">
+                        <i class="fas fa-hand-paper"></i>
+                    </button>
+                    <button class="tool-button" data-tool="zoom">
+                        <i class="fas fa-search-plus"></i>
+                    </button>
+                    <button class="tool-button" data-tool="select">
+                        <i class="fas fa-mouse-pointer"></i>
+                    </button>
+                </div>
+
+                <div class="tool-group">
+                    <button class="tool-button" id="reset-view">
+                        <i class="fas fa-compress-arrows-alt"></i>
+                    </button>
+                    <button class="tool-button" id="export-png">
+                        <i class="fas fa-download"></i>
+                    </button>
+                    <button class="tool-button" id="toggle-physics">
+                        <i class="fas fa-atom"></i>
+                    </button>
+                </div>
+            </div>
+
+            <div class="network-container">
+                <div id="network"></div>
+            </div>
+
+            <div class="status-bar">
+                <div class="status-item">
+                    <i class="fas fa-project-diagram"></i>
+                    <span id="node-count">0 nodes</span>
+                </div>
+                <div class="status-item">
+                    <i class="fas fa-share-alt"></i>
+                    <span id="edge-count">0 edges</span>
+                </div>
+                <div class="status-item">
+                    <i class="fas fa-clock"></i>
+                    <span id="query-time">0ms</span>
+                </div>
             </div>
         </div>
 
-        <div class="filter-section" id="relationship-section">
-            <div class="filter-buttons">
-                <button class="filter-button">includes</button>
-                <button class="filter-button">perfuses</button>
-                <button class="filter-button">supplies_blood</button>
-                <button class="filter-button">branches</button>
-                <button class="filter-button">drains_into</button>
-                <button class="filter-button">innervates</button>
+        <div class="details-panel">
+            <div class="panel-header">
+                <h3>details</h3>
+                <button class="close-panel">
+                    <i class="fas fa-times"></i>
+                </button>
+            </div>
+            <div class="panel-content">
+                <div class="no-selection">
+                    <i class="fas fa-mouse-pointer"></i>
+                    <p>select a node to view details</p>
+                </div>
             </div>
         </div>
-
-        <div class="action-bar">
-            <div class="active-filters" id="active-filters"></div>
-            <button class="show-fifty-btn" id="show-fifty-btn">
-                <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 12a9 9 0 01-9 9m9-9a9 9 0 00-9-9m9 9H3m9 9a9 9 0 01-9-9m9 9c1.657 0 3-4.03 3-9s-1.343-9-3-9m0 18c-1.657 0-3-4.03-3-9s1.343-9 3-9m-9 9a9 9 0 019-9" />
-                </svg>
-                show me 50
-            </button>
-        </div>
-
-        <div class="visualization" id="network-container"></div>
     </div>
 
     <script src="static/app.js"></script>
