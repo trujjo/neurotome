@@ -1,13 +1,15 @@
 services:
   - type: web
-    name: neuronetwork
+    name: neo4j-visualization
     env: python
     buildCommand: pip install -r requirements.txt
     startCommand: gunicorn app:app
     envVars:
       - key: NEO4J_URI
-        sync: false
+        value: neo4j+s://4e5eeae5.databases.neo4j.io:7687
       - key: NEO4J_USER
-        sync: false
+        value: neo4j
       - key: NEO4J_PASSWORD
         sync: false
+    healthCheckPath: /health
+    autoDeploy: true
