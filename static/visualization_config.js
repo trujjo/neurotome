@@ -1,19 +1,12 @@
 let driver;
 
-async function initDriver() {
-    try {
-        const response = await fetch('/api/config');
-        const config = await response.json();
+function initDriver() {
+    const uri = 'bolt://localhost:7687'; // Update with your Neo4j URI
+    const user = 'neo4j'; // Update with your Neo4j username
+    const password = 'password'; // Update with your Neo4j password
 
-        const uri = config.NEO4J_URI;
-        const user = config.NEO4J_USER;
-        const password = config.NEO4J_PASSWORD;
-
-        driver = neo4j.driver(uri, neo4j.auth.basic(user, password));
-        console.log('Neo4j driver initialized');
-    } catch (error) {
-        console.error('Error fetching config:', error);
-    }
+    driver = neo4j.driver(uri, neo4j.auth.basic(user, password));
+    console.log('Neo4j driver initialized');
 }
 
 document.querySelectorAll('.tab-button').forEach(button => {
