@@ -1,9 +1,9 @@
 let driver;
 
 function initDriver() {
-    const uri = 'bolt://localhost:7687'; // Update with your Neo4j URI
+    const uri = 'neo4j+s://4e5eeae5.databases.neo4j.io'; // Update with your Neo4j URI
     const user = 'neo4j'; // Update with your Neo4j username
-    const password = 'password'; // Update with your Neo4j password
+    const password = 'Poconoco16!'; // Update with your Neo4j password
 
     driver = neo4j.driver(uri, neo4j.auth.basic(user, password));
     console.log('Neo4j driver initialized');
