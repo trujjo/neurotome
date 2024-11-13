@@ -29,6 +29,15 @@ def get_neo4j_driver():
 def index():
     return render_template('index.html')
 
+@app.route('/api/config')
+def get_config():
+    config = {
+        "NEO4J_URI": NEO4J_URI,
+        "NEO4J_USER": NEO4J_USER,
+        "NEO4J_PASSWORD": NEO4J_PASSWORD
+    }
+    return jsonify(config)
+
 @app.route('/api/nodes/random')
 def get_random_nodes():
     try:
@@ -37,7 +46,7 @@ def get_random_nodes():
                 MATCH (n)
                 WITH n, rand() as random
                 ORDER BY random
-                LIMIT 5
+                LIMIT 100
                 MATCH (n)-[rel]-(m)
                 RETURN DISTINCT n, rel, m
                 LIMIT 100
