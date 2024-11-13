@@ -1,3 +1,14 @@
+let driver;
+
+function initDriver() {
+    const uri = 'bolt://localhost:7687'; // Update with your Neo4j URI
+    const user = 'neo4j'; // Update with your Neo4j username
+    const password = 'password'; // Update with your Neo4j password
+
+    driver = neo4j.driver(uri, neo4j.auth.basic(user, password));
+    console.log('Neo4j driver initialized');
+}
+
 document.querySelectorAll('.tab-button').forEach(button => {
     button.addEventListener('click', () => {
         const tabId = button.getAttribute('data-tab');
@@ -92,10 +103,14 @@ function createForceGraph(nodes, links) {
 
     const svg = d3.select('#visualization').append('svg')
         .attr('width', width)
-        .attr('height', height);
+        .attr('height', height)
+        .call(d3.zoom().on('zoom', (event) => {
+            svg.attr('transform', event.transform);
+        }))
+        .append('g');
 
     const simulation = d3.forceSimulation(nodes)
-        .force('link', d3.forceLink(links).id(d => d.id))
+        .force('link', d3.forceLink(links).id(d => d.id).distance(200)) // Increase the length of the relationship lines
         .force('charge', d3.forceManyBody().strength(-300))
         .force('center', d3.forceCenter(width / 2, height / 2));
 
@@ -104,21 +119,41 @@ function createForceGraph(nodes, links) {
         .selectAll('line')
         .data(links)
         .enter().append('line')
-        .attr('stroke-width', 1.5);
+        .attr('stroke-width', 1.5)
+        .attr('stroke', '#ffffff'); // Set the line color to white
+
+    const linkText = svg.append('g')
+        .attr('class', 'link-text')
+        .selectAll('text')
+        .data(links)
+        .enter().append('text')
+        .attr('class', 'link-label')
+        .attr('fill', '#ffffff') // Set the text color to white
+        .attr('font-size', '10px') // Set the font size
+        .text(d => d.type);
 
     const node = svg.append('g')
         .attr('class', 'nodes')
         .selectAll('circle')
         .data(nodes)
         .enter().append('circle')
-        .attr('r', 5)
-        .attr('fill', '#69b3a2')
+        .attr('r', 10) // Increase the size of the nodes
+        .attr('fill', '#cc5500') // Set the node color to burnt orange
         .call(d3.drag()
             .on('start', dragstarted)
             .on('drag', dragged)
             .on('end', dragended));
 
-    node.append('title')
+    const nodeText = svg.append('g')
+        .attr('class', 'node-text')
+        .selectAll('text')
+        .data(nodes)
+        .enter().append('text')
+        .attr('class', 'node-label')
+        .attr('fill', '#ffffff') // Set the text color to white
+        .attr('font-size', '10px') // Set the font size
+        .attr('dx', 12)
+        .attr('dy', '.35em')
         .text(d => d.name);
 
     simulation
@@ -135,9 +170,17 @@ function createForceGraph(nodes, links) {
             .attr('x2', d => d.target.x)
             .attr('y2', d => d.target.y);
 
+        linkText
+            .attr('x', d => (d.source.x + d.target.x) / 2)
+            .attr('y', d => (d.source.y + d.target.y) / 2);
+
         node
             .attr('cx', d => d.x)
             .attr('cy', d => d.y);
+
+        nodeText
+            .attr('x', d => d.x)
+            .attr('y', d => d.y);
     }
 
     function dragstarted(event, d) {
