@@ -1,125 +1,262 @@
 <!DOCTYPE html>
-<html lang="en">
+<html>
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>neuronetwork explorer</title>
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
-    <script type="text/javascript" src="https://unpkg.com/vis-network/standalone/umd/vis-network.min.js"></script>
-    <link rel="stylesheet" href="static/styles.css">
+    <title>Neo4j Force Graph</title>
+    <link rel="stylesheet" type="text/css" href="/static/css/styles.css">
+    <script src="https://unpkg.com/neo4j-driver"></script>
+    <script src="https://d3js.org/d3.v7.min.js"></script>
+    <style>
+        body {
+            background-color: #1e1e1e;
+            color: #f0f0f0;
+            font-family: Arial, sans-serif;
+            margin: 0;
+            padding: 0;
+            overflow: hidden;
+            text-transform: lowercase;
+        }
+
+        .filter-tabs {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 15px;
+            border-bottom: 1px solid #404040;
+            padding: 0 20px;
+            flex-wrap: wrap;
+        }
+        .tab-button {
+            padding: 10px 20px;
+            background: #2a2a2a;
+            border: none;
+            color: #f0f0f0;
+            cursor: pointer;
+            border-radius: 8px 8px 0 0;
+            transition: background 0.3s;
+        }
+        .tab-button.active {
+            background: #404040;
+        }
+        .tab-content {
+            display: none;
+            padding: 20px;
+        }
+        .tab-content.active {
+            display: block;
+        }
+        .location-buttons, .relationship-buttons, .tissue-buttons, .type-buttons {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 10px;
+        }
+        .location-button, .relationship-button, .tissue-button, .type-button {
+            padding: 5px 10px;
+            background: #2a2a2a;
+            border: none;
+            color: #f0f0f0;
+            cursor: pointer;
+            border-radius: 4px;
+            transition: background 0.3s;
+        }
+        .location-button:hover, .relationship-button:hover, .tissue-button:hover, .type-button:hover {
+            background: #404040;
+        }
+        .location-button.active, .relationship-button.active, .tissue-button.active, .type-button.active {
+            background: #cc5500; /* Burnt orange color for active buttons */
+        }
+        .location-group, .filter-group {
+            margin-bottom: 20px;
+        }
+        .location-group h3, .filter-group-title h3 {
+            margin: 0 0 10px 0;
+            color: #f0f0f0;
+        }
+        #visualization {
+            width: 100%;
+            height: 600px;
+            background-color: #2a2a2a;
+        }
+        #status {
+            position: fixed;
+            bottom: 0;
+            width: 100%;
+            background-color: #2a2a2a;
+            color: #f0f0f0;
+            text-align: center;
+            padding: 10px 0;
+            text-transform: lowercase;
+        }
+    </style>
 </head>
 <body>
-    <div class="container">
-        <div class="sidebar">
-            <div class="logo">
-                <i class="fas fa-brain"></i>
-                <span>neuronetwork</span>
-            </div>
-
-            <div class="search-bar">
-                <i class="fas fa-search"></i>
-                <input type="text" placeholder="search structures...">
-            </div>
-
-            <div class="filter-section">
-                <h3>tissue types</h3>
-                <div class="filter-buttons" id="tissue-filters">
-                    <button class="filter-button" data-type="tissue">nerve</button>
-                    <button class="filter-button" data-type="tissue">muscle</button>
-                    <button class="filter-button" data-type="tissue">bone</button>
-                    <button class="filter-button" data-type="tissue">artery</button>
-                    <button class="filter-button" data-type="tissue">organ</button>
-                </div>
-            </div>
-
-            <div class="filter-section">
-                <h3>locations</h3>
-                <div class="filter-buttons" id="location-filters">
-                    <button class="filter-button" data-type="location">head</button>
-                    <button class="filter-button" data-type="location">spine</button>
-                    <button class="filter-button" data-type="location">thorax</button>
-                    <button class="filter-button" data-type="location">abdomen</button>
-                </div>
-            </div>
-
-            <div class="filter-section">
-                <h3>connections</h3>
-                <div class="filter-buttons" id="connection-filters">
-                    <button class="filter-button" data-type="connection">perfuses</button>
-                    <button class="filter-button" data-type="connection">mechanical</button>
-                    <button class="filter-button" data-type="connection">vascular</button>
-                </div>
-            </div>
-
-            <div class="selected-info">
-                <span id="selection-count">0</span> items selected
+    <div class="filter-tabs">
+        <button class="tab-button active" data-tab="tissue">tissue</button>
+        <button class="tab-button" data-tab="location">location</button>
+        <button class="tab-button" data-tab="relationship">relationship</button>
+    </div>
+    <div id="tissue" class="tab-content active">
+        <div class="tissue-buttons">
+            <button class="tissue-button" onclick="toggleButton(this)">nerve</button>
+            <button class="tissue-button" onclick="toggleButton(this)">bone</button>
+            <button class="tissue-button" onclick="toggleButton(this)">neuro</button>
+            <button class="tissue-button" onclick="toggleButton(this)">region</button>
+            <button class="tissue-button" onclick="toggleButton(this)">viscera</button>
+            <button class="tissue-button" onclick="toggleButton(this)">muscle</button>
+            <button class="tissue-button" onclick="toggleButton(this)">sense</button>
+            <button class="tissue-button" onclick="toggleButton(this)">vein</button>
+            <button class="tissue-button" onclick="toggleButton(this)">artery</button>
+            <button class="tissue-button" onclick="toggleButton(this)">cv</button>
+            <button class="tissue-button" onclick="toggleButton(this)">function</button>
+            <button class="tissue-button" onclick="toggleButton(this)">sensory</button>
+            <button class="tissue-button" onclick="toggleButton(this)">gland</button>
+            <button class="tissue-button" onclick="toggleButton(this)">lymph</button>
+            <button class="tissue-button" onclick="toggleButton(this)">head</button>
+            <button class="tissue-button" onclick="toggleButton(this)">organ</button>
+            <button class="tissue-button" onclick="toggleButton(this)">sensation</button>
+            <button class="tissue-button" onclick="toggleButton(this)">skin</button>
+        </div>
+    </div>
+    <div id="location" class="tab-content">
+        <div class="location-group">
+            <h3>head</h3>
+            <div class="location-buttons">
+                <button class="location-button" onclick="toggleButton(this)">brain</button>
+                <button class="location-button" onclick="toggleButton(this)">eye</button>
+                <button class="location-button" onclick="toggleButton(this)">face</button>
+                <button class="location-button" onclick="toggleButton(this)">ear</button>
+                <button class="location-button" onclick="toggleButton(this)">nose</button>
+                <button class="location-button" onclick="toggleButton(this)">skull</button>
+                <button class="location-button" onclick="toggleButton(this)">mouth</button>
+                <button class="location-button" onclick="toggleButton(this)">head</button>
             </div>
         </div>
-
-        <div class="main-content">
-            <div class="toolbar">
-                <div class="tool-group">
-                    <button class="tool-button active" data-tool="pan">
-                        <i class="fas fa-hand-paper"></i>
-                    </button>
-                    <button class="tool-button" data-tool="zoom">
-                        <i class="fas fa-search-plus"></i>
-                    </button>
-                    <button class="tool-button" data-tool="select">
-                        <i class="fas fa-mouse-pointer"></i>
-                    </button>
-                </div>
-
-                <div class="tool-group">
-                    <button class="tool-button" id="reset-view">
-                        <i class="fas fa-compress-arrows-alt"></i>
-                    </button>
-                    <button class="tool-button" id="export-png">
-                        <i class="fas fa-download"></i>
-                    </button>
-                    <button class="tool-button" id="toggle-physics">
-                        <i class="fas fa-atom"></i>
-                    </button>
-                </div>
-            </div>
-
-            <div class="network-container">
-                <div id="network"></div>
-            </div>
-
-            <div class="status-bar">
-                <div class="status-item">
-                    <i class="fas fa-project-diagram"></i>
-                    <span id="node-count">0 nodes</span>
-                </div>
-                <div class="status-item">
-                    <i class="fas fa-share-alt"></i>
-                    <span id="edge-count">0 edges</span>
-                </div>
-                <div class="status-item">
-                    <i class="fas fa-clock"></i>
-                    <span id="query-time">0ms</span>
-                </div>
+        <div class="location-group">
+            <h3>neck</h3>
+            <div class="location-buttons">
+                <button class="location-button" onclick="toggleButton(this)">cervical spine</button>
+                <button class="location-button" onclick="toggleButton(this)">visceral</button>
+                <button class="location-button" onclick="toggleButton(this)">vascular</button>
             </div>
         </div>
-
-        <div class="details-panel">
-            <div class="panel-header">
-                <h3>details</h3>
-                <button class="close-panel">
-                    <i class="fas fa-times"></i>
-                </button>
+        <div class="location-group">
+            <h3>upper limb</h3>
+            <div class="location-buttons">
+                <button class="location-button" onclick="toggleButton(this)">wrist</button>
+                <button class="location-button" onclick="toggleButton(this)">hand</button>
+                <button class="location-button" onclick="toggleButton(this)">fingers</button>
+                <button class="location-button" onclick="toggleButton(this)">arm</button>
+                <button class="location-button" onclick="toggleButton(this)">forearm</button>
+                <button class="location-button" onclick="toggleButton(this)">elbow</button>
+                <button class="location-button" onclick="toggleButton(this)">shoulder</button>
             </div>
-            <div class="panel-content">
-                <div class="no-selection">
-                    <i class="fas fa-mouse-pointer"></i>
-                    <p>select a node to view details</p>
-                </div>
+        </div>
+        <div class="location-group">
+            <h3>thorax</h3>
+            <div class="location-buttons">
+                <button class="location-button" onclick="toggleButton(this)">thoracic spine</button>
+                <button class="location-button" onclick="toggleButton(this)">ribcage</button>
+                <button class="location-button" onclick="toggleButton(this)">heart</button>
+                <button class="location-button" onclick="toggleButton(this)">lung</button>
+            </div>
+        </div>
+        <div class="location-group">
+            <h3>abdomen</h3>
+            <div class="location-buttons">
+                <button class="location-button" onclick="toggleButton(this)">lumbar spine</button>
+                <button class="location-button" onclick="toggleButton(this)">right upper quadrant</button>
+                <button class="location-button" onclick="toggleButton(this)">left upper quadrant</button>
+                <button class="location-button" onclick="toggleButton(this)">right lower quadrant</button>
+                <button class="location-button" onclick="toggleButton(this)">left lower quadrant</button>
+            </div>
+        </div>
+        <div class="location-group">
+            <h3>spine</h3>
+            <div class="location-buttons">
+                <button class="location-button" onclick="toggleButton(this)">spinal cord</button>
+                <button class="location-button" onclick="toggleButton(this)">vertebral</button>
+                <button class="location-button" onclick="toggleButton(this)">tracts</button>
+                <button class="location-button" onclick="toggleButton(this)">sacral spine</button>
+            </div>
+        </div>
+        <div class="location-group">
+            <h3>pelvis</h3>
+            <div class="location-buttons">
+                <button class="location-button" onclick="toggleButton(this)">sacral spine</button>
+                <button class="location-button" onclick="toggleButton(this)">greater pelvis</button>
+                <button class="location-button" onclick="toggleButton(this)">lesser pelvis</button>
+            </div>
+        </div>
+        <div class="location-group">
+            <h3>lower limb</h3>
+            <div class="location-buttons">
+                <button class="location-button" onclick="toggleButton(this)">foot</button>
+                <button class="location-button" onclick="toggleButton(this)">thigh</button>
+                <button class="location-button" onclick="toggleButton(this)">knee</button>
+                <button class="location-button" onclick="toggleButton(this)">leg</button>
+                <button class="location-button" onclick="toggleButton(this)">ankle</button>
+                <button class="location-button" onclick="toggleButton(this)">toes</button>
             </div>
         </div>
     </div>
+    <div id="relationship" class="tab-content">
+        <div class="relationship-buttons">
+            <button class="relationship-button" onclick="toggleButton(this)">includes</button>
+            <button class="relationship-button" onclick="toggleButton(this)">perfuses</button>
+            <button class="relationship-button" onclick="toggleButton(this)">supplies blood</button>
+            <button class="relationship-button" onclick="toggleButton(this)">branches</button>
+            <button class="relationship-button" onclick="toggleButton(this)">more details</button>
+            <button class="relationship-button" onclick="toggleButton(this)">drains into</button>
+            <button class="relationship-button" onclick="toggleButton(this)">lymph drains</button>
+            <button class="relationship-button" onclick="toggleButton(this)">innervates</button>
+            <button class="relationship-button" onclick="toggleButton(this)">spinal cord</button>
+            <button class="relationship-button" onclick="toggleButton(this)">exits or occupies</button>
+            <button class="relationship-button" onclick="toggleButton(this)">nerve branches</button>
+            <button class="relationship-button" onclick="toggleButton(this)">spinothalamic tract</button>
+            <button class="relationship-button" onclick="toggleButton(this)">pumps blood</button>
+            <button class="relationship-button" onclick="toggleButton(this)">senses</button>
+            <button class="relationship-button" onclick="toggleButton(this)">motor innervation</button>
+            <button class="relationship-button" onclick="toggleButton(this)">anterior spinothalamic</button>
+            <button class="relationship-button" onclick="toggleButton(this)">lateral spinothalamic</button>
+            <button class="relationship-button" onclick="toggleButton(this)">dorsal column</button>
+            <button class="relationship-button" onclick="toggleButton(this)">controls</button>
+            <button class="relationship-button" onclick="toggleButton(this)">csf flow</button>
+            <button class="relationship-button" onclick="toggleButton(this)">releases hormones</button>
+            <button class="relationship-button" onclick="toggleButton(this)">sensory input</button>
+            <button class="relationship-button" onclick="toggleButton(this)">thalamocortical</button>
+            <button class="relationship-button" onclick="toggleButton(this)">corticospinal descending</button>
+            <button class="relationship-button" onclick="toggleButton(this)">innervated by</button>
+            <button class="relationship-button" onclick="toggleButton(this)">spinothalamic decussation</button>
+            <button class="relationship-button" onclick="toggleButton(this)">pyramidal decussation</button>
+            <button class="relationship-button" onclick="toggleButton(this)">corticospinal termination</button>
+        </div>
+    </div>
+    <div id="visualization"></div>
+    <button id="fetch-nodes" class="location-button">give me 100 random nodes</button>
+    <button id="fetch-random-nodes" class="location-button">show random nodes with relationships</button>
+    <div id="status">checking neo4j connection...</div>
+    <script src="/static/visualization_config.js"></script>
+    <script>
+        document.querySelectorAll('.filter-tab').forEach(tab => {
+            tab.addEventListener('click', () => {
+                const filter = tab.getAttribute('data-filter');
+                // Implement filter logic here
+                console.log(`Filter by ${filter} selected`);
+            });
+        });
 
-    <script src="static/app.py"></script>
+        function toggleButton(button) {
+            button.classList.toggle('active');
+        }
+
+        document.addEventListener('DOMContentLoaded', () => {
+            initDriver();
+            generateLocationButtons();
+        });
+
+        window.onbeforeunload = () => {
+            if (driver) {
+                driver.close();
+            }
+        };
+    </script>
 </body>
 </html>
