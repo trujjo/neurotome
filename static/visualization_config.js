@@ -1,9 +1,9 @@
 let driver;
 
 function initDriver() {
-    const uri = 'neo4j+s://4e5eeae5.databases.neo4j.io'; // Update with your Neo4j URI
-    const user = 'neo4j'; // Update with your Neo4j username
-    const password = 'Poconoco16!'; // Update with your Neo4j password
+    const uri = process.env.NEO4J_URI; // Neo4j URI from .env
+    const user = process.env.NEO4J_USER; // Neo4j username from .env
+    const password = process.env.NEO4J_PASSWORD; // Neo4j password from .env
 
     driver = neo4j.driver(uri, neo4j.auth.basic(user, password));
     console.log('Neo4j driver initialized');
