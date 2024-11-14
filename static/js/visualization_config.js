@@ -2,13 +2,18 @@ let driver;
 
 async function initDriver() {
     try {
-        driver = neo4j.driver(
-            "neo4j+s://4e5eeae5.databases.neo4j.io:7687",
-            neo4j.auth.basic("neo4j", "Poconoco16!")
-        );
+        const response = await fetch('/api/config');
+        const config = await response.json();
 
-    driver = neo4j.driver(uri, neo4j.auth.basic(user, password));
-    console.log('Neo4j driver initialized');
+        const uri = config.NEO4J_URI;
+        const user = config.NEO4J_USER;
+        const password = config.NEO4J_PASSWORD;
+
+        driver = neo4j.driver(uri, neo4j.auth.basic(user, password));
+        console.log('Neo4j driver initialized');
+    } catch (error) {
+        console.error('Error fetching config:', error);
+    }
 }
 
 document.querySelectorAll('.tab-button').forEach(button => {
