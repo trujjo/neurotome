@@ -77,29 +77,15 @@ def get_random_nodes():
         logger.error(f"Error fetching random nodes: {e}")
         return jsonify({"error": "Internal Server Error"}), 500
 
-import time
-
-start_time = time.time()
-driver = GraphDatabase.driver(
-    NEO4J_URI,
-    auth=(NEO4J_USER, NEO4J_PASSWORD)
-)
-logger.info(f"Neo4j driver initialization took {time.time() - start_time} seconds")
-
 @app.route('/api/neo4j/status')
 def neo4j_status():
     try:
-        start_time = time.time()
         with get_neo4j_driver().session() as session:
             session.run("RETURN 1")
-        duration = time.time() - start_time
-        logger.info(f"Neo4j status check took {duration} seconds")
-        return jsonify({"status": "connected", "duration": duration})
+        return jsonify({"status": "connected"})
     except Exception as e:
         logger.error(f"Neo4j connection error: {e}")
         return jsonify({"status": "disconnected"}), 500
 
 if __name__ == "__main__":
     app.run(debug=True)
-
-
