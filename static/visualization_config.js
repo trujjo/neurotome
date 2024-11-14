@@ -1,12 +1,11 @@
-require('dotenv').config();
-const neo4j = require('neo4j-driver');
-
 let driver;
 
-function initDriver() {
-    const uri = process.env.NEO4J_URI; // Neo4j URI from .env
-    const user = process.env.NEO4J_USER; // Neo4j username from .env
-    const password = process.env.NEO4J_PASSWORD; // Neo4j password from .env
+async function initDriver() {
+    try {
+        driver = neo4j.driver(
+            "neo4j+s://4e5eeae5.databases.neo4j.io:7687",
+            neo4j.auth.basic("neo4j", "Poconoco16!")
+        );
 
     driver = neo4j.driver(uri, neo4j.auth.basic(user, password));
     console.log('Neo4j driver initialized');
