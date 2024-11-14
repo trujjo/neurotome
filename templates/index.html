@@ -235,28 +235,18 @@
     <div id="status">checking neo4j connection...</div>
     <script src="/static/visualization_config.js"></script>
     <script>
-        document.querySelectorAll('.filter-tab').forEach(tab => {
-            tab.addEventListener('click', () => {
-                const filter = tab.getAttribute('data-filter');
-                // Implement filter logic here
-                console.log(`Filter by ${filter} selected`);
+    document.querySelectorAll('.tab-button').forEach(button => {
+        button.addEventListener('click', () => {
+            const tabId = button.getAttribute('data-tab');
+            document.querySelectorAll('.tab-button').forEach(btn => {
+                btn.classList.remove('active');
             });
+            button.classList.add('active');
+            document.querySelectorAll('.tab-content').forEach(content => {
+                content.classList.remove('active');
+            });
+            document.getElementById(tabId).classList.add('active');
         });
-
-        function toggleButton(button) {
-            button.classList.toggle('active');
-        }
-
-        document.addEventListener('DOMContentLoaded', () => {
-            initDriver();
-            generateLocationButtons();
-        });
-
-        window.onbeforeunload = () => {
-            if (driver) {
-                driver.close();
-            }
-        };
     </script>
 </body>
 </html>
