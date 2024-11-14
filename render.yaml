@@ -1,6 +1,6 @@
 services:
   - type: web
-    name: neo4j-visualization
+    name: neurotome
     env: python
     buildCommand: pip install -r requirements.txt
     startCommand: gunicorn app:app
@@ -13,4 +13,3 @@ services:
         sync: false
     healthCheckPath: /health
     autoDeploy: true
-   
