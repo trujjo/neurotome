@@ -1,0 +1,99 @@
+body {
+    margin: 0;
+    padding: 20px;
+    background-color: #1a1a1a;
+    color: white;
+    font-family: Arial, sans-serif;
+}
+
+.filter-tabs {
+    display: flex;
+    gap: 10px;
+    margin-bottom: 15px;
+    border-bottom: 1px solid #404040;
+    padding: 0 20px;
+    flex-wrap: wrap;
+}
+
+.tab-button {
+    padding: 10px 20px;
+    background: #2a2a2a;
+    border: none;
+    color: #f0f0f0;
+    cursor: pointer;
+    border-radius: 8px 8px 0 0;
+    transition: background 0.3s;
+}
+
+.tab-button.active {
+    background: #404040;
+}
+
+.tab-content {
+    display: none;
+    padding: 20px;
+}
+
+.tab-content.active {
+    display: block;
+}
+
+.location-buttons, .relationship-buttons, .tissue-buttons {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 10px;
+}
+
+.location-button, .relationship-button, .tissue-button {
+    padding: 5px 10px;
+    background: #2a2a2a;
+    border: none;
+    color: #f0f0f0;
+    cursor: pointer;
+    border-radius: 4px;
+    transition: background 0.3s;
+}
+
+.location-button:hover, .relationship-button:hover, .tissue-button:hover {
+    background: #404040;
+}
+
+.location-button.active, .relationship-button.active, .tissue-button.active {
+    background: #cc5500; /* Burnt orange color for active buttons */
+}
+
+.location-group, .filter-group {
+    margin-bottom: 20px;
+}
+
+.location-group h3, .filter-group-title h3 {
+    margin: 0 0 10px 0;
+    color: #f0f0f0;
+}
+
+#visualization {
+    width: 100%;
+    height: 600px;
+    background-color: #2a2a2a;
+}
+
+#status {
+    position: fixed;
+    bottom: 0;
+    width: 100%;
+    background-color: #2a2a2a;
+    color: #f0f0f0;
+    text-align: center;
+    padding: 10px 0;
+    text-transform: lowercase;
+}
+
+.node-label {
+    fill: white;
+    font-size: 7px;
+}
+
+.link-label {
+    fill: white;
+    font-size: 5px;
+}
