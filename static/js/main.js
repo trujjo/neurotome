@@ -230,3 +230,7 @@ function checkNeo4jStatus() {
 
 checkNeo4jStatus();
 setInterval(checkNeo4jStatus, 60000); // Check status every 60 seconds
+
+function toggleButton(button) {
+    button.classList.toggle('active');
+}
