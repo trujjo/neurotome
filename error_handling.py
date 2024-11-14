@@ -33,9 +33,11 @@ def handle_neo4j_error(f):
     return wrapper
 
 # Example usage in routes:
+'''
 @app.route('/api/graph/data')
 @handle_neo4j_error
 def get_graph_data():
     with get_neo4j_driver().session() as session:
         result = session.run("MATCH (n) RETURN n LIMIT 10")
         return jsonify([dict(record['n']) for record in result])
+'''
