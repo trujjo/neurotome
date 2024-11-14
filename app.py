@@ -88,8 +88,4 @@ def neo4j_status():
         return jsonify({"status": "disconnected"}), 500
 
 if __name__ == "__main__":
-<<<<<<< HEAD
     app.run(debug=True)
-=======
-    app.run(debug=True)
->>>>>>> origin/main
