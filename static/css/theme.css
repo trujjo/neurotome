@@ -1,0 +1,14 @@
+
+:root {
+    --background-dark: #121212;
+    --background-darker: #0a0a0a;
+    --surface-dark: #1e1e1e;
+    --surface-darker: #242424;
+    --accent-color: #ff5722;
+    --accent-hover: #ff7043;
+    --accent-transparent: rgba(255, 87, 34, 0.1);
+    --text-primary: #ffffff;
+    --text-secondary: rgba(255, 255, 255, 0.7);
+    --border-color: #333333;
+    --shadow-color: rgba(0, 0, 0, 0.3);
+}

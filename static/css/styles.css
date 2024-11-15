@@ -90,14 +90,10 @@ body {
 
 .node-label {
     fill: white;
-    font-size: 7px;
+    font-size: 10px;
 }
 
 .link-label {
     fill: white;
-    font-size: 5px;
-<<<<<<< HEAD
+    font-size: 10px;
 }
-=======
-}
->>>>>>> origin/main

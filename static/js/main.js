@@ -1,18 +1,26 @@
 let driver;
 
+
+let driver;
+let activeTypes = new Set();
+
 async function initDriver() {
     try {
-        const response = await fetch('/api/config');
-        const config = await response.json();
+        driver = neo4j.driver(
+            "neo4j+s://4e5eeae5.databases.neo4j.io:7687",
+            neo4j.auth.basic("neo4j", "Poconoco16!")
+        );
 
-        const uri = config.NEO4J_URI;
-        const user = config.NEO4J_USER;
-        const password = config.NEO4J_PASSWORD;
+        const session = driver.session();
+        await session.run("RETURN 1");
+        await session.close();
 
-        driver = neo4j.driver(uri, neo4j.auth.basic(user, password));
-        console.log('Neo4j driver initialized');
+        document.getElementById('status').style.backgroundColor = '#28a745';
+        document.getElementById('status').innerHTML = 'Connected to database';
     } catch (error) {
-        console.error('Error fetching config:', error);
+        document.getElementById('status').style.backgroundColor = '#dc3545';
+        document.getElementById('status').innerHTML = 'Connection error: ' + error.message;
+        console.error('Connection error:', error);
     }
 }
 
