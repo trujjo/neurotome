@@ -57,7 +57,7 @@ document.addEventListener('DOMContentLoaded', () => {
     });
 
     // Add event listeners to filter buttons
-    document.querySelectorAll('.tissue-button, .location-button, .relationship-button').forEach(button => {
+    document.querySelectorAll('.tissue-button, .location-button, .relationship-button, .detail-button').forEach(button => {
         button.addEventListener('click', () => {
             button.classList.toggle('active');
         });
@@ -67,7 +67,3 @@ document.addEventListener('DOMContentLoaded', () => {
 function toggleButton(button) {
     button.classList.toggle('active');
 }
-    
-    initDriver();
-    generateLocationButtons();
-});
