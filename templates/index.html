@@ -1,10 +1,11 @@
 <!DOCTYPE html>
-<html>
+<html lang="en">
 <head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="description" content="Neo4j Force Graph Visualization">
     <title>Neo4j Force Graph</title>
-    <link rel="stylesheet" type="text/css" href="/static/css/styles.css">
-    <link rel="stylesheet" type="text/css" href="/static/css/tabs.css">
-    <link rel="stylesheet" type="text/css" href="/static/css/theme.css">
+    <link rel="stylesheet" href="/static/css/styles.css">
     <script src="https://unpkg.com/neo4j-driver"></script>
     <script src="https://d3js.org/d3.v7.min.js"></script>
 </head>
@@ -156,11 +157,13 @@
         </div>
     </div>
     <div id="visualization"></div>
-    <button id="fetch-nodes" class="location-button">give me 100 random nodes</button>
-    <button id="fetch-random-nodes" class="location-button">show random nodes with relationships</button>
+    <div class="controls">
+        <button id="fetch-nodes" class="location-button">give me 100 random nodes</button>
+        <button id="fetch-connected-nodes" class="location-button">show connected random nodes</button>
+        <button id="fetch-random-nodes" class="location-button">show random nodes with relationships</button>
+        <input type="text" id="searchBox" placeholder="search nodes...">
+    </div>
     <div id="status">checking neo4j connection...</div>
-    <script src="/static/js/main.js"></script>
-    <script src="/static/js/tabs.js"></script>
-    <script src="/static/js/graph.js"></script>
+    <script src="/static/js/script.js"></script>
 </body>
 </html>

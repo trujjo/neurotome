@@ -1,3 +1,4 @@
+/* General Styles */
 body {
     margin: 0;
     padding: 20px;
@@ -6,94 +7,365 @@ body {
     font-family: Arial, sans-serif;
 }
 
-.filter-tabs {
-    display: flex;
-    gap: 10px;
-    margin-bottom: 15px;
-    border-bottom: 1px solid #404040;
-    padding: 0 20px;
-    flex-wrap: wrap;
-}
-
-.tab-button {
-    padding: 10px 20px;
-    background: #2a2a2a;
-    border: none;
-    color: #f0f0f0;
-    cursor: pointer;
-    border-radius: 8px 8px 0 0;
-    transition: background 0.3s;
-}
-
-.tab-button.active {
-    background: #404040;
-}
-
-.tab-content {
-    display: none;
-    padding: 20px;
-}
-
-.tab-content.active {
-    display: block;
-}
-
-.location-buttons, .relationship-buttons, .tissue-buttons {
-    display: flex;
-    flex-wrap: wrap;
-    gap: 10px;
-}
-
-.location-button, .relationship-button, .tissue-button {
-    padding: 5px 10px;
-    background: #2a2a2a;
-    border: none;
-    color: #f0f0f0;
-    cursor: pointer;
+/* Type Buttons */
+.type-buttons {
+    display: grid;
+    grid-template-rows: repeat(2, 1fr);
+    grid-template-columns: repeat(9, 1fr);
+    gap: 6px;
+    margin-bottom: 12px;
+    padding: 12px;
+    background-color: #2d2d2d;
     border-radius: 4px;
-    transition: background 0.3s;
+    width: calc(100% - 24px);
 }
 
-.location-button:hover, .relationship-button:hover, .tissue-button:hover {
-    background: #404040;
-}
-
-.location-button.active, .relationship-button.active, .tissue-button.active {
-    background: #cc5500; /* Burnt orange color for active buttons */
-}
-
-.location-group, .filter-group {
-    margin-bottom: 20px;
-}
-
-.location-group h3, .filter-group-title h3 {
-    margin: 0 0 10px 0;
-    color: #f0f0f0;
-}
-
-#visualization {
-    width: 100%;
-    height: 600px;
-    background-color: #2a2a2a;
-}
-
-#status {
-    position: fixed;
-    bottom: 0;
-    width: 100%;
-    background-color: #2a2a2a;
-    color: #f0f0f0;
+.type-button {
+    padding: 4px 8px;
+    background-color: #cc5500;
+    color: white;
+    border: none;
+    border-radius: 3px;
+    cursor: pointer;
+    font-size: 10px;
     text-align: center;
-    padding: 10px 0;
+    width: 100%;
+    min-width: 60px;
+    height: 25px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
     text-transform: lowercase;
 }
 
-.node-label {
-    fill: white;
+.type-button:hover {
+    background-color: #ff6a00;
+}
+
+.type-button.active {
+    background-color: #ff6a00;
+    border: 2px solid #ffffff;
+}
+
+/* Controls */
+.controls {
+    display: flex;
+    gap: 8px;
+    align-items: center;
+    margin: 12px;
+    background-color: #2d2d2d;
+    padding: 12px;
+    border-radius: 4px;
+}
+
+.button {
+    background-color: #cc5500;
+    color: white;
+    border: none;
+    border-radius: 3px;
+    padding: 6px 12px;
+    cursor: pointer;
+    height: 25px;
+    font-size: 10px;
+    text-transform: lowercase;
+}
+
+#searchBox {
+    padding: 6px;
+    border-radius: 3px;
+    border: 1px solid #666;
+    background-color: #333;
+    color: white;
+    width: 180px;
+    height: 25px;
+    box-sizing: border-box;
     font-size: 10px;
 }
 
+/* Status */
+#status {
+    padding: 10px;
+    margin: 10px 0;
+    border-radius: 4px;
+}
+
+/* Graph */
+#graph {
+    width: 100%;
+    height: 600px;
+    background-color: #2d2d2d;
+    border-radius: 4px;
+}
+
+/* Filter Tabs */
+.filter-tabs {
+    display: flex;
+    justify-content: center;
+    margin-bottom: 20px;
+}
+
+.filter-tab {
+    padding: 10px 20px;
+    margin: 0 5px;
+    border: 1px solid #ccc;
+    border-radius: 5px;
+    background-color: #f0f0f0;
+    cursor: pointer;
+}
+
+.filter-tab:hover {
+    background-color: #e0e0e0;
+}
+
+/* Tab Container */
+.tab-container {
+    display: flex;
+    justify-content: space-between;
+    padding: 16px;
+    background: var(--surface-darker);
+    border-bottom: 1px solid var(--border-color);
+    margin-bottom: 0;
+}
+
+.tab-container .tab-button {
+    flex: 1;
+    padding: 12px 20px;
+    background: transparent;
+    border: 1px solid var(--border-color);
+    border-radius: 8px;
+    color: var(--text-secondary);
+    font-size: 14px;
+    margin: 0 8px;
+    cursor: pointer;
+    transition: all 0.2s ease;
+}
+
+.tab-container .tab-button:hover {
+    background: var(--accent-transparent);
+    color: var(--text-primary);
+    transform: translateY(-1px);
+}
+
+.tab-container .tab-button.active {
+    background: var(--accent-color);
+    color: var(--text-primary);
+    border-color: var(--accent-color);
+}
+
+/* Tab Content */
+.tab-content {
+    background: var(--surface-dark);
+    border-radius: 12px;
+    margin: 16px;
+    padding: 20px;
+    border: 1px solid var(--border-color);
+    animation: fadeIn 0.3s ease-out;
+}
+
+/* Controls Section */
+.controls {
+    display: flex;
+    gap: 16px;
+    padding: 16px;
+    background: var(--surface-darker);
+    border-radius: 12px;
+    margin: 16px;
+    border: 1px solid var(--border-color);
+}
+
+.controls .button {
+    padding: 12px 24px;
+    background: var(--accent-color);
+    color: var(--text-primary);
+    border: none;
+    border-radius: 8px;
+    cursor: pointer;
+    font-size: 14px;
+    transition: all 0.2s ease;
+}
+
+.controls .button:hover {
+    background: var(--accent-hover);
+    transform: translateY(-1px);
+}
+
+#searchBox {
+    flex: 1;
+    padding: 12px 16px;
+    background: var(--surface-dark);
+    border: 1px solid var(--border-color);
+    border-radius: 8px;
+    color: var(--text-primary);
+    font-size: 14px;
+}
+
+#searchBox:focus {
+    outline: none;
+    border-color: var(--accent-color);
+    box-shadow: 0 0 0 3px var(--accent-transparent);
+}
+
+/* Status Display */
+#status {
+    margin: 16px;
+    padding: 12px;
+    border-radius: 8px;
+    font-size: 14px;
+    text-align: center;
+    transition: all 0.3s ease;
+}
+
+/* Graph Container */
+#graph {
+    background: var(--surface-dark);
+    border-radius: 12px;
+    margin: 16px;
+    border: 1px solid var(--border-color);
+    min-height: 500px;
+}
+
+/* Node and Link Styling */
+.node-label {
+    fill: var(--text-primary);
+    font-size: 12px;
+    text-anchor: middle;
+}
+
 .link-label {
-    fill: white;
+    fill: var(--text-secondary);
     font-size: 10px;
+    text-anchor: middle;
+}
+
+/* Consistent Button Styling */
+.type-button {
+    padding: 8px 16px;
+    background: var(--surface-darker);
+    border: 1px solid var(--border-color);
+    border-radius: 8px;
+    color: var(--text-secondary);
+    font-size: 13px;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    text-align: left;
+    width: 100%;
+    margin: 4px 0;
+}
+
+.type-button:hover {
+    background: var(--accent-transparent);
+    color: var(--accent-color);
+    transform: translateY(-1px);
+}
+
+.type-button.active {
+    background: var(--accent-color);
+    color: var(--text-primary);
+    border-color: var(--accent-color);
+}
+
+/* Clear Button Styling */
+.clear-btn {
+    padding: 8px 16px;
+    background: var(--surface-darker);
+    border: 1px solid var(--accent-color);
+    border-radius: 8px;
+    color: var(--accent-color);
+    font-size: 13px;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    text-transform: lowercase;
+    font-weight: 500;
+}
+
+.clear-btn:hover {
+    background: var(--accent-transparent);
+    color: var(--text-primary);
+    border-color: var(--accent-color);
+    transform: translateY(-1px);
+}
+
+.clear-btn:active {
+    background: var(--accent-color);
+    color: var(--text-primary);
+    transform: translateY(0);
+}
+
+/* Filter Group Title Styling */
+.filter-group-title {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 16px;
+    padding-bottom: 8px;
+    border-bottom: 1px solid var(--border-color);
+}
+
+.filter-group-title h3 {
+    color: var(--accent-color);
+    font-size: 16px;
+    font-weight: 600;
+    text-transform: lowercase;
+}
+
+/* Updated Button Styling */
+.type-button {
+    width: 150px; /* Fixed width for consistency */
+    padding: 8px 16px;
+    background: var(--surface-darker);
+    border: 1px solid var(--border-color);
+    border-radius: 8px;
+    color: var(--text-secondary);
+    font-size: 13px;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    text-align: left;
+    margin: 4px;
+    position: relative;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.type-button:hover {
+    background: var(--accent-transparent);
+    color: var(--accent-color);
+    transform: translateY(-1px);
+}
+
+.type-button.active {
+    background: var(--accent-color);
+    color: var(--text-primary);
+    border-color: var(--accent-color);
+}
+
+/* Updated Location Buttons Container */
+.location-buttons {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+    gap: 8px;
+    padding: 8px;
+}
+
+/* Updated Relationship Buttons Container */
+.type-buttons {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+    gap: 8px;
+    padding: 8px;
+}
+
+/* Theme Variables */
+:root {
+    --background-dark: #121212;
+    --background-darker: #0a0a0a;
+    --surface-dark: #1e1e1e;
+    --surface-darker: #242424;
+    --accent-color: #ff5722;
+    --accent-hover: #ff7043;
+    --accent-transparent: rgba(255, 87, 34, 0.1);
+    --text-primary: #ffffff;
+    --text-secondary: rgba(255, 255, 255, 0.7);
+    --border-color: #333333;
+    --shadow-color: rgba(0, 0, 0, 0.3);
 }

@@ -1,3 +1,32 @@
+let driver;
+let activeTypes = new Set();
+
+document.addEventListener('DOMContentLoaded', () => {
+    // Add event listeners to tab buttons
+    document.querySelectorAll('.tab-button').forEach(button => {
+        button.addEventListener('click', () => {
+            const tabId = button.getAttribute('data-tab');
+            document.querySelectorAll('.tab-button').forEach(btn => {
+                btn.classList.remove('active');
+            });
+            button.classList.add('active');
+            document.querySelectorAll('.tab-content').forEach(content => {
+                content.classList.remove('active');
+            });
+            document.getElementById(tabId).classList.add('active');
+        });
+    });
+
+    // Add event listeners to filter buttons
+    document.querySelectorAll('.tissue-button, .location-button, .relationship-button, .detail-button').forEach(button => {
+        button.addEventListener('click', () => {
+            button.classList.toggle('active');
+        });
+    });
+
+    initDriver();
+    generateLocationButtons();
+});
 
 async function initDriver() {
     try {
@@ -136,7 +165,7 @@ function createForceGraph(nodes, links) {
         .attr("class", "node-label")
         .attr("dy", ".35em")
         .text(d => d.name)
-        .each(function(d) {
+        .each(function (d) {
             let text = d3.select(this);
             let words = d.name.split(' ');
             let line = [];
@@ -197,17 +226,43 @@ function createForceGraph(nodes, links) {
 }
 
 function toggleNodesByType(type) {
+    // Find the clicked button
+    const buttons = document.querySelectorAll('.type-button');
+    const clickedButton = Array.from(buttons).find(button => 
+        button.textContent.trim() === type
+    );
+    
+    // Toggle the active class on the button
+    if (clickedButton) {
+        clickedButton.classList.toggle('active');
+    }
+    
+    // Update activeTypes Set
     if (activeTypes.has(type)) {
         activeTypes.delete(type);
     } else {
         activeTypes.add(type);
     }
+    
+    filterNodes();
+    cleanUpRelationships();
+}
+
+function clearNodeTypes() {
+    activeTypes.clear();
+    
+    // Remove active class from all buttons
+    const buttons = document.querySelectorAll('.type-button');
+    buttons.forEach(button => {
+        button.classList.remove('active');
+    });
+    
     filterNodes();
     cleanUpRelationships();
 }
 
 function filterNodes() {
-    d3.select("#graph").selectAll(".node-label").each(function(d) {
+    d3.select("#graph").selectAll(".node-label").each(function (d) {
         if (activeTypes.has(d.label)) {
             d3.select(this).style("display", "block");
         } else {
@@ -215,7 +270,7 @@ function filterNodes() {
         }
     });
 
-    d3.select("#graph").selectAll("circle").each(function(d) {
+    d3.select("#graph").selectAll("circle").each(function (d) {
         if (activeTypes.has(d.label)) {
             d3.select(this).style("display", "block");
         } else {
@@ -223,7 +278,7 @@ function filterNodes() {
         }
     });
 
-    d3.select("#graph").selectAll(".link").each(function(d) {
+    d3.select("#graph").selectAll(".link").each(function (d) {
         if (activeTypes.has(d.source.label) && activeTypes.has(d.target.label)) {
             d3.select(this).style("display", "block");
         } else {
@@ -232,23 +287,17 @@ function filterNodes() {
     });
 
     // Hide or show relationship names based on node visibility
-    d3.select("#graph").selectAll(".link-label").each(function(d) {
+    d3.select("#graph").selectAll(".link-label").each(function (d) {
         if (activeTypes.has(d.source.label) && activeTypes.has(d.target.label)) {
             d3.select(this).style("display", "block");
         } else {
             d3.select(this).style("display", "none");
         }
     });
-}
-
-function clearNodeTypes() {
-    activeTypes.clear();
-    filterNodes();
-    cleanUpRelationships();
 }
 
 function cleanUpRelationships() {
-    d3.select("#graph").selectAll(".link").each(function(d) {
+    d3.select("#graph").selectAll(".link").each(function (d) {
         if (activeTypes.has(d.source.label) && activeTypes.has(d.target.label)) {
             d3.select(this).style("display", "block");
         } else {
@@ -257,13 +306,160 @@ function cleanUpRelationships() {
     });
 }
 
-document.addEventListener('DOMContentLoaded', () => {
-    initDriver();
-    generateLocationButtons();
+// Initialize zoom behavior
+const zoom = d3.zoom()
+    .scaleExtent([0.1, 4]) // Min and max zoom scales
+    .on('zoom', (event) => {
+        svg.attr('transform', event.transform);
+    });
+
+// Apply zoom behavior to the SVG container
+const svg = d3.select('#graph-container svg')
+    .call(zoom)
+    .on("dblclick.zoom", null); // Disable double-click zoom
+
+// Store current transform
+let currentTransform = d3.zoomIdentity;
+
+// Zoom in function
+function zoomIn() {
+    currentTransform = currentTransform.scale(1.2);
+    svg.transition()
+        .duration(300)
+        .call(zoom.transform, currentTransform);
+}
+
+// Zoom out function
+function zoomOut() {
+    currentTransform = currentTransform.scale(0.8);
+    svg.transition()
+        .duration(300)
+        .call(zoom.transform, currentTransform);
+}
+
+// Fit all function
+function fitAll() {
+    const bounds = document.querySelector('#graph-container svg g').getBBox();
+    const parent = document.querySelector('#graph-container');
+    const fullWidth = parent.clientWidth;
+    const fullHeight = parent.clientHeight;
+    
+    const midX = bounds.x + bounds.width / 2;
+    const midY = bounds.y + bounds.height / 2;
+    
+    // Calculate scale to fit
+    const scale = Math.min(
+        0.9 * fullWidth / bounds.width,
+        0.9 * fullHeight / bounds.height
+    );
+    
+    currentTransform = d3.zoomIdentity
+        .translate(fullWidth / 2 - midX * scale, fullHeight / 2 - midY * scale)
+        .scale(scale);
+
+    svg.transition()
+        .duration(750)
+        .call(zoom.transform, currentTransform);
+}
+
+// Add touch gesture support
+let touchDistance = 0;
+let initialScale = 1;
+
+svg.on('touchstart', (event) => {
+    if (event.touches.length === 2) {
+        touchDistance = Math.hypot(
+            event.touches[0].pageX - event.touches[1].pageX,
+            event.touches[0].pageY - event.touches[1].pageY
+        );
+        initialScale = currentTransform.k;
+    }
 });
 
-window.onbeforeunload = () => {
-    if (driver) {
-        driver.close();
+svg.on('touchmove', (event) => {
+    if (event.touches.length === 2) {
+        event.preventDefault();
+        
+        const newDistance = Math.hypot(
+            event.touches[0].pageX - event.touches[1].pageX,
+            event.touches[0].pageY - event.touches[1].pageY
+        );
+        
+        const delta = newDistance / touchDistance;
+        const newScale = initialScale * delta;
+        
+        if (newScale >= 0.1 && newScale <= 4) {
+            const center = {
+                x: (event.touches[0].pageX + event.touches[1].pageX) / 2,
+                y: (event.touches[0].pageY + event.touches[1].pageY) / 2
+            };
+            
+            currentTransform = d3.zoomIdentity
+                .translate(currentTransform.x, currentTransform.y)
+                .scale(newScale);
+            
+            svg.call(zoom.transform, currentTransform);
+        }
     }
-};
+});
+
+// Initialize with fit all
+document.addEventListener('DOMContentLoaded', () => {
+    setTimeout(fitAll, 500); // Slight delay to ensure graph is rendered
+});
+
+document.addEventListener('DOMContentLoaded', function() {
+    const optionsContainer = document.querySelector('.options-container');
+    let selectedButton = null;
+
+    optionsContainer.addEventListener('click', function(e) {
+        if (e.target.classList.contains('option-button')) {
+            // Remove previous selection
+            if (selectedButton) {
+                selectedButton.classList.remove('selected');
+            }
+            
+            // Select new button
+            e.target.classList.add('selected');
+            selectedButton = e.target;
+            
+            // Get selected value
+            const selectedOption = e.target.dataset.option;
+            console.log('Selected option:', selectedOption);
+        }
+    });
+});
+
+// Updated Location Button Generation
+function generateLocationButtons() {
+    const locationContainer = document.getElementById('location-buttons-container');
+    
+    for (const region in locationData) {
+        if (locationData.hasOwnProperty(region)) {
+            const regionDiv = document.createElement('div');
+            regionDiv.className = 'location-group';
+            
+            const regionTitle = document.createElement('div');
+            regionTitle.className = 'location-group-title';
+            regionTitle.textContent = region;
+            
+            const buttonContainer = document.createElement('div');
+            buttonContainer.className = 'location-buttons';
+            
+            locationData[region].forEach(location => {
+                const locationButton = document.createElement('button');
+                locationButton.className = 'type-button';
+                locationButton.textContent = location;
+                locationButton.onclick = () => {
+                    locationButton.classList.toggle('active');
+                    toggleNodesByType(location);
+                };
+                buttonContainer.appendChild(locationButton);
+            });
+            
+            regionDiv.appendChild(regionTitle);
+            regionDiv.appendChild(buttonContainer);
+            locationContainer.appendChild(regionDiv);
+        }
+    }
+}
