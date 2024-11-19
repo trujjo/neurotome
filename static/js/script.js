@@ -1,32 +1,47 @@
+function openTab(evt, tabName) {
+    const tabContents = document.getElementsByClassName('tab-content');
+    for (let i = 0; i < tabContents.length; i++) {
+        tabContents[i].classList.remove('active');
+    }
+    const tabButtons = document.getElementsByClassName('tab-button');
+    for (let i = 0; i < tabButtons.length; i++) {
+        tabButtons[i].classList.remove('active');
+    }
+    document.getElementById(tabName).classList.add('active');
+    evt.currentTarget.classList.add('active');
+}
+
+function generateLocationButtons() {
+    const locationContainer = document.getElementById('location-buttons-container');
+    for (const region in locationData) {
+        if (locationData.hasOwnProperty(region)) {
+            const regionDiv = document.createElement('div');
+            regionDiv.className = 'location-group';
+
+            const regionTitle = document.createElement('div');
+            regionTitle.className = 'location-group-title';
+            regionTitle.textContent = region;
+            regionDiv.appendChild(regionTitle);
+
+            const buttonContainer = document.createElement('div');
+            buttonContainer.className = 'location-buttons';
+
+            locationData[region].forEach(location => {
+                const locationButton = document.createElement('button');
+                locationButton.className = 'type-button';
+                locationButton.textContent = location;
+                locationButton.onclick = () => toggleNodesByType(location);
+                buttonContainer.appendChild(locationButton);
+            });
+
+            regionDiv.appendChild(buttonContainer);
+            locationContainer.appendChild(regionDiv);
+        }
+    }
+}
+
 let driver;
 let activeTypes = new Set();
-
-document.addEventListener('DOMContentLoaded', () => {
-    // Add event listeners to tab buttons
-    document.querySelectorAll('.tab-button').forEach(button => {
-        button.addEventListener('click', () => {
-            const tabId = button.getAttribute('data-tab');
-            document.querySelectorAll('.tab-button').forEach(btn => {
-                btn.classList.remove('active');
-            });
-            button.classList.add('active');
-            document.querySelectorAll('.tab-content').forEach(content => {
-                content.classList.remove('active');
-            });
-            document.getElementById(tabId).classList.add('active');
-        });
-    });
-
-    // Add event listeners to filter buttons
-    document.querySelectorAll('.tissue-button, .location-button, .relationship-button, .detail-button').forEach(button => {
-        button.addEventListener('click', () => {
-            button.classList.toggle('active');
-        });
-    });
-
-    initDriver();
-    generateLocationButtons();
-});
 
 async function initDriver() {
     try {
@@ -60,14 +75,14 @@ async function showRandomNodesWithRelationships() {
 
     try {
         const result = await session.run(`
-            MATCH (n)
-            WITH n, rand() as random
-            ORDER BY random
-            LIMIT 5
-            MATCH (n)-[rel]-(m)
-            RETURN DISTINCT n, rel, m
-            LIMIT 100
-        `);
+                MATCH (n)
+                WITH n, rand() as random
+                ORDER BY random
+                LIMIT 5
+                MATCH (n)-[rel]-(m)
+                RETURN DISTINCT n, rel, m
+                LIMIT 100
+            `);
 
         document.getElementById('status').innerHTML = 'Processing data...';
 
@@ -226,37 +241,11 @@ function createForceGraph(nodes, links) {
 }
 
 function toggleNodesByType(type) {
-    // Find the clicked button
-    const buttons = document.querySelectorAll('.type-button');
-    const clickedButton = Array.from(buttons).find(button => 
-        button.textContent.trim() === type
-    );
-    
-    // Toggle the active class on the button
-    if (clickedButton) {
-        clickedButton.classList.toggle('active');
-    }
-    
-    // Update activeTypes Set
     if (activeTypes.has(type)) {
         activeTypes.delete(type);
     } else {
         activeTypes.add(type);
     }
-    
-    filterNodes();
-    cleanUpRelationships();
-}
-
-function clearNodeTypes() {
-    activeTypes.clear();
-    
-    // Remove active class from all buttons
-    const buttons = document.querySelectorAll('.type-button');
-    buttons.forEach(button => {
-        button.classList.remove('active');
-    });
-    
     filterNodes();
     cleanUpRelationships();
 }
@@ -294,6 +283,12 @@ function filterNodes() {
             d3.select(this).style("display", "none");
         }
     });
+}
+
+function clearNodeTypes() {
+    activeTypes.clear();
+    filterNodes();
+    cleanUpRelationships();
 }
 
 function cleanUpRelationships() {
@@ -429,37 +424,3 @@ document.addEventListener('DOMContentLoaded', function() {
         }
     });
 });
-
-// Updated Location Button Generation
-function generateLocationButtons() {
-    const locationContainer = document.getElementById('location-buttons-container');
-    
-    for (const region in locationData) {
-        if (locationData.hasOwnProperty(region)) {
-            const regionDiv = document.createElement('div');
-            regionDiv.className = 'location-group';
-            
-            const regionTitle = document.createElement('div');
-            regionTitle.className = 'location-group-title';
-            regionTitle.textContent = region;
-            
-            const buttonContainer = document.createElement('div');
-            buttonContainer.className = 'location-buttons';
-            
-            locationData[region].forEach(location => {
-                const locationButton = document.createElement('button');
-                locationButton.className = 'type-button';
-                locationButton.textContent = location;
-                locationButton.onclick = () => {
-                    locationButton.classList.toggle('active');
-                    toggleNodesByType(location);
-                };
-                buttonContainer.appendChild(locationButton);
-            });
-            
-            regionDiv.appendChild(regionTitle);
-            regionDiv.appendChild(buttonContainer);
-            locationContainer.appendChild(regionDiv);
-        }
-    }
-}
