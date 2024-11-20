@@ -1,84 +1,362 @@
+
 <!DOCTYPE html>
-<html lang="en">
+<html>
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Neo4j Force Graph</title>
-    <link rel="stylesheet" href="static/js/styles.css">
-    <script src="https://unpkg.com/neo4j-driver"></script>
-    <script src="https://d3js.org/d3.v5.min.js"></script>
+    <title>Neo4j Graph Visualization</title>
+    <script type="text/javascript" src="https://unpkg.com/vis-network/standalone/umd/vis-network.min.js"></script>
+    <style>
+        #mynetwork {
+            width: 100%;
+            height: 800px;
+            border: 1px solid #ddd;
+            background: white;
+        }
+        .controls {
+            margin: 20px 0;
+            text-align: center;
+        }
+        .filter-section {
+            margin: 10px 0;
+            padding: 15px;
+            background: #f5f5f5;
+            border-radius: 8px;
+        }
+        .filter-title {
+            font-weight: bold;
+            margin-bottom: 10px;
+            font-size: 16px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        .filter-buttons {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 10px;
+            justify-content: center;
+        }
+        .toggle-btn {
+            padding: 8px 15px;
+            border: 2px solid transparent;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 14px;
+            transition: all 0.3s;
+        }
+        .toggle-btn.active {
+            opacity: 1;
+            border-color: #333;
+        }
+        .toggle-btn.inactive {
+            opacity: 0.5;
+            border-color: transparent;
+        }
+        .main-btn {
+            background: #4CAF50;
+            color: white;
+            padding: 10px 20px;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            margin: 0 10px;
+            font-size: 16px;
+        }
+        .main-btn.hide {
+            background: #f44336;
+        }
+        #stats {
+            text-align: center;
+            margin: 10px 0;
+            font-family: Arial, sans-serif;
+        }
+        .loading-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(255, 255, 255, 0.9);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            z-index: 1000;
+        }
+        .loading-spinner {
+            border: 5px solid #f3f3f3;
+            border-top: 5px solid #3498db;
+            border-radius: 50%;
+            width: 50px;
+            height: 50px;
+            animation: spin 1s linear infinite;
+        }
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+    </style>
 </head>
 <body>
-    <div class="tab-container">
-        <button class="tab-button" onclick="openTab(event, 'LabelType')">Tissue Types</button>
-        <button class="tab-button active" onclick="openTab(event, 'Location')">Locations</button>
-        <button class="tab-button" onclick="openTab(event, 'Relationship')">Relationships</button>
+    <div id="loading-overlay" class="loading-overlay">
+        <div class="loading-spinner"></div>
     </div>
-
-    <div id="LabelType" class="tab-content">
-        <div class="filter-container">
-            <div class="filter-section">
-                <div class="filter-group">
-                    <div class="filter-group-title">
-                        <h3>Tissue Types</h3>
-                        <button class="clear-btn" onclick="clearNodeTypes()">Clear</button>
-                    </div>
-                    <div class="type-buttons">
-                        <!-- Tissue types buttons dynamically generated via JS -->
-                    </div>
-                </div>
-            </div>
-        </div>
-    </div>
-
-    <div id="Location" class="tab-content active">
-        <div class="filter-container">
-            <div class="filter-section">
-                <div class="filter-group">
-                    <div class="filter-group-title">
-                        <h3>Locations</h3>
-                        <button class="clear-btn" onclick="clearNodeTypes()">Clear</button>
-                    </div>
-                    <div id="location-buttons-container">
-                        <!-- Location buttons dynamically generated via JS -->
-                    </div>
-                </div>
-            </div>
-        </div>
-    </div>
-
-    <div id="Relationship" class="tab-content">
-        <div class="filter-container">
-            <div class="filter-section">
-                <div class="filter-group">
-                    <div class="filter-group-title">
-                        <h3>Relationships</h3>
-                        <button class="clear-btn" onclick="clearRelationshipTypes()">Clear</button>
-                    </div>
-                    <div class="type-buttons">
-                        <!-- Relationship buttons dynamically generated via JS -->
-                    </div>
-                </div>
-            </div>
-        </div>
-    </div>
-
+    
     <div class="controls">
-        <button class="button" onclick="showRandomNodesWithRelationships()">Show Connected Nodes</button>
-        <div class="question-container">
-            <div class="question-text">Detail Level:</div>
-            <div class="options-container">
-                <button class="option-button" data-option="major">High Level</button>
-                <button class="option-button" data-option="intermediate">Intermediate</button>
-                <button class="option-button" data-option="minor">Most Specific</button>
-            </div>
-        </div>
-        <input type="text" id="searchBox" placeholder="Search nodes...">
+        <button class="main-btn" onclick="showAll()">Show All</button>
+        <button class="main-btn hide" onclick="hideAll()">Hide All</button>
+        <button class="main-btn" onclick="loadFullData()">Load Full Dataset</button>
     </div>
+    <div id="stats"></div>
+    
+    <!-- Node Type Filters -->
+    <div class="filter-section">
+        <div class="filter-title">
+            Node Types
+            <button class="toggle-btn" onclick="toggleSection('type')">Toggle All</button>
+        </div>
+        <div class="filter-buttons" id="typeToggles"></div>
+    </div>
+    
+    <!-- Location Filters -->
+    <div class="filter-section">
+        <div class="filter-title">
+            Locations
+            <button class="toggle-btn" onclick="toggleSection('location')">Toggle All</button>
+        </div>
+        <div class="filter-buttons" id="locationToggles"></div>
+    </div>
+    
+    <!-- Sublocation Filters -->
+    <div class="filter-section">
+        <div class="filter-title">
+            Sublocations
+            <button class="toggle-btn" onclick="toggleSection('sublocation')">Toggle All</button>
+        </div>
+        <div class="filter-buttons" id="sublocationToggles"></div>
+    </div>
+    
+    <div id="mynetwork"></div>
 
-    <div id="status" style="background-color: rgb(40, 167, 69);">Graph rendered successfully</div>
-    <div id="graph"></div>
+    <script type="text/javascript">
 
-    <script src="static/js/script.js"></script>
+        const labelColors = {"artery": "#25b738", "bone": "#cda329", "cv": "#f8b99f", "dermatome": "#62de55", "function": "#40ca78", "ganglion": "#f959ac", "gland": "#38a828", "head": "#49101f", "lymph": "#627293", "muscle": "#449b58", "nerve": "#0e7628", "neuro": "#1f0388", "organ": "#91139b", "region": "#01380f", "sensation": "#b8fe6f", "sense": "#9989ee", "sensory": "#628905", "skin": "#0b6bb8", "target": "#ef036b", "vein": "#d0a056", "viscera": "#af7036"};
+        const locationColors = {"abdomen": "#dba1ab", "head": "#56245b", "lower limb": "#e12b8c", "neck": "#1baac9", "other": "#de97ac", "pelvis": "#dba614", "spine": "#67fb62", "thorax": "#a6a641", "upper limb": "#1e68e3"};
+        const sublocationColors = {"ankle": "#97153f", "arm": "#c06b69", "brain": "#0d4a3a", "cervical spine": "#e1d5fc", "ear": "#a1bb4a", "elbow": "#02662a", "eye": "#c98916", "face": "#be22b8", "fingers": "#0e7468", "foot": "#1f2268", "forearm": "#a21f7d", "greater pelvis": "#c875ab", "hand": "#9ef391", "head": "#eca507", "heart": "#22337d", "knee": "#6c3b93", "left lower quadrant": "#18bfdf", "left upper quadrant": "#2eb8c8", "leg": "#b34edf", "lesser pelvis": "#8a13a2", "lumbar spine": "#05fa3e", "lung": "#46deb8", "mouth": "#202c46", "nose": "#850344", "ribcage": "#dd26e5", "right lower quadrant": "#672bb1", "right upper quadrant": "#d10bdc", "sacral spine": "#e65779", "shoulder": "#8145d8", "skull": "#0304a3", "spinal cord": "#ae6e64", "thigh": "#524853", "thoracic spine": "#50b968", "toes": "#317e8f", "tracts": "#27e4b4", "unspecified": "#676954", "vascular": "#3ed836", "vertebral": "#a01acd", "visceral": "#7bc2da", "wrist": "#6a4027"};
+        let isFullDataLoaded = false;
+        
+        // Create network
+        const container = document.getElementById('mynetwork');
+        const nodes = new vis.DataSet([]);
+        const edges = new vis.DataSet([]);
+        
+        // Create filter sets (all empty initially)
+        const activeTypes = new Set();
+        const activeLocations = new Set();
+        const activeSublocations = new Set();
+
+        // Create toggle buttons for each filter type
+        function createToggleButtons(containerId, items, colors, activeSet) {
+            const container = document.getElementById(containerId);
+            items.forEach(item => {
+                const btn = document.createElement('button');
+                btn.className = 'toggle-btn inactive';  // Start inactive
+                btn.style.backgroundColor = colors[item];
+                btn.style.color = 'white';
+                btn.textContent = item;
+                btn.onclick = () => toggleFilter(item, btn, activeSet);
+                container.appendChild(btn);
+            });
+        }
+
+        // Create all toggle buttons
+        createToggleButtons('typeToggles', Object.keys(labelColors), labelColors, activeTypes);
+        createToggleButtons('locationToggles', Object.keys(locationColors), locationColors, activeLocations);
+        createToggleButtons('sublocationToggles', Object.keys(sublocationColors), sublocationColors, activeSublocations);
+
+        // Network options with optimized physics
+        const options = {
+            nodes: {
+                shape: 'dot',
+                size: 15,
+                font: { size: 12, color: '#333' },
+                borderWidth: 2,
+                shadow: true
+            },
+            edges: {
+                width: 1,
+                arrows: 'to',
+                color: { color: '#848484' },
+                smooth: { type: 'continuous' }
+            },
+            physics: {
+                enabled: true,
+                solver: 'forceAtlas2Based',
+                forceAtlas2Based: {
+                    gravitationalConstant: -100,
+                    centralGravity: 0.01,
+                    springLength: 200,
+                    springConstant: 0.08,
+                    damping: 0.4,
+                    avoidOverlap: 0.5
+                },
+                stabilization: {
+                    enabled: true,
+                    iterations: 100,
+                    updateInterval: 25
+                }
+            },
+            interaction: {
+                hover: true,
+                tooltipDelay: 200,
+                hideEdgesOnDrag: true,
+                multiselect: true,
+                navigationButtons: true
+            }
+        };
+
+        // Create network
+        const network = new vis.Network(container, { nodes, edges }, options);
+
+        // Toggle section function
+        function toggleSection(section) {
+            let activeSet, togglesId, colors;
+            switch(section) {
+                case 'type':
+                    activeSet = activeTypes;
+                    togglesId = 'typeToggles';
+                    colors = labelColors;
+                    break;
+                case 'location':
+                    activeSet = activeLocations;
+                    togglesId = 'locationToggles';
+                    colors = locationColors;
+                    break;
+                case 'sublocation':
+                    activeSet = activeSublocations;
+                    togglesId = 'sublocationToggles';
+                    colors = sublocationColors;
+                    break;
+            }
+            
+            const buttons = document.querySelectorAll(`#${togglesId} .toggle-btn`);
+            const allActive = Array.from(buttons).every(btn => btn.classList.contains('active'));
+            
+            buttons.forEach(btn => {
+                const value = btn.textContent;
+                if (allActive) {
+                    activeSet.delete(value);
+                    btn.className = 'toggle-btn inactive';
+                } else {
+                    activeSet.add(value);
+                    btn.className = 'toggle-btn active';
+                }
+            });
+            
+            updateVisibleNodes();
+        }
+
+        // Toggle filter function
+        function toggleFilter(value, btn, activeSet) {
+            if (activeSet.has(value)) {
+                activeSet.delete(value);
+                btn.className = 'toggle-btn inactive';
+            } else {
+                activeSet.add(value);
+                btn.className = 'toggle-btn active';
+            }
+            updateVisibleNodes();
+        }
+
+        function showAll() {
+            [
+                {containerId: 'typeToggles', activeSet: activeTypes, colors: labelColors},
+                {containerId: 'locationToggles', activeSet: activeLocations, colors: locationColors},
+                {containerId: 'sublocationToggles', activeSet: activeSublocations, colors: sublocationColors}
+            ].forEach(({containerId, activeSet, colors}) => {
+                Object.keys(colors).forEach(value => {
+                    activeSet.add(value);
+                    const btn = document.querySelector(`#${containerId} button[textContent="${value}"]`);
+                    if (btn) btn.className = 'toggle-btn active';
+                });
+            });
+            updateVisibleNodes();
+        }
+
+        function hideAll() {
+            [
+                {containerId: 'typeToggles', activeSet: activeTypes},
+                {containerId: 'locationToggles', activeSet: activeLocations},
+                {containerId: 'sublocationToggles', activeSet: activeSublocations}
+            ].forEach(({containerId, activeSet}) => {
+                activeSet.clear();
+                document.querySelectorAll(`#${containerId} .toggle-btn`).forEach(btn => {
+                    btn.className = 'toggle-btn inactive';
+                });
+            });
+            updateVisibleNodes();
+        }
+
+        function updateVisibleNodes() {
+            const currentData = isFullDataLoaded ? graphData.full : graphData.initial;
+            const visibleNodes = currentData.nodes.filter(node =>
+                (activeTypes.size === 0 || activeTypes.has(node.group)) &&
+                (activeLocations.size === 0 || activeLocations.has(node.location)) &&
+                (activeSublocations.size === 0 || activeSublocations.has(node.sublocation))
+            );
+            
+            const visibleNodeIds = new Set(visibleNodes.map(node => node.id));
+            const visibleEdges = currentData.edges.filter(edge =>
+                visibleNodeIds.has(edge.from) && visibleNodeIds.has(edge.to)
+            );
+            
+            nodes.clear();
+            edges.clear();
+            nodes.add(visibleNodes);
+            edges.add(visibleEdges);
+            
+            updateStats();
+        }
+
+        function updateStats() {
+            const statsDiv = document.getElementById('stats');
+            statsDiv.innerHTML = `Visible Nodes: ${nodes.length} | Visible Edges: ${edges.length}`;
+        }
+
+        function loadFullData() {
+            if (isFullDataLoaded) return;
+            
+            document.getElementById('loading-overlay').style.display = 'flex';
+            
+            // Simulate async loading (in real app, this would be an API call)
+            setTimeout(() => {
+                isFullDataLoaded = true;
+                updateVisibleNodes();
+                document.getElementById('loading-overlay').style.display = 'none';
+            }, 100);
+        }
+
+        // Initial setup
+        hideAll();  // Start with all filters off
+        updateStats();
+        document.getElementById('loading-overlay').style.display = 'none';
+
+        // Network events
+        network.on('stabilizationProgress', function(params) {
+            const progress = Math.round((params.iterations / params.total) * 100);
+            document.getElementById('stats').innerHTML = `Loading: ${progress}%`;
+        });
+
+        network.on('stabilizationIterationsDone', function() {
+            updateStats();
+        });
+
+        network.on('doubleClick', function(params) {
+            if (params.nodes.length > 0) {
+                network.focus(params.nodes[0], {
+                    scale: 1.2,
+                    animation: true
+                });
+            }
+        });
+    </script>
 </body>
 </html>
