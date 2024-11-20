@@ -3,45 +3,82 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Graph Viewer</title>
+    <title>Neo4j Force Graph</title>
     <link rel="stylesheet" href="static/js/styles.css">
-    <script src="static/js/script.js"></script>
+    <script src="https://unpkg.com/neo4j-driver"></script>
+    <script src="https://d3js.org/d3.v5.min.js"></script>
 </head>
 <body>
     <div class="tab-container">
-        <button class="tab-button active" onclick="openTab(event, 'LabelType')">Tissue Types</button>
-        <button class="tab-button" onclick="openTab(event, 'Location')">Locations</button>
+        <button class="tab-button" onclick="openTab(event, 'LabelType')">Tissue Types</button>
+        <button class="tab-button active" onclick="openTab(event, 'Location')">Locations</button>
         <button class="tab-button" onclick="openTab(event, 'Relationship')">Relationships</button>
     </div>
 
-    <div id="LabelType" class="tab-content active">
-        <div class="type-buttons">
-            <button class="clear-btn" onclick="clearNodeTypes()">Clear All</button>
+    <div id="LabelType" class="tab-content">
+        <div class="filter-container">
+            <div class="filter-section">
+                <div class="filter-group">
+                    <div class="filter-group-title">
+                        <h3>Tissue Types</h3>
+                        <button class="clear-btn" onclick="clearNodeTypes()">Clear</button>
+                    </div>
+                    <div class="type-buttons">
+                        <!-- Tissue types buttons dynamically generated via JS -->
+                    </div>
+                </div>
+            </div>
         </div>
     </div>
 
-    <div id="Location" class="tab-content">
-        <div id="location-buttons-container"></div>
+    <div id="Location" class="tab-content active">
+        <div class="filter-container">
+            <div class="filter-section">
+                <div class="filter-group">
+                    <div class="filter-group-title">
+                        <h3>Locations</h3>
+                        <button class="clear-btn" onclick="clearNodeTypes()">Clear</button>
+                    </div>
+                    <div id="location-buttons-container">
+                        <!-- Location buttons dynamically generated via JS -->
+                    </div>
+                </div>
+            </div>
+        </div>
     </div>
 
     <div id="Relationship" class="tab-content">
-        <div id="relationship-buttons-container"></div>
+        <div class="filter-container">
+            <div class="filter-section">
+                <div class="filter-group">
+                    <div class="filter-group-title">
+                        <h3>Relationships</h3>
+                        <button class="clear-btn" onclick="clearRelationshipTypes()">Clear</button>
+                    </div>
+                    <div class="type-buttons">
+                        <!-- Relationship buttons dynamically generated via JS -->
+                    </div>
+                </div>
+            </div>
+        </div>
     </div>
 
     <div class="controls">
-        <button id="show-nodes-btn" class="action-btn">Show Connected Nodes</button>
+        <button class="button" onclick="showRandomNodesWithRelationships()">Show Connected Nodes</button>
+        <div class="question-container">
+            <div class="question-text">Detail Level:</div>
+            <div class="options-container">
+                <button class="option-button" data-option="major">High Level</button>
+                <button class="option-button" data-option="intermediate">Intermediate</button>
+                <button class="option-button" data-option="minor">Most Specific</button>
+            </div>
+        </div>
+        <input type="text" id="searchBox" placeholder="Search nodes...">
     </div>
 
-    <div class="options-container">
-        <div class="question-text">Detail Level:</div>
-        <button class="option-button" data-option="major">High Level</button>
-        <button class="option-button" data-option="intermediate">Intermediate</button>
-        <button class="option-button" data-option="minor">Most Specific</button>
-    </div>
-
-    <div id="status">Graph rendered successfully</div>
+    <div id="status" style="background-color: rgb(40, 167, 69);">Graph rendered successfully</div>
     <div id="graph"></div>
 
-    
+    <script src="static/js/script.js"></script>
 </body>
 </html>
