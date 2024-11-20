@@ -1,8 +1,13 @@
-// Neo4j connection and visualization setup
+// Initialize Neo4j driver
+const driver = neo4j.driver(
+    'neo4j+s://4e5eeae5.databases.neo4j.io:7687',
+    neo4j.auth.basic('neo4j', 'Poconoco16!')
+);
+
 let root;
 let chart;
 
-// Initialize the chart
+// Initialize the visualization
 am5.ready(function() {
     // Create root element
     root = am5.Root.new("chartdiv");
@@ -34,13 +39,22 @@ am5.ready(function() {
         })
     );
     
-    // Set up node colors based on labels
+    // Node colors based on labels
     const colors = {
-        artery: "#FF6B6B",
         muscle: "#4ECDC4",
+        viscera: "#FFB347",
+        sense: "#9B59B6",
+        artery: "#FF6B6B",
+        cv: "#3498DB",
+        bone: "#95A5A6",
+        neuro: "#2ECC71",
         nerve: "#45B7D1",
+        gland: "#E74C3C",
+        vein: "#D4A5A5",
+        region: "#F1C40F",
+        lymph: "#1ABC9C",
         organ: "#96CEB4",
-        vein: "#D4A5A5"
+        sensation: "#E67E22"
     };
     
     // Style nodes
@@ -50,9 +64,13 @@ am5.ready(function() {
         strokeWidth: 2,
         radius: 25,
         fill: function(dataItem) {
-            return am5.color(colors[dataItem.dataContext.label.toLowerCase()] || "#999999");
+            if (dataItem.dataContext.labels && dataItem.dataContext.labels.length > 0) {
+                return am5.color(colors[dataItem.dataContext.labels[0].toLowerCase()] || "#999999");
+            }
+            return am5.color("#999999");
         },
-        stroke: am5.color(0x555555)
+        stroke: am5.color(0x555555),
+        tooltipText: "{name}"
     });
     
     // Add hover state
@@ -64,7 +82,8 @@ am5.ready(function() {
     // Style links
     chart.links.template.setAll({
         strokeWidth: 2,
-        strokeOpacity: 0.5
+        strokeOpacity: 0.5,
+        tooltipText: "{type}"
     });
     
     // Add click listener for zoom
@@ -81,10 +100,57 @@ am5.ready(function() {
         }
     });
     
-    // Initial data fetch
-    updateVisualization();
+    // Initialize filters
+    populateFilters();
 });
 
+// Populate filter dropdowns
+async function populateFilters() {
+    const session = driver.session();
+    try {
+        // Fetch node labels
+        const labelResult = await session.run('CALL db.labels() YIELD label RETURN label ORDER BY label');
+        const nodeLabelsSelect = document.getElementById('nodeLabels');
+        nodeLabelsSelect.innerHTML = '';
+        labelResult.records.forEach(record => {
+            const option = document.createElement('option');
+            option.value = record.get('label');
+            option.textContent = record.get('label');
+            nodeLabelsSelect.appendChild(option);
+        });
+
+        // Fetch relationship types
+        const relResult = await session.run('CALL db.relationshipTypes() YIELD relationshipType RETURN relationshipType ORDER BY relationshipType');
+        const relationshipsSelect = document.getElementById('relationships');
+        relationshipsSelect.innerHTML = '';
+        relResult.records.forEach(record => {
+            const option = document.createElement('option');
+            option.value = record.get('relationshipType');
+            option.textContent = record.get('relationshipType');
+            relationshipsSelect.appendChild(option);
+        });
+
+        // Fetch locations
+        const locationResult = await session.run('MATCH (n) WHERE exists(n.location) RETURN DISTINCT n.location AS location ORDER BY location');
+        const locationSelect = document.getElementById('location');
+        locationSelect.innerHTML = '<option value="">All Locations</option>';
+        locationResult.records.forEach(record => {
+            const location = record.get('location');
+            if (location) {
+                const option = document.createElement('option');
+                option.value = location;
+                option.textContent = location;
+                locationSelect.appendChild(option);
+            }
+        });
+    } catch (error) {
+        console.error('Error populating filters:', error);
+    } finally {
+        await session.close();
+    }
+}
+
+// Fetch graph data based on filters
 async function fetchGraphData(filters) {
     const session = driver.session();
     try {
@@ -94,12 +160,29 @@ async function fetchGraphData(filters) {
         
         let query = `
         MATCH (n)
-        WHERE ${nodeLabels.length ? 'any(label IN labels(n) WHERE label IN $nodeLabels)' : 'true'}
+        ${nodeLabels.length ? 'WHERE any(label IN labels(n) WHERE label IN $nodeLabels)' : ''}
         ${location ? 'AND n.location = $location' : ''}
         WITH n
         OPTIONAL MATCH (n)-[r]->(m)
-        WHERE ${relationships.length ? 'type(r) IN $relationships' : 'true'}
-        RETURN n, r, m
+        ${relationships.length ? 'WHERE type(r) IN $relationships' : ''}
+        WITH COLLECT(DISTINCT n) + COLLECT(DISTINCT m) as allNodes, 
+             COLLECT(DISTINCT r) as allRels
+        UNWIND allNodes as node
+        WITH DISTINCT node, allRels
+        RETURN 
+            collect(DISTINCT {
+                id: toString(id(node)),
+                name: COALESCE(node.name, head(labels(node)) + '_' + id(node)),
+                labels: labels(node),
+                properties: properties(node)
+            }) as nodes,
+            [rel IN allRels | {
+                id: toString(id(rel)),
+                type: type(rel),
+                source: toString(startNode(rel).id),
+                target: toString(endNode(rel).id),
+                properties: properties(rel)
+            }] as relationships
         LIMIT 100
         `;
         
@@ -109,70 +192,57 @@ async function fetchGraphData(filters) {
             location: location
         });
         
-        return transformNeo4jData(result.records);
+        if (result.records.length === 0) {
+            console.log('No data returned from query');
+            return [];
+        }
+        
+        return transformNeo4jData(result.records[0].get('nodes'), result.records[0].get('relationships'));
+    } catch (error) {
+        console.error('Error fetching graph data:', error);
+        return [];
     } finally {
         await session.close();
     }
 }
 
-function transformNeo4jData(records) {
-    const nodes = new Map();
-    const relationships = new Set();
+// Transform Neo4j data for visualization
+function transformNeo4jData(nodes, relationships) {
+    const nodesMap = new Map();
     
-    // First pass: Collect nodes
-    records.forEach(record => {
-        const startNode = record.get('n');
-        const endNode = record.get('m');
-        
-        if (!nodes.has(startNode.identity.toString())) {
-            nodes.set(startNode.identity.toString(), {
-                id: startNode.identity.toString(),
-                name: startNode.properties.name || startNode.labels[0] + '_' + startNode.identity,
-                label: startNode.labels[0],
-                value: 1,
-                children: []
-            });
-        }
-        
-        if (endNode && !nodes.has(endNode.identity.toString())) {
-            nodes.set(endNode.identity.toString(), {
-                id: endNode.identity.toString(),
-                name: endNode.properties.name || endNode.labels[0] + '_' + endNode.identity,
-                label: endNode.labels[0],
-                value: 1,
-                children: []
-            });
-        }
+    // Process nodes
+    nodes.forEach(node => {
+        nodesMap.set(node.id, {
+            id: node.id,
+            name: node.name,
+            labels: node.labels,
+            value: 1,
+            children: [],
+            linkWith: [],
+            properties: node.properties
+        });
     });
     
-    // Second pass: Build relationships
-    records.forEach(record => {
-        const rel = record.get('r');
-        if (rel) {
-            const startNodeId = rel.startNodeIdentity.toString();
-            const endNodeId = rel.endNodeIdentity.toString();
+    // Process relationships
+    relationships.forEach(rel => {
+        const sourceNode = nodesMap.get(rel.source);
+        const targetNode = nodesMap.get(rel.target);
+        
+        if (sourceNode && targetNode) {
+            // Add to children array
+            sourceNode.children.push(targetNode);
             
-            const startNode = nodes.get(startNodeId);
-            const endNode = nodes.get(endNodeId);
-            
-            if (startNode && endNode) {
-                startNode.children.push(endNode);
-                relationships.add(`${startNodeId}-${endNodeId}`);
+            // Add to linkWith array
+            if (!sourceNode.linkWith.includes(targetNode.id)) {
+                sourceNode.linkWith.push(targetNode.id);
             }
         }
     });
     
-    // Convert to array and add linkWith property
-    const nodesArray = Array.from(nodes.values());
-    nodesArray.forEach(node => {
-        node.linkWith = Array.from(relationships)
-            .filter(rel => rel.startsWith(node.id))
-            .map(rel => rel.split('-')[1]);
-    });
-    
-    return nodesArray;
+    return Array.from(nodesMap.values());
 }
 
+// Update visualization with new data
 async function updateVisualization() {
     const filters = {
         nodeLabels: Array.from(document.getElementById('nodeLabels').selectedOptions).map(opt => opt.value),
@@ -181,8 +251,20 @@ async function updateVisualization() {
     };
     
     const data = await fetchGraphData(filters);
-    chart.data.setAll(data);
+    if (data && data.length > 0) {
+        chart.data.setAll(data);
+    } else {
+        console.log('No data returned from query');
+        chart.data.setAll([]);
+    }
 }
 
 // Add event listener for the apply filters button
 document.getElementById('applyFilters').addEventListener('click', updateVisualization);
+
+// Clean up on page unload
+window.addEventListener('unload', () => {
+    if (driver) {
+        driver.close();
+    }
+});
