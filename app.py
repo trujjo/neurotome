@@ -1,4 +1,4 @@
-from flask import Flask, jsonify, request
+from flask import Flask, jsonify, request, render_template
 from flask_cors import CORS
 from neo4j import GraphDatabase
 from typing import List, Dict, Any
@@ -150,6 +150,10 @@ class NeuroanatomyDatabase:
             }
 
 db = NeuroanatomyDatabase()
+
+@app.route('/')
+def index():
+    return render_template('index.html')
 
 @app.route('/api/metadata', methods=['GET'])
 def get_metadata():
