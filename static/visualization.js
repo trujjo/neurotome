@@ -1,9 +1,4 @@
-// Neo4j connection
-const driver = neo4j.driver(
-    'neo4j+s://4e5eeae5.databases.neo4j.io:7687',
-    neo4j.auth.basic('neo4j', 'Poconoco16!')
-);
-
+// Neo4j connection and visualization setup
 let root;
 let chart;
 
@@ -39,7 +34,54 @@ am5.ready(function() {
         })
     );
     
-    // Generate and set data
+    // Set up node colors based on labels
+    const colors = {
+        artery: "#FF6B6B",
+        muscle: "#4ECDC4",
+        nerve: "#45B7D1",
+        organ: "#96CEB4",
+        vein: "#D4A5A5"
+    };
+    
+    // Style nodes
+    chart.circles.template.setAll({
+        toggleKey: "active",
+        interactive: true,
+        strokeWidth: 2,
+        radius: 25,
+        fill: function(dataItem) {
+            return am5.color(colors[dataItem.dataContext.label.toLowerCase()] || "#999999");
+        },
+        stroke: am5.color(0x555555)
+    });
+    
+    // Add hover state
+    chart.circles.template.states.create("hover", {
+        scale: 1.2,
+        fill: am5.color(0xff7f50)
+    });
+    
+    // Style links
+    chart.links.template.setAll({
+        strokeWidth: 2,
+        strokeOpacity: 0.5
+    });
+    
+    // Add click listener for zoom
+    chart.circles.template.events.on("click", function(ev) {
+        const dataItem = ev.target.dataItem;
+        if (dataItem) {
+            if (dataItem.get("active")) {
+                dataItem.set("active", false);
+                chart.zoomToDataItem(chart.homeDataItem);
+            } else {
+                chart.zoomToDataItem(dataItem);
+                dataItem.set("active", true);
+            }
+        }
+    });
+    
+    // Initial data fetch
     updateVisualization();
 });
 
@@ -77,7 +119,7 @@ function transformNeo4jData(records) {
     const nodes = new Map();
     const relationships = new Set();
     
-    // First pass: Collect all nodes
+    // First pass: Collect nodes
     records.forEach(record => {
         const startNode = record.get('n');
         const endNode = record.get('m');
@@ -140,76 +182,7 @@ async function updateVisualization() {
     
     const data = await fetchGraphData(filters);
     chart.data.setAll(data);
-    
-    // Set up series for different node types
-    chart.circles.template.setAll({
-        toggleKey: "active",
-        interactive: true,
-        strokeWidth: 2,
-        radius: 25,
-        fill: am5.color(0x6794dc),
-        stroke: am5.color(0x555555)
-    });
-    
-    // Add hover state
-    chart.circles.template.states.create("hover", {
-        scale: 1.2,
-        fill: am5.color(0xff7f50)
-    });
-    
-    // Add click listener to zoom
-    chart.circles.template.events.on("click", function(ev) {
-        const dataItem = ev.target.dataItem;
-        if (dataItem) {
-            if (dataItem.get("active")) {
-                dataItem.set("active", false);
-                chart.zoomToDataItem(chart.homeDataItem);
-            } else {
-                chart.zoomToDataItem(dataItem);
-                dataItem.set("active", true);
-            }
-        }
-    });
-    
-    // Style the links
-    chart.links.template.setAll({
-        strokeWidth: 2,
-        strokeOpacity: 0.5
-    });
 }
 
-// Initialize locations dropdown
-async function initializeLocations() {
-    const session = driver.session();
-    try {
-        const result = await session.run(`
-            MATCH (n)
-            WHERE exists(n.location)
-            RETURN DISTINCT n.location AS location
-            ORDER BY location
-        `);
-        
-        const locationSelect = document.getElementById('location');
-        result.records.forEach(record => {
-            const location = record.get('location');
-            if (location) {
-                const option = document.createElement('option');
-                option.value = location;
-                option.textContent = location;
-                locationSelect.appendChild(option);
-            }
-        });
-    } finally {
-        await session.close();
-    }
-}
-
-// Call initializeLocations when the page loads
-document.addEventListener('DOMContentLoaded', initializeLocations);
-
-// Clean up on page unload
-window.addEventListener('unload', () => {
-    if (driver) {
-        driver.close();
-    }
-});
+// Add event listener for the apply filters button
+document.getElementById('applyFilters').addEventListener('click', updateVisualization);
