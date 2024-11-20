@@ -1,8 +1,10 @@
 from flask import Flask, jsonify, request
+from flask_cors import CORS
 from neo4j import GraphDatabase
 from typing import List, Dict, Any
 
 app = Flask(__name__)
+CORS(app)
 
 class NeuroanatomyDatabase:
     def __init__(self):
@@ -14,98 +16,153 @@ class NeuroanatomyDatabase:
     def close(self):
         self.driver.close()
 
+    def get_all_labels(self):
+        """Get all available node labels from the database"""
+        with self.driver.session() as session:
+            result = session.run("CALL db.labels()")
+            return [record["label"] for record in result]
+
+    def get_all_relationship_types(self):
+        """Get all relationship types from the database"""
+        with self.driver.session() as session:
+            result = session.run("CALL db.relationshipTypes()")
+            return [record["relationshipType"] for record in result]
+
     def function1_dynamic_filter(self, label: str = None, location: str = None, 
                                sublocation: str = None, relationship: str = None) -> List[Dict]:
-        """
-        Dynamic filtering system that builds visualization based on selected criteria
-        """
+        """Dynamic filtering system that builds visualization based on selected criteria"""
         with self.driver.session() as session:
-            query = """
-            MATCH (n)
-            WHERE 1=1
-            """
+            # Base query
+            query = "MATCH (n)"
+            params = {}
             
+            # Add label filter if provided
             if label:
-                query += f" AND n:`{label}`"
-            if location:
-                query += f" AND n.location = '{location}'"
-            if sublocation:
-                query += f" AND n.sublocation = '{sublocation}'"
-            
+                labels = label.split(',')
+                label_conditions = []
+                for i, l in enumerate(labels):
+                    if l:
+                        label_conditions.append(f"n:`{l}`")
+                if label_conditions:
+                    query += " WHERE " + " OR ".join(label_conditions)
+
+            # Add relationship filter if provided
             if relationship:
-                query += f" MATCH (n)-[r:`{relationship}`]-(m)"
+                rel_types = relationship.split(',')
+                rel_conditions = []
+                for rel in rel_types:
+                    if rel:
+                        rel_conditions.append(f"type(r) = '{rel}'")
+                if rel_conditions:
+                    query += f" MATCH (n)-[r]->(m) WHERE " + " OR ".join(rel_conditions)
             else:
-                query += " MATCH (n)-[r]-(m)"
-                
+                query += " MATCH (n)-[r]->(m)"
+
+            # Add LIMIT to prevent overwhelming response
             query += " RETURN n, r, m LIMIT 100"
             
             result = session.run(query)
-            return [record.data() for record in result]
-
-    def function2_diagnostic_analysis(self, lesion_location: str) -> Dict[str, Any]:
-        """
-        Analyze lesions and determine neurological vs vascular pathologies
-        """
-        with self.driver.session() as session:
-            query = """
-            MATCH (l:Lesion {location: $location})
-            OPTIONAL MATCH (l)-[r:AFFECTS]->(t:Tract)
-            OPTIONAL MATCH (a:Artery)-[s:SUPPLIES]->(tissue:Tissue)
-            WHERE a.status = 'occluded' AND tissue.location = $location
-            RETURN {
-                neurological: collect(DISTINCT t.name),
-                vascular: collect(DISTINCT tissue.name)
-            } as results
-            """
-            result = session.run(query, location=lesion_location)
-            return result.single()["results"]
-
-    def function3_path_identification(self, start_node_id: str, 
-                                    end_node_id: str) -> List[Dict]:
-        """
-        Identify all possible paths between two nodes
-        """
-        with self.driver.session() as session:
-            query = """
-            MATCH paths = allShortestPaths(
-                (start)-[*]->(end)
-            )
-            WHERE id(start) = $start_id AND id(end) = $end_id
-            RETURN paths
-            """
-            result = session.run(query, 
-                               start_id=start_node_id, 
-                               end_id=end_node_id)
-            return [record.data() for record in result]
-
-    def function4_downstream_analysis(self, affected_node_id: str) -> Dict[str, List]:
-        """
-        Analyze downstream effects with complete and partial loss
-        """
-        with self.driver.session() as session:
-            query = """
-            // Complete loss
-            MATCH (source) WHERE id(source) = $node_id
-            MATCH path = (source)-[:SUPPLIES*]->(affected:Tissue)
-            WHERE NOT EXISTS((affected)<-[:SUPPLIES]-(:Artery {status: 'patent'}))
-            WITH collect(affected.name) as complete_loss
+            nodes = {}
+            links = []
             
-            // Partial loss
-            MATCH (source) WHERE id(source) = $node_id
-            MATCH path = (source)-[:SUPPLIES*]->(affected:Tissue)
-            WHERE EXISTS((affected)<-[:SUPPLIES]-(:Artery {status: 'patent'}))
-            AND EXISTS((affected)<-[:SUPPLIES]-(:Artery {status: 'occluded'}))
-            WITH complete_loss, collect(affected.name) as partial_loss
+            for record in result:
+                source = record['n']
+                target = record['m']
+                rel = record['r']
+                
+                # Add source node if not already added
+                if source.id not in nodes:
+                    nodes[source.id] = {
+                        'id': source.id,
+                        'labels': list(source.labels),
+                        'properties': dict(source)
+                    }
+                
+                # Add target node if not already added
+                if target.id not in nodes:
+                    nodes[target.id] = {
+                        'id': target.id,
+                        'labels': list(target.labels),
+                        'properties': dict(target)
+                    }
+                
+                # Add relationship
+                links.append({
+                    'source': source.id,
+                    'target': target.id,
+                    'type': type(rel).__name__,
+                    'properties': dict(rel)
+                })
             
-            RETURN {
-                complete_loss: complete_loss,
-                partial_loss: partial_loss
-            } as results
+            return {
+                'nodes': list(nodes.values()),
+                'links': links
+            }
+
+    def search_nodes(self, search_term: str) -> Dict[str, List]:
+        """Search for nodes containing the search term in their properties"""
+        with self.driver.session() as session:
+            query = """
+            MATCH (n)
+            WHERE any(prop in keys(n) WHERE toString(n[prop]) CONTAINS $search)
+            WITH n
+            OPTIONAL MATCH (n)-[r]->(m)
+            RETURN collect(distinct n) as nodes, collect(distinct r) as rels, collect(distinct m) as targets
             """
-            result = session.run(query, node_id=affected_node_id)
-            return result.single()["results"]
+            result = session.run(query, search=search_term)
+            record = result.single()
+            
+            if not record:
+                return {'nodes': [], 'links': []}
+            
+            nodes = {}
+            links = []
+            
+            # Process nodes
+            for node in record['nodes']:
+                nodes[node.id] = {
+                    'id': node.id,
+                    'labels': list(node.labels),
+                    'properties': dict(node)
+                }
+            
+            # Process relationships and target nodes
+            for i, rel in enumerate(record['rels']):
+                if rel is not None:
+                    target = record['targets'][i]
+                    if target.id not in nodes:
+                        nodes[target.id] = {
+                            'id': target.id,
+                            'labels': list(target.labels),
+                            'properties': dict(target)
+                        }
+                    
+                    links.append({
+                        'source': rel.start_node.id,
+                        'target': rel.end_node.id,
+                        'type': type(rel).__name__,
+                        'properties': dict(rel)
+                    })
+            
+            return {
+                'nodes': list(nodes.values()),
+                'links': links
+            }
 
 db = NeuroanatomyDatabase()
+
+@app.route('/api/metadata', methods=['GET'])
+def get_metadata():
+    """Get all available node labels and relationship types"""
+    try:
+        labels = db.get_all_labels()
+        relationship_types = db.get_all_relationship_types()
+        return jsonify({
+            'labels': labels,
+            'relationshipTypes': relationship_types
+        })
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
 
 @app.route('/api/filter', methods=['GET'])
 def filter_nodes():
@@ -113,36 +170,13 @@ def filter_nodes():
     location = request.args.get('location')
     sublocation = request.args.get('sublocation')
     relationship = request.args.get('relationship')
+    search = request.args.get('search')
+    
     try:
-        results = db.function1_dynamic_filter(label, location, sublocation, relationship)
-        return jsonify(results)
-    except Exception as e:
-        return jsonify({"error": str(e)}), 500
-
-@app.route('/api/diagnosis', methods=['GET'])
-def diagnosis():
-    lesion_location = request.args.get('location')
-    try:
-        results = db.function2_diagnostic_analysis(lesion_location)
-        return jsonify(results)
-    except Exception as e:
-        return jsonify({"error": str(e)}), 500
-
-@app.route('/api/paths', methods=['GET'])
-def paths():
-    start_node_id = request.args.get('start')
-    end_node_id = request.args.get('end')
-    try:
-        results = db.function3_path_identification(start_node_id, end_node_id)
-        return jsonify(results)
-    except Exception as e:
-        return jsonify({"error": str(e)}), 500
-
-@app.route('/api/downstream', methods=['GET'])
-def downstream():
-    affected_node_id = request.args.get('node')
-    try:
-        results = db.function4_downstream_analysis(affected_node_id)
+        if search:
+            results = db.search_nodes(search)
+        else:
+            results = db.function1_dynamic_filter(label, location, sublocation, relationship)
         return jsonify(results)
     except Exception as e:
         return jsonify({"error": str(e)}), 500
