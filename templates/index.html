@@ -1,70 +1,12 @@
 <!DOCTYPE html>
 <html>
 <head>
-    <title>Anatomy Graph Explorer</title>
-    <script src="https://d3js.org/d3.v7.min.js">
-// Filter data from Neo4j
-const filterData = {"locations": ["neck", "thorax", "pelvis", "head", "lower limb", "upper limb", "spine", "abdomen", "other"], "nodeTypes": ["artery", "muscle", "nerve", "organ", "vein", "viscera", "bone", "gland", "cv", "lymph", "sense", "sensation", "sensory", "function", "region", "neuro", "skin", "head"], "relationships": ["drains_into", "includes", "perfuses", "innervates", "dorsal_column", "spinal_cord", "ant_spinothalamic", "lat_spinothalamic", "controls", "branches", "lymph_drains", "supplies_blood", "nerve_branches", "motor_innervation", "more_details", "exits_or_occupies", "spinothalamic_tract", "csf_flow", "pumps_blood", "releases_hormones", "sensory_input", "spinothalamic_decussation", "thalamocortical", "corticospinal_descending", "pyramidal_decussation", "corticospinal_termination", "innervated_by"]};
-
-// Function to create toggle buttons
-function createToggleButtons(data, containerId) {
-    const container = document.getElementById(containerId);
-    data.forEach(item => {
-        const button = document.createElement('button');
-        button.className = 'toggle-btn';
-        button.textContent = item;
-        button.onclick = function() {
-            this.classList.toggle('active');
-            updateFilters();
-        };
-        container.appendChild(button);
-    });
-}
-
-// Initialize filter buttons
-createToggleButtons(filterData.locations, 'location-filters');
-createToggleButtons(filterData.nodeTypes, 'type-filters');
-createToggleButtons(filterData.relationships, 'relationship-filters');
-
-
-// Function to query Neo4j and add nodes
-async function queryNeo4j(searchTerm) {
-    const query = `
-        MATCH (n)
-        WHERE n.name =~ $searchTerm
-        RETURN n.name as name, labels(n)[0] as type, n.location as location
-        LIMIT 5
-    `;
-    
-    // Here you would make an API call to your backend
-    // For now, we'll simulate with some example data
-    const results = [
-        { name: searchTerm + " (example)", type: "nerve", location: "head" }
-    ];
-    
-    results.forEach(result => {
-        if (!nodes.some(n => n.id === result.name)) {
-            nodes.push({
-                id: result.name,
-                name: result.name,
-                type: result.type,
-                location: result.location
-            });
-            updateGraph();
-        }
-    });
-}
-
-// Update the Add Node button click handler
-document.getElementById("add-node-btn").onclick = () => {
-    const searchTerm = document.getElementById("search-box").value;
-    if (searchTerm) {
-        queryNeo4j(searchTerm);
-    }
-};
-
-</script>
+    <title>Neo4j Force Graph</title>
+    <link rel="stylesheet" type="text/css" href="/static/css/styles.css">
+    <script src="https://unpkg.com/neo4j-driver"></script>
+    <script src="https://d3js.org/d3.v7.min.js"></script>
     <style>
+        /* Add your CSS styles here */
         .container {
             display: flex;
             height: 100vh;
@@ -232,75 +174,96 @@ document.getElementById("add-node-btn").onclick = () => {
     updateGraph();
 
     // Add event listener for the Add Node button
-    document.getElementById("add-node-btn").addEventListener("click", () => {
+    document.getElementById("add-node-btn").onclick = () => {
         const searchTerm = document.getElementById("search-box").value;
         if (searchTerm) {
-            // Here we'll add the Neo4j query to find and add nodes
-            console.log("Searching for:", searchTerm);
-            // TODO: Implement Neo4j query
+            queryNeo4j(searchTerm);
         }
-    });
-    
-// Filter data from Neo4j
-const filterData = {"locations": ["neck", "thorax", "pelvis", "head", "lower limb", "upper limb", "spine", "abdomen", "other"], "nodeTypes": ["artery", "muscle", "nerve", "organ", "vein", "viscera", "bone", "gland", "cv", "lymph", "sense", "sensation", "sensory", "function", "region", "neuro", "skin", "head"], "relationships": ["drains_into", "includes", "perfuses", "innervates", "dorsal_column", "spinal_cord", "ant_spinothalamic", "lat_spinothalamic", "controls", "branches", "lymph_drains", "supplies_blood", "nerve_branches", "motor_innervation", "more_details", "exits_or_occupies", "spinothalamic_tract", "csf_flow", "pumps_blood", "releases_hormones", "sensory_input", "spinothalamic_decussation", "thalamocortical", "corticospinal_descending", "pyramidal_decussation", "corticospinal_termination", "innervated_by"]};
+    };
 
-// Function to create toggle buttons
-function createToggleButtons(data, containerId) {
-    const container = document.getElementById(containerId);
-    data.forEach(item => {
-        const button = document.createElement('button');
-        button.className = 'toggle-btn';
-        button.textContent = item;
-        button.onclick = function() {
-            this.classList.toggle('active');
-            updateFilters();
-        };
-        container.appendChild(button);
-    });
-}
-
-// Initialize filter buttons
-createToggleButtons(filterData.locations, 'location-filters');
-createToggleButtons(filterData.nodeTypes, 'type-filters');
-createToggleButtons(filterData.relationships, 'relationship-filters');
-
-
-// Function to query Neo4j and add nodes
-async function queryNeo4j(searchTerm) {
-    const query = `
-        MATCH (n)
-        WHERE n.name =~ $searchTerm
-        RETURN n.name as name, labels(n)[0] as type, n.location as location
-        LIMIT 5
-    `;
-    
-    // Here you would make an API call to your backend
-    // For now, we'll simulate with some example data
-    const results = [
-        { name: searchTerm + " (example)", type: "nerve", location: "head" }
-    ];
-    
-    results.forEach(result => {
-        if (!nodes.some(n => n.id === result.name)) {
-            nodes.push({
-                id: result.name,
-                name: result.name,
-                type: result.type,
-                location: result.location
-            });
-            updateGraph();
-        }
-    });
-}
-
-// Update the Add Node button click handler
-document.getElementById("add-node-btn").onclick = () => {
-    const searchTerm = document.getElementById("search-box").value;
-    if (searchTerm) {
-        queryNeo4j(searchTerm);
+    // Function to create toggle buttons
+    function createToggleButtons(data, containerId) {
+        const container = document.getElementById(containerId);
+        data.forEach(item => {
+            const button = document.createElement('button');
+            button.className = 'toggle-btn';
+            button.textContent = item;
+            button.onclick = function() {
+                this.classList.toggle('active');
+                updateFilters();
+            };
+            container.appendChild(button);
+        });
     }
-};
 
-</script>
+    // Initialize filter buttons
+    const filterData = {
+        locations: ["neck", "thorax", "pelvis", "head", "lower limb", "upper limb", "spine", "abdomen", "other"],
+        nodeTypes: ["artery", "muscle", "nerve", "organ", "vein", "viscera", "bone", "gland", "cv", "lymph", "sense", "sensation", "sensory", "function", "region", "neuro", "skin", "head"],
+        relationships: ["drains_into", "includes", "perfuses", "innervates", "dorsal_column", "spinal_cord", "ant_spinothalamic", "lat_spinothalamic", "controls", "branches", "lymph_drains", "supplies_blood", "nerve_branches", "motor_innervation", "more_details", "exits_or_occupies", "spinothalamic_tract", "csf_flow", "pumps_blood", "releases_hormones", "sensory_input", "spinothalamic_decussation", "pyramidal_decussation", "corticospinal_termination"]
+    };
+    createToggleButtons(filterData.locations, 'location-filters');
+    createToggleButtons(filterData.nodeTypes, 'type-filters');
+    createToggleButtons(filterData.relationships, 'relationship-filters');
+
+    // Function to query Neo4j and add nodes
+    async function queryNeo4j(searchTerm) {
+        const query = `
+            MATCH (n)
+            WHERE n.name =~ $searchTerm
+            RETURN n.name as name, labels(n)[0] as type, n.location as location
+            LIMIT 5
+        `;
+        
+        // Here you would make an API call to your backend
+        // For now, we'll simulate with some example data
+        const results = [
+            { name: searchTerm + " (example)", type: "nerve", location: "head" }
+        ];
+        
+        results.forEach(result => {
+            if (!nodes.some(n => n.id === result.name)) {
+                nodes.push({
+                    id: result.name,
+                    name: result.name,
+                    type: result.type,
+                    location: result.location
+                });
+                updateGraph();
+            }
+        });
+    }
+
+    // Function to update filters
+    function updateFilters() {
+        // Update active filters based on button states
+        activeFilters.locations = new Set([...document.querySelectorAll('#location-filters .toggle-btn.active')].map(btn => btn.textContent));
+        activeFilters.types = new Set([...document.querySelectorAll('#type-filters .toggle-btn.active')].map(btn => btn.textContent));
+        activeFilters.relationships = new Set([...document.querySelectorAll('#relationship-filters .toggle-btn.active')].map(btn => btn.textContent));
+        
+        // Call the filterNodes function with the active filters
+        filterNodes([...activeFilters.types], [...activeFilters.locations], null, [...activeFilters.relationships]);
+    }
+
+    // Function to filter nodes
+    async function filterNodes(labels, locations, sublocation, relationships) {
+        try {
+            const label = labels.join(',');
+            const location = locations.join(',');
+            const relationship = relationships.join(',');
+            const response = await fetch(`/api/filter?label=${label}&location=${location}&sublocation=${sublocation}&relationship=${relationship}`);
+            const data = await response.json();
+            if (response.ok) {
+                console.log('Filtered Results:', data);
+                // Handle the filtered results (e.g., update the graph)
+            } else {
+                console.error('Error:', data.error);
+            }
+        } catch (error) {
+            console.error('Fetch error:', error);
+        }
+    }
+
+    </script>
 </body>
 </html>
