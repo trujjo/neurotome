@@ -40,7 +40,7 @@ body {
 }
 
 /* Buttons */
-.type-button, .clear-btn {
+.type-button, .clear-btn, .action-btn {
     padding: 8px 16px;
     background-color: #cc5500;
     color: white;
@@ -51,7 +51,7 @@ body {
     transition: background-color 0.2s;
 }
 
-.type-button:hover, .clear-btn:hover {
+.type-button:hover, .clear-btn:hover, .action-btn:hover {
     background-color: #ff6a00;
 }
 
@@ -81,4 +81,34 @@ body {
     height: 600px;
     background-color: #2d2d2d;
     border-radius: 4px;
+}
+
+/* Status Display */
+#status {
+    margin: 16px;
+    padding: 12px;
+    border-radius: 8px;
+    text-align: center;
+    font-size: 14px;
+}
+
+/* Options */
+.options-container {
+    display: flex;
+    gap: 10px;
+}
+
+.option-button {
+    padding: 8px 12px;
+    border: 1px solid #444;
+    background-color: #2d2d2d;
+    color: white;
+    border-radius: 4px;
+    cursor: pointer;
+    text-align: center;
+}
+
+.option-button.selected {
+    background-color: #ff6a00;
+    border-color: white;
 }

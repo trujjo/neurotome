@@ -15,19 +15,6 @@ const locationData = {
     'lower limb': ['foot', 'thigh', 'knee', 'leg', 'ankle', 'toes']
 };
 
-const relationships = [
-    'includes', 'perfuses', 'supplies_blood', 'branches', 
-    'more_details', 'drains_into', 'lymph_drains', 
-    'innervates', 'spinal_cord', 'exits_or_occupies', 
-    'nerve_branches', 'spinothalamic_tract', 'pumps_blood', 
-    'senses', 'motor_innervation', 'ant_spinothalamic', 
-    'lat_spinothalamic', 'dorsal_column', 'controls', 
-    'csf_flow', 'releases_hormones', 'sensory_input', 
-    'thalamocortical', 'corticospinal_descending', 
-    'innervated_by', 'spinothalamic_decussation', 
-    'pyramidal_decussation', 'corticospinal_termination'
-];
-
 let activeTypes = new Set();
 
 function generateButtons(containerId, data, callback) {
@@ -84,6 +71,24 @@ function clearNodeTypes() {
     filterNodes();
 }
 
+function showRandomConnectedNodes() {
+    console.log('Fetching random connected nodes...');
+    // Placeholder: Call to fetch random connected nodes from the database.
+}
+
+function setDetailLevel(level) {
+    document.querySelectorAll('.option-button').forEach(button => {
+        button.classList.remove('selected');
+    });
+    document.querySelector(`.option-button[data-option="${level}"]`).classList.add('selected');
+    console.log(`Detail level set to: ${level}`);
+}
+
 document.addEventListener('DOMContentLoaded', () => {
     generateButtons('location-buttons-container', locationData, toggleNodesByType);
+
+    document.getElementById('show-nodes-btn').addEventListener('click', showRandomConnectedNodes);
+    document.querySelectorAll('.option-button').forEach(button => {
+        button.addEventListener('click', () => setDetailLevel(button.dataset.option));
+    });
 });

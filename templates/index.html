@@ -4,8 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Graph Viewer</title>
-    <link rel="stylesheet" href="/static/js/styles.css">
-    <script src="/static/js/script.js" defer></script>
+    <link rel="stylesheet" href="styles.css">
 </head>
 <body>
     <div class="tab-container">
@@ -28,6 +27,20 @@
         <div id="relationship-buttons-container"></div>
     </div>
 
+    <div class="controls">
+        <button id="show-nodes-btn" class="action-btn">Show Connected Nodes</button>
+    </div>
+
+    <div class="options-container">
+        <div class="question-text">Detail Level:</div>
+        <button class="option-button" data-option="major">High Level</button>
+        <button class="option-button" data-option="intermediate">Intermediate</button>
+        <button class="option-button" data-option="minor">Most Specific</button>
+    </div>
+
+    <div id="status">Graph rendered successfully</div>
     <div id="graph"></div>
+
+    <script src="script.js"></script>
 </body>
 </html>
