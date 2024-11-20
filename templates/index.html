@@ -926,13 +926,26 @@
 </script>
 
 
+<script>
 
+document.querySelectorAll('.tab-button').forEach(button => {
+    button.addEventListener('click', () => {
+        const tabId = button.getAttribute('data-tab');
+        const tabContent = document.getElementById(tabId);
 
-            <script>document.querySelectorAll('.filter-tab').forEach(tab => {
-    tab.addEventListener('click', () => {
-        const filter = tab.getAttribute('data-filter');
-        // Implement filter logic here
-        console.log(`Filter by ${filter} selected`);
+        // Toggle active class on the button
+        button.classList.toggle('active');
+
+        // Toggle visibility of the tab content
+        if (tabContent.classList.contains('active')) {
+            tabContent.classList.remove('active');
+        } else {
+            // Hide all other tab contents
+            document.querySelectorAll('.tab-content').forEach(content => {
+                content.classList.remove('active');
+            });
+            tabContent.classList.add('active');
+        }
     });
 });
 
