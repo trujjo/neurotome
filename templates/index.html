@@ -1,44 +1,259 @@
+
 <!DOCTYPE html>
 <html>
 <head>
-    <title>Neo4j Network Visualization</title>
+    <title>Neo4j Graph Visualization</title>
     <script src="https://cdn.amcharts.com/lib/5/index.js"></script>
     <script src="https://cdn.amcharts.com/lib/5/hierarchy.js"></script>
     <script src="https://cdn.amcharts.com/lib/5/themes/Animated.js"></script>
+    <script src="https://cdn.amcharts.com/lib/5/plugins/forceDirected.js"></script>
     <script src="https://unpkg.com/neo4j-driver"></script>
-    <link rel="stylesheet" href="/static/styles.css">
+
+    
+    <style>
+        #chartdiv {
+            width: 100%;
+            height: 800px;
+        }
+        .controls {
+            margin: 20px;
+            padding: 15px;
+            background-color: #f5f5f5;
+            border-radius: 5px;
+        }
+        .filter-section {
+            margin-bottom: 15px;
+        }
+        select, button {
+            padding: 5px;
+            margin: 5px;
+        }
+        #mapButton {
+            background-color: #4CAF50;
+            color: white;
+            padding: 10px 20px;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+        }
+        #mapButton:hover {
+            background-color: #45a049;
+        }
+    </style>
 </head>
 <body>
-    <div class="container">
-        <div class="sidebar">
-            <div class="filter-section">
-                <h3>Node Labels</h3>
-                <select id="nodeLabels" multiple size="5">
-                    <option value="">Loading...</option>
-                </select>
-            </div>
-            
-            <div class="filter-section">
-                <h3>Relationships</h3>
-                <select id="relationships" multiple size="5">
-                    <option value="">Loading...</option>
-                </select>
-            </div>
-            
-            <div class="filter-section">
-                <h3>Location</h3>
-                <select id="location">
-                    <option value="">All Locations</option>
-                </select>
-            </div>
-            
-            <button id="applyFilters" class="apply-btn">Apply Filters</button>
+    <div class="controls">
+        <div class="filter-section">
+            <label>Node Labels:</label>
+            <select id="nodeLabels" multiple></select>
         </div>
-        
-        <div class="main-content">
-            <div id="chartdiv"></div>
+        <div class="filter-section">
+            <label>Locations:</label>
+            <select id="locations" multiple></select>
         </div>
+        <div class="filter-section">
+            <label>Relationships:</label>
+            <select id="relationships" multiple></select>
+        </div>
+        <button id="mapButton">Map Them</button>
     </div>
-    <script src="/static/visualization.js"></script>
+    <div id="chartdiv"></div>
+
+    <script>
+        // Neo4j Connection
+        const driver = neo4j.driver(
+            "neo4j+s://4e5eeae5.databases.neo4j.io:7687",
+            neo4j.auth.basic("neo4j", "Poconoco16!")
+        );
+
+        // Initialize filters
+        async function initializeFilters() {
+            const session = driver.session();
+            try {
+                // Get node labels
+                const labelResult = await session.run("CALL db.labels()");
+                const labels = labelResult.records.map(record => record.get(0));
+                populateSelect('nodeLabels', labels);
+
+                // Get relationship types
+                const relResult = await session.run("CALL db.relationshipTypes()");
+                const relationships = relResult.records.map(record => record.get(0));
+                populateSelect('relationships', relationships);
+
+                // Get locations from all nodes
+                const locationResult = await session.run(
+                    "MATCH (n) RETURN DISTINCT labels(n) as labels, CASE WHEN exists(n.location) THEN n.location ELSE 'Unknown' END as location"
+                );
+                const locations = locationResult.records.map(record => record.get('location'))
+                    .filter(location => location != null)
+                    .sort();
+                populateSelect('locations', locations);
+            } finally {
+                await session.close();
+            }
+        }
+
+        function populateSelect(id, options) {
+            const select = document.getElementById(id);
+            options.forEach(option => {
+                const opt = document.createElement('option');
+                opt.value = option;
+                opt.textContent = option;
+                select.appendChild(opt);
+            });
+        }
+
+        // Create the chart
+        async function createChart(data) {
+            const root = am5.Root.new("chartdiv");
+            root.setThemes([am5themes_Animated.new(root)]);
+
+            const chart = root.container.children.push(
+                am5plugins_forceDirected.ForceDirected.new(root, {
+                    singleBranchOnly: false,
+                    downDepth: 1,
+                    initialDepth: 2,
+                    valueField: "value",
+                    categoryField: "name",
+                    childDataField: "children",
+                    centerStrength: 0.5
+                })
+            );
+
+            // Configure nodes
+            const series = chart.series.push(
+                am5plugins_forceDirected.ForceDirectedSeries.new(root, {
+                    calculateAggregates: true,
+                    minRadius: 20,
+                    maxRadius: 40,
+                    valueField: "value",
+                    categoryField: "name",
+                    childDataField: "children",
+                    idField: "name",
+                    linkWithField: "linkWith",
+                    manyBodyStrength: -50,
+                    centerStrength: 0.8
+                })
+            );
+
+            // Style nodes
+            series.circles.template.setAll({
+                fillOpacity: 0.8,
+                strokeWidth: 2,
+                strokeOpacity: 1
+            });
+
+            series.links.template.setAll({
+                strokeWidth: 2,
+                strokeOpacity: 0.5
+            });
+
+            // Add data
+            series.data.setAll([data]);
+            series.set("selectedDataItem", series.dataItems[0]);
+
+            // Add zoom buttons
+            chart.set("zoomControl", am5.ZoomControl.new(root, {}));
+            
+            // Make the chart responsive
+            chart.set("responsive", true);
+
+            return chart;
+        }
+
+        // Function to fetch and process Neo4j data
+        async function fetchGraphData() {
+            const session = driver.session();
+            const nodeLabels = Array.from(document.getElementById('nodeLabels').selectedOptions).map(opt => opt.value);
+            const relationships = Array.from(document.getElementById('relationships').selectedOptions).map(opt => opt.value);
+            const locations = Array.from(document.getElementById('locations').selectedOptions).map(opt => opt.value);
+
+            try {
+                let query = `
+                    MATCH (n)
+                    WHERE (size($labels) = 0 OR any(label IN labels(n) WHERE label IN $labels))
+                    AND (size($locations) = 0 OR n.location IN $locations)
+                    WITH n
+                    OPTIONAL MATCH (n)-[r]->(m)
+                    WHERE (size($relationships) = 0 OR type(r) IN $relationships)
+                    RETURN n, r, m
+                `;
+
+                const result = await session.run(query, {
+                    labels: nodeLabels,
+                    relationships: relationships,
+                    locations: locations
+                });
+
+                // Process results into amCharts format
+                const nodes = new Map();
+                const relationships = new Set();
+
+                result.records.forEach(record => {
+                    const source = record.get('n');
+                    const target = record.get('m');
+                    const rel = record.get('r');
+
+                    if (!nodes.has(source.identity.toString())) {
+                        nodes.set(source.identity.toString(), {
+                            name: source.properties.name || `Node ${source.identity}`,
+                            value: 1,
+                            children: [],
+                            linkWith: [],
+                            nodeType: source.labels[0],
+                            location: source.properties.location
+                        });
+                    }
+
+                    if (target && !nodes.has(target.identity.toString())) {
+                        nodes.set(target.identity.toString(), {
+                            name: target.properties.name || `Node ${target.identity}`,
+                            value: 1,
+                            children: [],
+                            linkWith: [],
+                            nodeType: target.labels[0],
+                            location: target.properties.location
+                        });
+                    }
+
+                    if (rel) {
+                        const relKey = `${source.identity}-${target.identity}`;
+                        if (!relationships.has(relKey)) {
+                            relationships.add(relKey);
+                            const sourceNode = nodes.get(source.identity.toString());
+                            sourceNode.linkWith.push(target.identity.toString());
+                        }
+                    }
+                });
+
+                return {
+                    name: "Root",
+                    value: 0,
+                    children: Array.from(nodes.values())
+                };
+
+            } finally {
+                await session.close();
+            }
+        }
+
+        // Initialize the visualization
+        async function initialize() {
+            await initializeFilters();
+            
+            document.getElementById('mapButton').addEventListener('click', async () => {
+                const data = await fetchGraphData();
+                document.getElementById('chartdiv').innerHTML = '';
+                createChart(data);
+            });
+
+            // Initial load
+            const data = await fetchGraphData();
+            createChart(data);
+        }
+
+        // Start the application
+        initialize();
+    </script>
 </body>
 </html>
