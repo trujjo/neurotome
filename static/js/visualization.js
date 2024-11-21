@@ -286,8 +286,7 @@ window.addEventListener('unload', () => {
 });
 
 function visualizeData(data) {
-    console.log('Received data:', data);
-    
+    console.log('Visualizing data:', data);
     if (!data || !data.nodes || !data.relationships) {
         console.error('Invalid data format:', data);
         return;
@@ -454,7 +453,12 @@ function createForceGraph(nodes, links) {
     console.log('Visualization created');
 }
 function visualizeData(data) {
-    console.log("Received data:", data); // Add this line for debugging
+    console.log('Visualizing data:', data);
+    if (!data || !data.nodes || !data.relationships) {
+        console.error('Invalid data format:', data);
+        return;
+    }
+
     const width = document.getElementById('visualization').clientWidth;
     const height = document.getElementById('visualization').clientHeight;
 
