@@ -195,3 +195,6 @@ def get_filtered_nodes():
     except Exception as e:
         logger.error(f"Error in get_filtered_nodes: {str(e)}")
         return jsonify({"error": str(e)}), 500
+
+# Move visualization code to static/js/visualization.js
+# CSS stays in static/js/styles.css
