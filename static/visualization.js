@@ -243,6 +243,20 @@ function transformNeo4jData(nodes, relationships) {
 }
 
 function updateVisualization() {
+    fetch('/api/nodes/random')
+        .then(response => response.json())
+        .then(data => {
+            console.log('Received data:', data);
+            if (!data.nodes || !data.nodes.length) {
+                console.error('No nodes received');
+                return;
+            }
+            createForceGraph(data.nodes, data.relationships);
+        })
+        .catch(error => console.error('Error:', error));
+}
+
+function updateVisualization() {
     const nodeLabels = Array.from(document.getElementById('nodeLabels').selectedOptions).map(option => option.value);
     const relationships = Array.from(document.getElementById('relationships').selectedOptions).map(option => option.value);
     const location = document.getElementById('location').value;
@@ -337,4 +351,105 @@ function visualizeData(data) {
             .attr('x', d => d.x)
             .attr('y', d => d.y);
     });
+}
+
+function createForceGraph(nodes, links) {
+    // Clear any existing visualization
+    d3.select('#visualization').selectAll('*').remove();
+    
+    console.log('Creating visualization with:', {nodes, links});
+
+    // Set explicit dimensions
+    const width = 800;
+    const height = 600;
+
+    // Create SVG container with explicit size
+    const svg = d3.select('#visualization')
+        .append('svg')
+        .attr('width', width)
+        .attr('height', height)
+        .style('border', '1px solid #ccc'); // Visual debug helper
+
+    // Add container for zoom
+    const g = svg.append('g');
+
+    // Add zoom behavior
+    const zoom = d3.zoom()
+        .on('zoom', (event) => {
+            g.attr('transform', event.transform);
+        });
+    svg.call(zoom);
+
+    // Create simulation
+    const simulation = d3.forceSimulation(nodes)
+        .force('link', d3.forceLink(links).id(d => d.id).distance(100))
+        .force('charge', d3.forceManyBody().strength(-300))
+        .force('center', d3.forceCenter(width / 2, height / 2))
+        .force('collision', d3.forceCollide().radius(30));
+
+    // Create links
+    const link = g.append('g')
+        .selectAll('line')
+        .data(links)
+        .enter()
+        .append('line')
+        .attr('stroke', '#999')
+        .attr('stroke-width', 1);
+
+    // Create nodes
+    const node = g.append('g')
+        .selectAll('g')
+        .data(nodes)
+        .enter()
+        .append('g')
+        .call(d3.drag()
+            .on('start', dragstarted)
+            .on('drag', dragged)
+            .on('end', dragended));
+
+    // Add circles to nodes
+    node.append('circle')
+        .attr('r', 10)
+        .attr('fill', '#69b3a2');
+
+    // Add labels to nodes
+    node.append('text')
+        .attr('dx', 12)
+        .attr('dy', '.35em')
+        .text(d => d.properties.name || d.labels[0])
+        .style('fill', '#fff')
+        .style('font-size', '12px');
+
+    // Tick function
+    simulation.on('tick', () => {
+        link
+            .attr('x1', d => d.source.x)
+            .attr('y1', d => d.source.y)
+            .attr('x2', d => d.target.x)
+            .attr('y2', d => d.target.y);
+
+        node
+            .attr('transform', d => `translate(${d.x},${d.y})`);
+    });
+
+    // Drag functions
+    function dragstarted(event, d) {
+        if (!event.active) simulation.alphaTarget(0.3).restart();
+        d.fx = d.x;
+        d.fy = d.y;
+    }
+
+    function dragged(event, d) {
+        d.fx = event.x;
+        d.fy = event.y;
+    }
+
+    function dragended(event, d) {
+        if (!event.active) simulation.alphaTarget(0);
+        d.fx = null;
+        d.fy = null;
+    }
+
+    // Debug logging
+    console.log('Visualization created');
 }
