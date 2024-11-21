@@ -1,119 +1,5 @@
-<!DOCTYPE html>
-<html>
-<head>
-    <title>Neo4j Network Visualization</title>
-    <script src="https://cdn.amcharts.com/lib/5/index.js"></script>
-    <script src="https://cdn.amcharts.com/lib/5/hierarchy.js"></script>
-    <script src="https://cdn.amcharts.com/lib/5/themes/Animated.js"></script>
-    <script src="https://d3js.org/d3.v7.min.js"></script>
-    <script src="/static/js/visualization.js"></script>
-    <link rel="stylesheet" href="/static/js/styles.css">
-</head>
-<body>
-    <div class="container">
-        <div class="sidebar">
-            <div class="filter-section">
-                <h3>Node Labels</h3>
-                <select id="nodeLabels" multiple size="5"></select>
-            </div>
-
-            <div class="filter-section">
-                <h3>Relationships</h3>
-                <select id="relationships" multiple size="5"></select>
-            </div>
-
-            <div class="filter-section">
-                <h3>Location</h3>
-                <select id="location"></select>
-            </div>
-
-            <button id="applyFilters" class="apply-btn">Apply Filters</button>
-        </div>
-
-        <div class="main-content">
-            <div id="visualization" style="width: 100%; height: 600px;"></div>
-        </div>
-    </div>
-</body>
-</html>
-    
-    // Create network chart
-    chart = container.children.push(
-        am5hierarchy.ForceDirected.new(root, {
-            downDepth: 1,
-            initialDepth: 2,
-            valueField: "value",
-            categoryField: "name",
-            childDataField: "children",
-            centerStrength: 0.5,
-            minRadius: 20,
-            maxRadius: 35,
-            linkWithField: "linkWith"
-        })
-    );
-    
-    // Node colors based on labels
-    const colors = {
-        muscle: "#4ECDC4",
-        viscera: "#FFB347",
-        sense: "#9B59B6",
-        artery: "#FF6B6B",
-        cv: "#3498DB",
-        bone: "#95A5A6",
-        neuro: "#2ECC71",
-        nerve: "#45B7D1",
-        gland: "#E74C3C",
-        vein: "#D4A5A5",
-        region: "#F1C40F",
-        lymph: "#1ABC9C",
-        organ: "#96CEB4",
-        sensation: "#E67E22"
-    };
-    
-    // Style nodes
-    chart.circles.template.setAll({
-        toggleKey: "active",
-        interactive: true,
-        strokeWidth: 2,
-        radius: 25,
-        fill: function(dataItem) {
-            if (dataItem.dataContext.labels && dataItem.dataContext.labels.length > 0) {
-                return am5.color(colors[dataItem.dataContext.labels[0].toLowerCase()] || "#999999");
-            }
-            return am5.color("#999999");
-        },
-        stroke: am5.color(0x555555),
-        tooltipText: "{name}"
-    });
-    
-    // Add hover state
-    chart.circles.template.states.create("hover", {
-        scale: 1.2,
-        fill: am5.color(0xff7f50)
-    });
-    
-    // Style links
-    chart.links.template.setAll({
-        strokeWidth: 2,
-        strokeOpacity: 0.5,
-        tooltipText: "{type}"
-    });
-    
-    // Add click listener for zoom
-    chart.circles.template.events.on("click", function(ev) {
-        const dataItem = ev.target.dataItem;
-        if (dataItem) {
-            if (dataItem.get("active")) {
-                dataItem.set("active", false);
-                chart.zoomToDataItem(chart.homeDataItem);
-            } else {
-                chart.zoomToDataItem(dataItem);
-                dataItem.set("active", true);
-            }
-        }
-    });
-    
-    // Initialize filters
+// Initialize the visualization when the DOM is fully loaded
+document.addEventListener('DOMContentLoaded', () => {
     populateFilters();
 });
 
@@ -162,145 +48,33 @@ async function populateFilters() {
     }
 }
 
-// Call populateFilters when the DOM is fully loaded
-document.addEventListener('DOMContentLoaded', () => {
-    populateFilters();
-});
-
 // Fetch graph data based on filters
 async function fetchGraphData(filters) {
-    try {
-        const nodeLabels = filters.nodeLabels || [];
-        const relationships = filters.relationships || [];
-        const location = filters.location;
-        
-        let query = `
-        MATCH (n)
-        ${nodeLabels.length ? 'WHERE any(label IN labels(n) WHERE label IN $nodeLabels)' : ''}
-        ${location ? 'AND n.location = $location' : ''}
-        WITH n
-        OPTIONAL MATCH (n)-[r]->(m)
-        ${relationships.length ? 'WHERE type(r) IN $relationships' : ''}
-        WITH COLLECT(DISTINCT n) + COLLECT(DISTINCT m) as allNodes, 
-             COLLECT(DISTINCT r) as allRels
-        UNWIND allNodes as node
-        WITH DISTINCT node, allRels
-        RETURN 
-            collect(DISTINCT {
-                id: toString(id(node)),
-                name: COALESCE(node.name, head(labels(node)) + '_' + id(node)),
-                labels: labels(node),
-                properties: properties(node)
-            }) as nodes,
-            [rel IN allRels | {
-                id: toString(id(rel)),
-                type: type(rel),
-                source: toString(startNode(rel).id),
-                target: toString(endNode(rel).id),
-                properties: properties(rel)
-            }] as relationships
-        LIMIT 100
-        `;
-        
-        const result = await session.run(query, {
-            nodeLabels: nodeLabels,
-            relationships: relationships,
-            location: location
-        });
-        
-        if (result.records.length === 0) {
-            console.log('No data returned from query');
-            return [];
-        }
-        
-        return transformNeo4jData(result.records[0].get('nodes'), result.records[0].get('relationships'));
-    } catch (error) {
-        console.error('Error fetching graph data:', error);
-        return [];
-    } finally {
-        await session.close();
-    }
+    const params = new URLSearchParams(filters);
+    const response = await fetch(`/api/nodes/filtered?${params}`);
+    return response.json();
 }
 
-// Transform Neo4j data for visualization
-function transformNeo4jData(nodes, relationships) {
-    const nodesMap = new Map();
-    
-    // Process nodes
-    nodes.forEach(node => {
-        nodesMap.set(node.id, {
-            id: node.id,
-            name: node.name,
-            labels: node.labels,
-            value: 1,
-            children: [],
-            linkWith: [],
-            properties: node.properties
-        });
-    });
-    
-    // Process relationships
-    relationships.forEach(rel => {
-        const sourceNode = nodesMap.get(rel.source);
-        const targetNode = nodesMap.get(rel.target);
-        
-        if (sourceNode && targetNode) {
-            // Add to children array
-            sourceNode.children.push(targetNode);
-            
-            // Add to linkWith array
-            if (!sourceNode.linkWith.includes(targetNode.id)) {
-                sourceNode.linkWith.push(targetNode.id);
-            }
-        }
-    });
-    
-    return Array.from(nodesMap.values());
-}
-
-function updateVisualization() {
-    fetch('/api/nodes/random')
-        .then(response => response.json())
-        .then(data => {
-            console.log('Received data:', data);
-            if (!data.nodes || !data.nodes.length) {
-                console.error('No nodes received');
-                return;
-            }
-            createForceGraph(data.nodes, data.relationships);
-        })
-        .catch(error => console.error('Error:', error));
-}
-
+// Update the visualization based on selected filters
 function updateVisualization() {
     const nodeLabels = Array.from(document.getElementById('nodeLabels').selectedOptions).map(option => option.value);
     const relationships = Array.from(document.getElementById('relationships').selectedOptions).map(option => option.value);
     const location = document.getElementById('location').value;
 
-    const params = new URLSearchParams();
-    nodeLabels.forEach(label => params.append('labels', label));
-    relationships.forEach(rel => params.append('relationships', rel));
-    if (location) params.append('location', location);
+    const filters = {};
+    if (nodeLabels.length) filters.labels = nodeLabels;
+    if (relationships.length) filters.relationships = relationships;
+    if (location) filters.location = location;
 
-    fetch(`/api/nodes/filtered?${params}`)
-        .then(response => response.json())
+    fetchGraphData(filters)
         .then(data => {
             console.log('Received data:', data);
             visualizeData(data);
         })
-        .catch(error => console.error('Error:', error));
+        .catch(error => console.error('Error fetching data:', error));
 }
 
-// Add event listener for the apply filters button
-document.getElementById('applyFilters').addEventListener('click', updateVisualization);
-
-// Clean up on page unload
-window.addEventListener('unload', () => {
-    if (driver) {
-        driver.close();
-    }
-});
-
+// Visualize the data using D3.js
 function visualizeData(data) {
     console.log('Visualizing data:', data);
     if (!data || !data.nodes || !data.relationships) {
@@ -308,77 +82,60 @@ function visualizeData(data) {
         return;
     }
 
-    // Your visualization code here
-}
-
-function createForceGraph(nodes, links) {
-    // Clear any existing visualization
+    // Clear previous visualization
     d3.select('#visualization').selectAll('*').remove();
-    
-    console.log('Creating visualization with:', {nodes, links});
 
-    // Set explicit dimensions
-    const width = 800;
-    const height = 600;
+    const width = document.getElementById('visualization').clientWidth || 800;
+    const height = document.getElementById('visualization').clientHeight || 600;
 
-    // Create SVG container with explicit size
     const svg = d3.select('#visualization')
         .append('svg')
         .attr('width', width)
-        .attr('height', height)
-        .style('border', '1px solid #ccc'); // Visual debug helper
-
-    // Add container for zoom
-    const g = svg.append('g');
-
-    // Add zoom behavior
-    const zoom = d3.zoom()
-        .on('zoom', (event) => {
-            g.attr('transform', event.transform);
-        });
-    svg.call(zoom);
+        .attr('height', height);
 
     // Create simulation
-    const simulation = d3.forceSimulation(nodes)
-        .force('link', d3.forceLink(links).id(d => d.id).distance(100))
+    const simulation = d3.forceSimulation(data.nodes)
+        .force('link', d3.forceLink(data.relationships).id(d => d.id).distance(100))
         .force('charge', d3.forceManyBody().strength(-300))
         .force('center', d3.forceCenter(width / 2, height / 2))
         .force('collision', d3.forceCollide().radius(30));
 
-    // Create links
-    const link = g.append('g')
+    // Add links
+    const link = svg.append('g')
         .selectAll('line')
-        .data(links)
+        .data(data.relationships)
         .enter()
         .append('line')
         .attr('stroke', '#999')
-        .attr('stroke-width', 1);
+        .attr('stroke-width', 1)
+        .attr('stroke-opacity', 0.6);
 
-    // Create nodes
-    const node = g.append('g')
-        .selectAll('g')
-        .data(nodes)
+    // Add nodes
+    const node = svg.append('g')
+        .selectAll('circle')
+        .data(data.nodes)
         .enter()
-        .append('g')
+        .append('circle')
+        .attr('r', 10)
+        .attr('fill', d => getNodeColor(d.labels[0]))
         .call(d3.drag()
             .on('start', dragstarted)
             .on('drag', dragged)
             .on('end', dragended));
 
-    // Add circles to nodes
-    node.append('circle')
-        .attr('r', 10)
-        .attr('fill', '#69b3a2');
-
-    // Add labels to nodes
-    node.append('text')
+    // Add labels
+    const labels = svg.append('g')
+        .selectAll('text')
+        .data(data.nodes)
+        .enter()
+        .append('text')
+        .text(d => d.properties.name || d.labels[0])
         .attr('dx', 12)
         .attr('dy', '.35em')
-        .text(d => d.properties.name || d.labels[0])
-        .style('fill', '#fff')
+        .style('fill', '#000')
         .style('font-size', '12px');
 
-    // Tick function
+    // Simulation tick function
     simulation.on('tick', () => {
         link
             .attr('x1', d => d.source.x)
@@ -387,10 +144,15 @@ function createForceGraph(nodes, links) {
             .attr('y2', d => d.target.y);
 
         node
-            .attr('transform', d => `translate(${d.x},${d.y})`);
+            .attr('cx', d => d.x)
+            .attr('cy', d => d.y);
+
+        labels
+            .attr('x', d => d.x)
+            .attr('y', d => d.y);
     });
 
-    // Drag functions
+    // Drag event handlers
     function dragstarted(event, d) {
         if (!event.active) simulation.alphaTarget(0.3).restart();
         d.fx = d.x;
@@ -407,91 +169,9 @@ function createForceGraph(nodes, links) {
         d.fx = null;
         d.fy = null;
     }
-
-    // Debug logging
-    console.log('Visualization created');
 }
 
-function visualizeData(data) {
-    console.log('Visualizing data:', data);
-    if (!data || !data.nodes || !data.relationships) {
-        console.error('Invalid data format:', data);
-        return;
-    }
-
-    const width = document.getElementById('visualization').clientWidth;
-    const height = document.getElementById('visualization').clientHeight;
-
-    // Clear previous visualization
-    d3.select('#visualization').selectAll('*').remove();
-
-    const svg = d3.select('#visualization')
-        .append('svg')
-        .attr('width', width)
-        .attr('height', height);
-
-    // Create simulation with proper data references
-    const simulation = d3.forceSimulation(data.nodes)
-        .force('link', d3.forceLink(data.relationships)
-            .id(d => d.id)
-            .distance(100))
-        .force('charge', d3.forceManyBody().strength(-300))
-        .force('center', d3.forceCenter(width / 2, height / 2))
-        .force('collision', d3.forceCollide().radius(30));
-
-    // Draw relationships
-    const link = svg.append('g')
-        .selectAll('line')
-        .data(data.relationships)
-        .enter()
-        .append('line')
-        .attr('stroke', '#999')
-        .attr('stroke-opacity', 0.6)
-        .attr('stroke-width', 1);
-
-    // Draw nodes
-    const node = svg.append('g')
-        .selectAll('circle')
-        .data(data.nodes)
-        .enter()
-        .append('circle')
-        .attr('r', 5)
-        .attr('fill', d => getNodeColor(d.labels[0]))
-        .call(d3.drag()
-            .on('start', dragstarted)
-            .on('drag', dragged)
-            .on('end', dragended));
-
-    // Add node labels
-    const labels = svg.append('g')
-        .selectAll('text')
-        .data(data.nodes)
-        .enter()
-        .append('text')
-        .text(d => d.properties.name || d.labels[0])
-        .attr('font-size', '8px')
-        .attr('dx', 8)
-        .attr('dy', 3)
-        .style('fill', '#fff');
-
-    // Update positions on tick
-    simulation.on('tick', () => {
-        link
-            .attr('x1', d => d.source.x)
-            .attr('y1', d => d.source.y)
-            .attr('x2', d => d.target.x)
-            .attr('y2', d => d.target.y);
-
-        node
-            .attr('cx', d => d.x)
-            .attr('cy', d => d.y);
-
-        labels
-            .attr('x', d => d.x + 8)
-            .attr('y', d => d.y);
-    });
-}
-
+// Helper function to assign colors based on node labels
 function getNodeColor(label) {
     const colors = {
         'nerve': '#ff7f0e',
@@ -503,19 +183,11 @@ function getNodeColor(label) {
         'sense': '#7f7f7f',
         'vein': '#bcbd22',
         'artery': '#17becf',
-        'cv': '#1f77b4'
+        'cv': '#1f77b4',
+        // Add more labels and colors as needed
     };
     return colors[label.toLowerCase()] || '#666666';
 }
 
-@app.route('/api/labels')
-def get_labels():
-    # Endpoint to get node labels
-
-@app.route('/api/relationship-types')
-def get_relationship_types():
-    # Endpoint to get relationship types
-
-@app.route('/api/locations')
-def get_locations():
-    # Endpoint to get locations
+// Add event listener for the apply filters button
+document.getElementById('applyFilters').addEventListener('click', updateVisualization);
