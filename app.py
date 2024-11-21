@@ -195,21 +195,3 @@ def get_filtered_nodes():
     except Exception as e:
         logger.error(f"Error in get_filtered_nodes: {str(e)}")
         return jsonify({"error": str(e)}), 500
-
-# Backend returns:
-{
-    'nodes': [
-        {
-            'id': node.id,
-            'labels': list(node.labels),
-            'properties': dict(node)
-        }
-    ],
-    'relationships': [
-        {
-            'source': source.id,
-            'target': target.id,
-            'type': rel.type
-        }
-    ]
-}
