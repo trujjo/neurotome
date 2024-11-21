@@ -25,74 +25,83 @@ def get_neo4j_driver():
 def index():
     return render_template('index.html')
 
+def convert_neo4j_to_json(record):
+    """Convert Neo4j records to JSON-serializable format"""
+    try:
+        source = record['n']
+        target = record['m']
+        rel = record['r']
+        
+        logger.debug(f"Processing record: {source.labels}, {target.labels if target else 'None'}")
+        
+        node_data = {
+            'id': source.id,
+            'labels': [label.lower() for label in source.labels],
+            'properties': {
+                k.lower(): str(v).lower() if isinstance(v, str) else v 
+                for k, v in source.items()
+            }
+        }
+        
+        if target and rel:
+            relationship_data = {
+                'source': source.id,
+                'target': target.id,
+                'type': rel.type.lower(),
+                'properties': {
+                    k.lower(): str(v).lower() if isinstance(v, str) else v 
+                    for k, v in rel.items()
+                }
+            }
+            return node_data, relationship_data
+            
+        return node_data, None
+            
+    except Exception as e:
+        logger.error(f"Error converting Neo4j record: {str(e)}")
+        raise
+
 @app.route('/api/nodes/random')
 def get_random_nodes():
     try:
+        nodes = []
+        relationships = []
+        node_ids = set()
+        
         with get_neo4j_driver().session() as session:
-            query = """
-            MATCH (n)
-            WITH n, rand() as random
-            ORDER BY random
-            LIMIT 5
-            WITH n
-            OPTIONAL MATCH (n)-[r]-(m)
-            RETURN DISTINCT n, r, m
-            LIMIT 100
-            """
-            
-            logger.debug(f"Executing query: {query}")
-            result = session.run(query)
-            
-            nodes = []
-            relationships = []
-            node_ids = set()
+            result = session.run('''
+                MATCH (n)
+                WITH n, rand() as random
+                ORDER BY random
+                LIMIT 5
+                WITH n
+                OPTIONAL MATCH (n)-[r]-(m)
+                RETURN DISTINCT n, r, m
+                LIMIT 100
+            ''')
             
             for record in result:
-                source = record['n']
-                target = record['m']
-                rel = record['r']
+                node_data, rel_data = convert_neo4j_to_json(record)
                 
-                # Add source node
-                if source.id not in node_ids:
-                    source_data = {
-                        'id': source.id,
-                        'labels': list(source.labels),
-                        'properties': {k: v for k, v in source.items()}
-                    }
-                    nodes.append(source_data)
-                    node_ids.add(source.id)
+                if node_data['id'] not in node_ids:
+                    nodes.append(node_data)
+                    node_ids.add(node_data['id'])
                 
-                # Add target node and relationship if they exist
-                if target and rel:
-                    if target.id not in node_ids:
-                        target_data = {
-                            'id': target.id,
-                            'labels': list(target.labels),
-                            'properties': {k: v for k, v in target.items()}
-                        }
-                        nodes.append(target_data)
-                        node_ids.add(target.id)
-                    
-                    rel_data = {
-                        'source': source.id,
-                        'target': target.id,
-                        'type': rel.type,
-                        'properties': {k: v for k, v in rel.items()}
-                    }
+                if rel_data:
                     relationships.append(rel_data)
-
-            response_data = {
+            
+            response = {
                 'nodes': nodes,
                 'relationships': relationships
             }
             
-            logger.debug(f"Response data: {response_data}")
-            return jsonify(response_data)
+            logger.debug(f"Response data: {response}")
+            return jsonify(response)
             
     except Exception as e:
-        logger.error(f"Error: {str(e)}")
+        logger.error(f"Error in get_random_nodes: {str(e)}")
         return jsonify({"error": str(e)}), 500
-        
+            
 @app.route('/api/neo4j/status')
 def neo4j_status():
     try:
