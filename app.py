@@ -2,6 +2,13 @@ from flask import Flask, render_template, jsonify, request
 from neo4j import GraphDatabase
 from flask_cors import CORS
 import os
+import logging
+logging.basicConfig(level=logging.DEBUG)
+logger = logging.getLogger(__name__)
+
+# In your route:
+logger.debug(f"Returned nodes: {nodes}")
+logger.debug(f"Returned relationships: {relationships}")
 
 app = Flask(__name__)
 CORS(app)
@@ -28,18 +35,39 @@ def get_random_nodes():
                 MATCH (n)
                 WITH n, rand() as random
                 ORDER BY random
-                LIMIT 25
-                RETURN n
+                LIMIT 5
+                MATCH (n)-[r]-(m)
+                RETURN DISTINCT n, r, m
+                LIMIT 100
             ''')
             nodes = []
+            relationships = []
+            node_ids = set()
+            
             for record in result:
-                node = record['n']
-                nodes.append({
-                    'id': node.id,
-                    'labels': list(node.labels),
-                    'properties': dict(node)
+                source = record['n']
+                target = record['m']
+                rel = record['r']
+                
+                for node in (source, target):
+                    if node.id not in node_ids:
+                        nodes.append({
+                            'id': node.id,
+                            'labels': list(node.labels),
+                            'properties': dict(node)
+                        })
+                        node_ids.add(node.id)
+                
+                relationships.append({
+                    'source': source.id,
+                    'target': target.id,
+                    'type': rel.type
                 })
-            return jsonify(nodes)
+            
+            return jsonify({
+                'nodes': nodes,
+                'relationships': relationships
+            })
     except Exception as e:
         return jsonify({"error": str(e)}), 500
 
