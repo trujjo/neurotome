@@ -3,12 +3,10 @@ from neo4j import GraphDatabase
 from flask_cors import CORS
 import os
 import logging
+
+# Set up logging
 logging.basicConfig(level=logging.DEBUG)
 logger = logging.getLogger(__name__)
-
-# In your route:
-logger.debug(f"Returned nodes: {nodes}")
-logger.debug(f"Returned relationships: {relationships}")
 
 app = Flask(__name__)
 CORS(app)
@@ -64,11 +62,16 @@ def get_random_nodes():
                     'type': rel.type
                 })
             
+            # Move logging statements inside the function
+            logger.debug(f"Returned nodes: {nodes}")
+            logger.debug(f"Returned relationships: {relationships}")
+            
             return jsonify({
                 'nodes': nodes,
                 'relationships': relationships
             })
     except Exception as e:
+        logger.error(f"Error in get_random_nodes: {str(e)}")
         return jsonify({"error": str(e)}), 500
 
 @app.route('/api/neo4j/status')
