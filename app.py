@@ -19,7 +19,10 @@ NEO4J_PASSWORD = os.getenv("NEO4J_PASSWORD", "Poconoco16!")
 driver = GraphDatabase.driver(NEO4J_URI, auth=(NEO4J_USER, NEO4J_PASSWORD))
 
 def get_neo4j_driver():
-    return driver
+    uri = "bolt://localhost:7687"
+    user = "neo4j"
+    password = "Poconoco16!"
+    return GraphDatabase.driver(uri, auth=(user, password))
 
 @app.route('/')
 def index():
@@ -205,4 +208,31 @@ def get_labels():
             return jsonify(labels)
     except Exception as e:
         app.logger.error(f"Error in get_labels: {str(e)}")
+        return jsonify({"error": str(e)}), 500
+
+@app.route('/api/relationship-types')
+def get_relationship_types():
+    try:
+        with get_neo4j_driver().session() as session:
+            result = session.run('CALL db.relationshipTypes() YIELD relationshipType RETURN relationshipType ORDER BY relationshipType')
+            relationship_types = [record['relationshipType'] for record in result]
+            return jsonify(relationship_types)
+    except Exception as e:
+        app.logger.error(f"Error in get_relationship_types: {str(e)}")
+        return jsonify({"error": str(e)}), 500
+
+@app.route('/api/locations')
+def get_locations():
+    try:
+        with get_neo4j_driver().session() as session:
+            result = session.run('''
+                MATCH (n)
+                WHERE exists(n.location)
+                RETURN DISTINCT n.location AS location
+                ORDER BY location
+            ''')
+            locations = [record['location'] for record in result]
+            return jsonify(locations)
+    except Exception as e:
+        app.logger.error(f"Error in get_locations: {str(e)}")
         return jsonify({"error": str(e)}), 500
