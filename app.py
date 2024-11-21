@@ -86,7 +86,7 @@ def neo4j_status():
 if __name__ == "__main__":
     app.run(debug=True)
 
-    @app.route('/api/nodes/filtered', methods=['GET'])
+@app.route('/api/nodes/filtered', methods=['GET'])
 def get_filtered_nodes():
     try:
         labels = request.args.getlist('labels')
