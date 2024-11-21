@@ -453,3 +453,23 @@ function createForceGraph(nodes, links) {
     // Debug logging
     console.log('Visualization created');
 }
+function visualizeData(data) {
+    console.log("Received data:", data); // Add this line for debugging
+    const width = document.getElementById('visualization').clientWidth;
+    const height = document.getElementById('visualization').clientHeight;
+
+    // Clear previous visualization
+    d3.select('#visualization').selectAll('*').remove();
+
+    const svg = d3.select('#visualization').append('svg')
+        .attr('width', width)
+        .attr('height', height);
+
+    const simulation = d3.forceSimulation(data.nodes)
+        .force('link', d3.forceLink(data.relationships).id(d => d.id))
+        .force('charge', d3.forceManyBody().strength(-300))
+        .force('center', d3.forceCenter(width / 2, height / 2));
+
+    // Add visualization elements here
+    console.log("Visualization complete"); // Add this line for debugging
+}

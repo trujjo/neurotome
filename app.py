@@ -64,44 +64,52 @@ def convert_neo4j_to_json(record):
 @app.route('/api/nodes/random')
 def get_random_nodes():
     try:
-        nodes = []
-        relationships = []
-        node_ids = set()
-        
         with get_neo4j_driver().session() as session:
             result = session.run('''
                 MATCH (n)
                 WITH n, rand() as random
                 ORDER BY random
                 LIMIT 5
-                WITH n
-                OPTIONAL MATCH (n)-[r]-(m)
+                MATCH (n)-[r]-(m)
                 RETURN DISTINCT n, r, m
                 LIMIT 100
             ''')
             
-            for record in result:
-                node_data, rel_data = convert_neo4j_to_json(record)
-                
-                if node_data['id'] not in node_ids:
-                    nodes.append(node_data)
-                    node_ids.add(node_data['id'])
-                
-                if rel_data:
-                    relationships.append(rel_data)
+            nodes = []
+            relationships = []
+            node_ids = set()
             
-            response = {
+            for record in result:
+                source = record['n']
+                target = record['m']
+                rel = record['r']
+                
+                # Add nodes if not already added
+                for node in (source, target):
+                    if node.id not in node_ids:
+                        nodes.append({
+                            'id': node.id,
+                            'labels': list(node.labels),
+                            'properties': dict(node)
+                        })
+                        node_ids.add(node.id)
+                
+                # Add relationship
+                relationships.append({
+                    'source': source.id,
+                    'target': target.id,
+                    'type': rel.type
+                })
+            
+            return jsonify({
                 'nodes': nodes,
                 'relationships': relationships
-            }
-            
-            logger.debug(f"Response data: {response}")
-            return jsonify(response)
+            })
             
     except Exception as e:
-        logger.error(f"Error in get_random_nodes: {str(e)}")
+        app.logger.error(f"Error in get_random_nodes: {str(e)}")
         return jsonify({"error": str(e)}), 500
-            
+                
 @app.route('/api/neo4j/status')
 def neo4j_status():
     try:
