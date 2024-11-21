@@ -195,3 +195,14 @@ def get_filtered_nodes():
     except Exception as e:
         logger.error(f"Error in get_filtered_nodes: {str(e)}")
         return jsonify({"error": str(e)}), 500
+
+@app.route('/api/labels')
+def get_labels():
+    try:
+        with get_neo4j_driver().session() as session:
+            result = session.run('CALL db.labels() YIELD label RETURN label ORDER BY label')
+            labels = [record['label'] for record in result]
+            return jsonify(labels)
+    except Exception as e:
+        app.logger.error(f"Error in get_labels: {str(e)}")
+        return jsonify({"error": str(e)}), 500
