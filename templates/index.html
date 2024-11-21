@@ -1,75 +1,26 @@
 <!DOCTYPE html>
-<html lang="en">
+<html>
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Neo4j Network Visualization</title>
-    
-    <!-- Load D3.js -->
-    <script src="https://d3js.org/d3.v7.min.js"></script>
-    
-    <!-- Load your local files -->
+    <title>Neo4j Graph Visualization</title>
     <link rel="stylesheet" href="/static/js/styles.css">
-    <script src="/static/js/visualization.js" defer></script>
 </head>
 <body>
     <div class="container">
-        <!-- Sidebar with filters -->
         <div class="sidebar">
-            <h2>Filters</h2>
-            
-            <div class="filter-section">
-                <h3>Node Labels</h3>
-                <div class="filter-group">
-                    <input type="text" id="labelSearch" placeholder="Search labels...">
-                    <select id="nodeLabels" multiple>
-                        <!-- Will be populated dynamically -->
-                    </select>
-                    <div class="selected-count">Selected: <span id="labelCount">0</span></div>
-                </div>
-            </div>
-            
-            <div class="filter-section">
-                <h3>Relationships</h3>
-                <div class="filter-group">
-                    <input type="text" id="relSearch" placeholder="Search relationships...">
-                    <select id="relationships" multiple>
-                        <!-- Will be populated dynamically -->
-                    </select>
-                    <div class="selected-count">Selected: <span id="relCount">0</span></div>
-                </div>
-            </div>
-            
-            <div class="filter-section">
-                <h3>Location</h3>
-                <select id="location">
-                    <option value="">All Locations</option>
-                    <!-- Will be populated dynamically -->
-                </select>
-            </div>
-            
-            <div class="filter-controls">
-                <button id="clearFilters" class="secondary-btn">Clear Filters</button>
-                <button id="applyFilters" class="primary-btn">Apply Filters</button>
-            </div>
+            <h3>Node Labels</h3>
+            <div id="label-filters" class="checkbox-list"></div>
         </div>
-
-        <!-- Main content area -->
-        <div class="main-content">
-            <div id="visualization"></div>
-            <div id="loading">
-                <div class="spinner"></div>
-                <div class="loading-text">Loading...</div>
-            </div>
-            <div class="zoom-controls">
-                <button class="zoom-button" id="zoomIn">+</button>
-                <button class="zoom-button" id="zoomReset">Reset</button>
-                <button class="zoom-button" id="zoomOut">-</button>
-            </div>
+        
+        <div id="visualization" class="visualization"></div>
+        
+        <div class="sidebar">
+            <h3>Locations</h3>
+            <div id="location-filters" class="checkbox-list"></div>
         </div>
     </div>
 
-    <!-- Tooltip container -->
-    <div id="tooltip" class="tooltip" style="display: none;"></div>
+    <script src="https://d3js.org/d3.v7.min.js"></script>
+    <script src="https://unpkg.com/neo4j-driver"></script>
+    <script type="module" src="/static/js/visualization.js"></script>
 </body>
 </html>
