@@ -227,7 +227,7 @@ def get_locations():
         with get_neo4j_driver().session() as session:
             result = session.run('''
                 MATCH (n)
-                WHERE exists(n.location)
+                WHERE n.location IS NOT NULL
                 RETURN DISTINCT n.location AS location
                 ORDER BY location
             ''')
