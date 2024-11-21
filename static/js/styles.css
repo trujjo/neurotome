@@ -1,122 +1,219 @@
-body {
-    font-family: Arial, sans-serif;
+/* Base styles */
+* {
     margin: 0;
     padding: 0;
-    background: #f0f2f5;
+    box-sizing: border-box;
 }
 
+body {
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+    line-height: 1.6;
+    color: #333;
+    background: #f5f5f5;
+}
+
+/* Layout */
 .container {
     display: grid;
-    grid-template-columns: 250px 1fr;
+    grid-template-columns: 300px 1fr;
     height: 100vh;
+    overflow: hidden;
 }
 
+/* Sidebar */
 .sidebar {
     background: white;
     padding: 20px;
     border-right: 1px solid #ddd;
+    overflow-y: auto;
     box-shadow: 2px 0 5px rgba(0,0,0,0.1);
 }
 
+.sidebar h2 {
+    margin-bottom: 20px;
+    color: #2c3e50;
+    font-size: 1.5em;
+}
+
+/* Filter sections */
 .filter-section {
     margin-bottom: 25px;
 }
 
 .filter-section h3 {
-    margin: 0 0 10px 0;
-    color: #333;
-    font-size: 14px;
+    color: #34495e;
+    margin-bottom: 10px;
+    font-size: 1.1em;
 }
 
+.filter-group {
+    position: relative;
+}
+
+/* Input styles */
+input[type="text"],
 select {
     width: 100%;
-    padding: 8px;
+    padding: 8px 12px;
     border: 1px solid #ddd;
     border-radius: 4px;
-    margin-bottom: 10px;
+    font-size: 14px;
+    margin-bottom: 8px;
 }
 
-#chartdiv {
-    width: 100%;
-    height: calc(100vh - 40px);
-    margin: 20px;
+select[multiple] {
+    height: 150px;
 }
 
-.apply-btn {
+/* Button styles */
+.primary-btn,
+.secondary-btn {
     width: 100%;
     padding: 10px;
-    background: #4CAF50;
-    color: white;
     border: none;
     border-radius: 4px;
     cursor: pointer;
-    margin-top: 10px;
+    font-weight: 500;
+    transition: background-color 0.3s ease;
 }
 
-.apply-btn:hover {
-    background: #45a049;
+.primary-btn {
+    background: #3498db;
+    color: white;
+    margin-bottom: 10px;
 }
 
+.secondary-btn {
+    background: #ecf0f1;
+    color: #2c3e50;
+}
+
+.primary-btn:hover {
+    background: #2980b9;
+}
+
+.secondary-btn:hover {
+    background: #bdc3c7;
+}
+
+/* Main content area */
 .main-content {
-    padding: 20px;
+    position: relative;
     background: white;
-    border-radius: 8px;
-    margin: 20px;
-    box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+    overflow: hidden;
 }
 
-/* Node styling */
-.node-circle {
+#visualization {
+    width: 100%;
+    height: 100%;
+}
+
+/* Graph elements */
+.node circle {
+    stroke: white;
     stroke-width: 2px;
-    cursor: pointer;
     transition: all 0.3s ease;
 }
 
-.node-circle:hover {
-    stroke-width: 3px;
-    filter: brightness(1.2);
-}
-
-/* Relationship styling */
-.relationship-line {
-    stroke-opacity: 0.6;
-    transition: all 0.3s ease;
-}
-
-.relationship-line:hover {
-    stroke-opacity: 1;
+.node:hover circle {
+    stroke: #000;
     stroke-width: 3px;
 }
 
-/* Loading state */
-.loading {
-    opacity: 0.5;
+.node text {
+    font-size: 12px;
     pointer-events: none;
 }
 
-/* Error message styling */
-.error-message {
-    color: #d32f2f;
-    padding: 10px;
-    margin: 10px 0;
-    background: #ffebee;
-    border-radius: 4px;
-    font-size: 12px;
+.link {
+    stroke: #999;
+    stroke-opacity: 0.6;
 }
 
-/* Tooltip styling */
+/* Loading spinner */
+#loading {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    display: none;
+    text-align: center;
+}
+
+.spinner {
+    border: 4px solid #f3f3f3;
+    border-top: 4px solid #3498db;
+    border-radius: 50%;
+    width: 40px;
+    height: 40px;
+    animation: spin 1s linear infinite;
+    margin: 0 auto 10px;
+}
+
+@keyframes spin {
+    0% { transform: rotate(0deg); }
+    100% { transform: rotate(360deg); }
+}
+
+/* Tooltip */
 .tooltip {
     position: absolute;
     background: white;
-    padding: 8px;
+    padding: 10px;
     border-radius: 4px;
-    box-shadow: 0 2px 4px rgba(0,0,0,0.2);
-    font-size: 12px;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.1);
     pointer-events: none;
+    font-size: 12px;
     z-index: 1000;
 }
 
-/* Multiple select styling */
-select[multiple] {
-    height: 120px;
+/* Zoom controls */
+.zoom-controls {
+    position: absolute;
+    bottom: 20px;
+    right: 20px;
+    background: white;
+    padding: 5px;
+    border-radius: 4px;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+}
+
+.zoom-button {
+    padding: 5px 10px;
+    margin: 0 2px;
+    border: 1px solid #ddd;
+    background: white;
+    cursor: pointer;
+    font-size: 14px;
+}
+
+.zoom-button:hover {
+    background: #f5f5f5;
+}
+
+/* Selected count */
+.selected-count {
+    font-size: 12px;
+    color: #666;
+    margin-top: 5px;
+}
+
+/* Responsive design */
+@media (max-width: 768px) {
+    .container {
+        grid-template-columns: 1fr;
+    }
+
+    .sidebar {
+        position: fixed;
+        left: -300px;
+        top: 0;
+        bottom: 0;
+        z-index: 1000;
+        transition: left 0.3s ease;
+    }
+
+    .sidebar.active {
+        left: 0;
+    }
 }
