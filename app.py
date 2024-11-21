@@ -29,15 +29,20 @@ def index():
 def get_random_nodes():
     try:
         with get_neo4j_driver().session() as session:
-            result = session.run('''
-                MATCH (n)
-                WITH n, rand() as random
-                ORDER BY random
-                LIMIT 5
-                MATCH (n)-[r]-(m)
-                RETURN DISTINCT n, r, m
-                LIMIT 100
-            ''')
+            query = """
+            MATCH (n)
+            WITH n, rand() as random
+            ORDER BY random
+            LIMIT 5
+            WITH n
+            OPTIONAL MATCH (n)-[r]-(m)
+            RETURN DISTINCT n, r, m
+            LIMIT 100
+            """
+            
+            logger.debug(f"Executing query: {query}")
+            result = session.run(query)
+            
             nodes = []
             relationships = []
             node_ids = set()
@@ -47,33 +52,47 @@ def get_random_nodes():
                 target = record['m']
                 rel = record['r']
                 
-                for node in (source, target):
-                    if node.id not in node_ids:
-                        nodes.append({
-                            'id': node.id,
-                            'labels': list(node.labels),
-                            'properties': dict(node)
-                        })
-                        node_ids.add(node.id)
+                # Add source node
+                if source.id not in node_ids:
+                    source_data = {
+                        'id': source.id,
+                        'labels': list(source.labels),
+                        'properties': {k: v for k, v in source.items()}
+                    }
+                    nodes.append(source_data)
+                    node_ids.add(source.id)
                 
-                relationships.append({
-                    'source': source.id,
-                    'target': target.id,
-                    'type': rel.type
-                })
-            
-            # Move logging statements inside the function
-            logger.debug(f"Returned nodes: {nodes}")
-            logger.debug(f"Returned relationships: {relationships}")
-            
-            return jsonify({
+                # Add target node and relationship if they exist
+                if target and rel:
+                    if target.id not in node_ids:
+                        target_data = {
+                            'id': target.id,
+                            'labels': list(target.labels),
+                            'properties': {k: v for k, v in target.items()}
+                        }
+                        nodes.append(target_data)
+                        node_ids.add(target.id)
+                    
+                    rel_data = {
+                        'source': source.id,
+                        'target': target.id,
+                        'type': rel.type,
+                        'properties': {k: v for k, v in rel.items()}
+                    }
+                    relationships.append(rel_data)
+
+            response_data = {
                 'nodes': nodes,
                 'relationships': relationships
-            })
+            }
+            
+            logger.debug(f"Response data: {response_data}")
+            return jsonify(response_data)
+            
     except Exception as e:
-        logger.error(f"Error in get_random_nodes: {str(e)}")
+        logger.error(f"Error: {str(e)}")
         return jsonify({"error": str(e)}), 500
-
+        
 @app.route('/api/neo4j/status')
 def neo4j_status():
     try:

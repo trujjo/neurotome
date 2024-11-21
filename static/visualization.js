@@ -270,3 +270,71 @@ window.addEventListener('unload', () => {
         driver.close();
     }
 });
+
+function visualizeData(data) {
+    console.log('Received data:', data);
+    
+    if (!data || !data.nodes || !data.relationships) {
+        console.error('Invalid data format:', data);
+        return;
+    }
+
+    const width = document.getElementById('visualization').clientWidth;
+    const height = document.getElementById('visualization').clientHeight;
+
+    // Clear previous visualization
+    d3.select('#visualization').selectAll('*').remove();
+
+    const svg = d3.select('#visualization').append('svg')
+        .attr('width', width)
+        .attr('height', height);
+
+    const simulation = d3.forceSimulation(data.nodes)
+        .force('link', d3.forceLink(data.relationships).id(d => d.id))
+        .force('charge', d3.forceManyBody().strength(-300))
+        .force('center', d3.forceCenter(width / 2, height / 2));
+
+    // Draw relationships
+    const link = svg.append('g')
+        .selectAll('line')
+        .data(data.relationships)
+        .enter().append('line')
+        .attr('stroke', '#999')
+        .attr('stroke-opacity', 0.6)
+        .attr('stroke-width', 1);
+
+    // Draw nodes
+    const node = svg.append('g')
+        .selectAll('circle')
+        .data(data.nodes)
+        .enter().append('circle')
+        .attr('r', 5)
+        .attr('fill', d => getNodeColor(d.labels[0]));
+
+    // Add node labels
+    const labels = svg.append('g')
+        .selectAll('text')
+        .data(data.nodes)
+        .enter().append('text')
+        .text(d => d.properties.name || d.labels[0])
+        .attr('font-size', '8px')
+        .attr('dx', 8)
+        .attr('dy', 3)
+        .style('fill', '#fff');
+
+    simulation.on('tick', () => {
+        link
+            .attr('x1', d => d.source.x)
+            .attr('y1', d => d.source.y)
+            .attr('x2', d => d.target.x)
+            .attr('y2', d => d.target.y);
+
+        node
+            .attr('cx', d => d.x)
+            .attr('cy', d => d.y);
+
+        labels
+            .attr('x', d => d.x)
+            .attr('y', d => d.y);
+    });
+}
