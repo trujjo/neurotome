@@ -9,11 +9,7 @@
 </body>
 </html>
 
-// Initialize Neo4j driver
-const driver = neo4j.driver(
-    'neo4j+s://4e5eeae5.databases.neo4j.io:7687',
-    neo4j.auth.basic('neo4j', 'Poconoco16!')
-);
+
 
 let root;
 let chart;
@@ -117,36 +113,37 @@ am5.ready(function() {
 
 // Populate filter dropdowns
 async function populateFilters() {
-    const session = driver.session();
     try {
-        // Fetch node labels
-        const labelResult = await session.run('CALL db.labels() YIELD label RETURN label ORDER BY label');
+        // Fetch node labels from backend
+        const labelResponse = await fetch('/api/labels');
+        const labels = await labelResponse.json();
         const nodeLabelsSelect = document.getElementById('nodeLabels');
         nodeLabelsSelect.innerHTML = '';
-        labelResult.records.forEach(record => {
+        labels.forEach(label => {
             const option = document.createElement('option');
-            option.value = record.get('label');
-            option.textContent = record.get('label');
+            option.value = label;
+            option.textContent = label;
             nodeLabelsSelect.appendChild(option);
         });
 
-        // Fetch relationship types
-        const relResult = await session.run('CALL db.relationshipTypes() YIELD relationshipType RETURN relationshipType ORDER BY relationshipType');
+        // Fetch relationship types from backend
+        const relResponse = await fetch('/api/relationship-types');
+        const relationships = await relResponse.json();
         const relationshipsSelect = document.getElementById('relationships');
         relationshipsSelect.innerHTML = '';
-        relResult.records.forEach(record => {
+        relationships.forEach(relType => {
             const option = document.createElement('option');
-            option.value = record.get('relationshipType');
-            option.textContent = record.get('relationshipType');
+            option.value = relType;
+            option.textContent = relType;
             relationshipsSelect.appendChild(option);
         });
 
-        // Fetch locations
-        const locationResult = await session.run('MATCH (n) WHERE exists(n.location) RETURN DISTINCT n.location AS location ORDER BY location');
+        // Fetch locations from backend
+        const locationResponse = await fetch('/api/locations');
+        const locations = await locationResponse.json();
         const locationSelect = document.getElementById('location');
         locationSelect.innerHTML = '<option value="">All Locations</option>';
-        locationResult.records.forEach(record => {
-            const location = record.get('location');
+        locations.forEach(location => {
             if (location) {
                 const option = document.createElement('option');
                 option.value = location;
@@ -156,14 +153,16 @@ async function populateFilters() {
         });
     } catch (error) {
         console.error('Error populating filters:', error);
-    } finally {
-        await session.close();
     }
 }
 
+// Call populateFilters when the DOM is fully loaded
+document.addEventListener('DOMContentLoaded', () => {
+    populateFilters();
+});
+
 // Fetch graph data based on filters
 async function fetchGraphData(filters) {
-    const session = driver.session();
     try {
         const nodeLabels = filters.nodeLabels || [];
         const relationships = filters.relationships || [];
@@ -502,3 +501,36 @@ function getNodeColor(label) {
     };
     return colors[label.toLowerCase()] || '#666666';
 }
+
+@app.route('/api/labels')
+def get_labels():
+    try:
+        with get_neo4j_driver().session() as session:
+            result = session.run('CALL db.labels() YIELD label RETURN label ORDER BY label')
+            labels = [record['label'] for record in result]
+            return jsonify(labels)
+    except Exception as e:
+        app.logger.error(f"Error in get_labels: {str(e)}")
+        return jsonify({"error": str(e)}), 500
+
+@app.route('/api/relationship-types')
+def get_relationship_types():
+    try:
+        with get_neo4j_driver().session() as session:
+            result = session.run('CALL db.relationshipTypes() YIELD relationshipType RETURN relationshipType ORDER BY relationshipType')
+            relationships = [record['relationshipType'] for record in result]
+            return jsonify(relationships)
+    except Exception as e:
+        app.logger.error(f"Error in get_relationship_types: {str(e)}")
+        return jsonify({"error": str(e)}), 500
+
+@app.route('/api/locations')
+def get_locations():
+    try:
+        with get_neo4j_driver().session() as session:
+            result = session.run('MATCH (n) WHERE exists(n.location) RETURN DISTINCT n.location AS location ORDER BY location')
+            locations = [record['location'] for record in result if record['location']]
+            return jsonify(locations)
+    except Exception as e:
+        app.logger.error(f"Error in get_locations: {str(e)}")
+        return jsonify({"error": str(e)}), 500
