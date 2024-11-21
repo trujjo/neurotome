@@ -157,7 +157,16 @@ class GraphVisualization {
             'Genre': '#2ca02c',
             'Actor': '#d62728',
             'Director': '#9467bd',
-            // Add more mappings as needed
+            'nerve': '#ff7f0e',
+            'bone': '#2ca02c',
+            'neuro': '#d62728',
+            'region': '#9467bd',
+            'viscera': '#8c564b',
+            'muscle': '#e377c2',
+            'sense': '#7f7f7f',
+            'vein': '#bcbd22',
+            'artery': '#17becf',
+            'cv': '#1f77b4'
         };
         return colors[label] || '#666666';
     }
@@ -184,4 +193,173 @@ class GraphVisualization {
     }
 
     dragStarted(event, d) {
-        if (!
+        if (!event.active) this.simulation.alphaTarget(0.3).restart();
+        d.fx = d.x;
+        d.fy = d.y;
+    }
+
+    dragged(event, d) {
+        d.fx = event.x;
+        d.fy = event.y;
+    }
+
+    dragEnded(event, d) {
+        if (!event.active) this.simulation.alphaTarget(0);
+        d.fx = null;
+        d.fy = null;
+    }
+}
+
+// Filter and data loading functionality
+async function populateFilters() {
+    try {
+        // Fetch and populate node labels
+        const labelResponse = await fetch('/api/labels');
+        const labels = await labelResponse.json();
+        const nodeLabelsSelect = document.getElementById('nodeLabels');
+        nodeLabelsSelect.innerHTML = '';
+        labels.forEach(label => {
+            const option = document.createElement('option');
+            option.value = label;
+            option.textContent = label;
+            nodeLabelsSelect.appendChild(option);
+        });
+
+        // Fetch and populate relationship types
+        const relResponse = await fetch('/api/relationship-types');
+        const relationships = await relResponse.json();
+        const relationshipsSelect = document.getElementById('relationships');
+        relationshipsSelect.innerHTML = '';
+        relationships.forEach(relType => {
+            const option = document.createElement('option');
+            option.value = relType;
+            option.textContent = relType;
+            relationshipsSelect.appendChild(option);
+        });
+
+        // Fetch and populate locations
+        const locationResponse = await fetch('/api/locations');
+        const locations = await locationResponse.json();
+        const locationSelect = document.getElementById('location');
+        locationSelect.innerHTML = '<option value="">All Locations</option>';
+        locations.forEach(location => {
+            if (location) {
+                const option = document.createElement('option');
+                option.value = location;
+                option.textContent = location;
+                locationSelect.appendChild(option);
+            }
+        });
+
+        // Setup event listeners for filters
+        setupFilterEventListeners();
+        
+    } catch (error) {
+        console.error('Error populating filters:', error);
+        showError('Failed to load filter options');
+    }
+}
+
+function setupFilterEventListeners() {
+    // Setup search functionality
+    document.getElementById('labelSearch')?.addEventListener('input', (e) => {
+        filterOptions('nodeLabels', e.target.value);
+    });
+
+    document.getElementById('relSearch')?.addEventListener('input', (e) => {
+        filterOptions('relationships', e.target.value);
+    });
+
+    // Setup clear filters
+    document.getElementById('clearFilters')?.addEventListener('click', () => {
+        document.getElementById('nodeLabels').selectedIndex = -1;
+        document.getElementById('relationships').selectedIndex = -1;
+        document.getElementById('location').value = '';
+        updateSelectedCounts();
+    });
+
+    // Apply filters
+    document.getElementById('applyFilters')?.addEventListener('click', () => {
+        updateVisualization();
+    });
+
+    // Track selected counts
+    ['nodeLabels', 'relationships'].forEach(id => {
+        document.getElementById(id)?.addEventListener('change', updateSelectedCounts);
+    });
+}
+
+function filterOptions(selectId, searchText) {
+    const select = document.getElementById(selectId);
+    const options = select.options;
+    
+    for (let i = 0; i < options.length; i++) {
+        const option = options[i];
+        const text = option.text.toLowerCase();
+        const search = searchText.toLowerCase();
+        
+        option.style.display = text.includes(search) ? '' : 'none';
+    }
+}
+
+function updateSelectedCounts() {
+    const labelCount = document.getElementById('labelCount');
+    const relCount = document.getElementById('relCount');
+    
+    if (labelCount) {
+        labelCount.textContent = document.getElementById('nodeLabels').selectedOptions.length;
+    }
+    if (relCount) {
+        relCount.textContent = document.getElementById('relationships').selectedOptions.length;
+    }
+}
+
+async function updateVisualization() {
+    const loadingElement = document.getElementById('loading');
+    try {
+        if (loadingElement) loadingElement.style.display = 'block';
+
+        const nodeLabels = Array.from(document.getElementById('nodeLabels').selectedOptions).map(option => option.value);
+        const relationships = Array.from(document.getElementById('relationships').selectedOptions).map(option => option.value);
+        const location = document.getElementById('location').value;
+
+        const params = new URLSearchParams();
+        if (nodeLabels.length) params.append('labels', nodeLabels.join(','));
+        if (relationships.length) params.append('relationships', relationships.join(','));
+        if (location) params.append('location', location);
+
+        const response = await fetch(`/api/nodes/filtered?${params}`);
+        if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
+        
+        const data = await response.json();
+        if (window.graphViz) {
+            window.graphViz.updateData(data);
+        }
+    } catch (error) {
+        console.error('Error updating visualization:', error);
+        showError('Failed to update visualization');
+    } finally {
+        if (loadingElement) loadingElement.style.display = 'none';
+    }
+}
+
+function showError(message) {
+    const errorDiv = document.createElement('div');
+    errorDiv.className = 'error-message';
+    errorDiv.textContent = message;
+    
+    const container = document.querySelector('.main-content');
+    container.insertBefore(errorDiv, container.firstChild);
+    
+    setTimeout(() => {
+        errorDiv.remove();
+    }, 5000);
+}
+
+// Initialize visualization when the DOM is loaded
+document.addEventListener('DOMContentLoaded', () => {
+    window.graphViz = new GraphVisualization('visualization');
+    populateFilters();
+    // Load initial data
+    updateVisualization();
+});

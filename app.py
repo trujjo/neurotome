@@ -1,235 +1,32 @@
-from flask import Flask, render_template, jsonify, request
-from neo4j import GraphDatabase
-from flask_cors import CORS
-import os
-import logging
+# Add at top
+from functools import wraps
+from datetime import datetime
 
-# Set up logging
-logging.basicConfig(level=logging.DEBUG)
-logger = logging.getLogger(__name__)
+# Add connection pooling
+driver = GraphDatabase.driver(
+    NEO4J_URI,
+    auth=(NEO4J_USER, NEO4J_PASSWORD),
+    max_connection_lifetime=3600
+)
 
-app = Flask(__name__)
-CORS(app)
+# Add decorator for error handling
+def handle_db_errors(f):
+    @wraps(f)
+    def wrapper(*args, **kwargs):
+        try:
+            return f(*args, **kwargs)
+        except Exception as e:
+            logger.error(f"Database error in {f.__name__}: {str(e)}")
+            return jsonify({"error": "An internal error occurred"}), 500
+    return wrapper
 
-# Neo4j connection configuration
-NEO4J_URI = os.getenv("NEO4J_URI", "bolt+s://4e5eeae5.databases.neo4j.io:7687")
-NEO4J_USER = os.getenv("NEO4J_USER", "neo4j")
-NEO4J_PASSWORD = os.getenv("NEO4J_PASSWORD", "Poconoco16!")
+# Add cleanup
+@app.teardown_appcontext
+def close_db(error):
+    if driver:
+        driver.close()
 
-driver = GraphDatabase.driver(NEO4J_URI, auth=(NEO4J_USER, NEO4J_PASSWORD))
-
-def get_neo4j_driver():
-    return driver
-
-@app.route('/')
-def index():
-    return render_template('index.html')
-
-def convert_neo4j_to_json(record):
-    """Convert Neo4j records to JSON-serializable format"""
-    try:
-        source = record['n']
-        target = record['m']
-        rel = record['r']
-        
-        logger.debug(f"Processing record: {source.labels}, {target.labels if target else 'None'}")
-        
-        node_data = {
-            'id': source.id,
-            'labels': [label.lower() for label in source.labels],
-            'properties': {
-                k.lower(): str(v).lower() if isinstance(v, str) else v 
-                for k, v in source.items()
-            }
-        }
-        
-        if target and rel:
-            relationship_data = {
-                'source': source.id,
-                'target': target.id,
-                'type': rel.type.lower(),
-                'properties': {
-                    k.lower(): str(v).lower() if isinstance(v, str) else v 
-                    for k, v in rel.items()
-                }
-            }
-            return node_data, relationship_data
-            
-        return node_data, None
-            
-    except Exception as e:
-        logger.error(f"Error converting Neo4j record: {str(e)}")
-        raise
-
-@app.route('/api/nodes/random')
-def get_random_nodes():
-    try:
-        with get_neo4j_driver().session() as session:
-            result = session.run('''
-                MATCH (n)
-                WITH n, rand() as random
-                ORDER BY random
-                LIMIT 5
-                MATCH (n)-[r]-(m)
-                RETURN DISTINCT n, r, m
-                LIMIT 100
-            ''')
-            
-            nodes = []
-            relationships = []
-            node_ids = set()
-            
-            for record in result:
-                source = record['n']
-                target = record['m']
-                rel = record['r']
-                
-                # Add nodes if not already added
-                for node in (source, target):
-                    if node.id not in node_ids:
-                        nodes.append({
-                            'id': node.id,
-                            'labels': list(node.labels),
-                            'properties': dict(node)
-                        })
-                        node_ids.add(node.id)
-                
-                # Add relationship
-                relationships.append({
-                    'source': source.id,
-                    'target': target.id,
-                    'type': rel.type
-                })
-            
-            return jsonify({
-                'nodes': nodes,
-                'relationships': relationships
-            })
-            
-    except Exception as e:
-        app.logger.error(f"Error in get_random_nodes: {str(e)}")
-        return jsonify({"error": str(e)}), 500
-                
-@app.route('/api/neo4j/status')
-def neo4j_status():
-    try:
-        with get_neo4j_driver().session() as session:
-            session.run("RETURN 1")
-        return jsonify({"status": "connected"})
-    except Exception as e:
-        return jsonify({"status": "disconnected"}), 500
-
+# Move routes before if __name__ == "__main__"
+# Add proper environment handling
 if __name__ == "__main__":
-    app.run(debug=True)
-
-@app.route('/api/nodes/filtered', methods=['GET'])
-def get_filtered_nodes():
-    try:
-        labels = request.args.getlist('labels')
-        relationships = request.args.getlist('relationships')
-        location = request.args.get('location')
-
-        query = """
-        MATCH (n)
-        WHERE 1=1
-        """
-        params = {}
-
-        if labels:
-            query += " AND any(label IN $labels WHERE label in labels(n))"
-            params['labels'] = labels
-
-        if location:
-            query += " AND n.location = $location"
-            params['location'] = location
-
-        if relationships:
-            query += """
-            WITH n
-            MATCH (n)-[r]->(m)
-            WHERE type(r) IN $relationships
-            """
-            params['relationships'] = relationships
-        else:
-            query += """
-            WITH n
-            MATCH (n)-[r]->(m)
-            """
-
-        query += " RETURN DISTINCT n, r, m LIMIT 100"
-
-        with get_neo4j_driver().session() as session:
-            result = session.run(query, params)
-            nodes = []
-            relationships = []
-            node_ids = set()
-            
-            for record in result:
-                source = record['n']
-                target = record['m']
-                rel = record['r']
-                
-                for node in (source, target):
-                    if node.id not in node_ids:
-                        nodes.append({
-                            'id': node.id,
-                            'labels': list(node.labels),
-                            'properties': dict(node)
-                        })
-                        node_ids.add(node.id)
-                
-                relationships.append({
-                    'source': source.id,
-                    'target': target.id,
-                    'type': rel.type
-                })
-
-            logger.debug(f"Filtered nodes: {nodes}")
-            logger.debug(f"Filtered relationships: {relationships}")
-            
-            return jsonify({
-                'nodes': nodes,
-                'relationships': relationships
-            })
-
-    except Exception as e:
-        logger.error(f"Error in get_filtered_nodes: {str(e)}")
-        return jsonify({"error": str(e)}), 500
-
-@app.route('/api/labels')
-def get_labels():
-    try:
-        with get_neo4j_driver().session() as session:
-            result = session.run('CALL db.labels() YIELD label RETURN label ORDER BY label')
-            labels = [record['label'] for record in result]
-            return jsonify(labels)
-    except Exception as e:
-        app.logger.error(f"Error in get_labels: {str(e)}")
-        return jsonify({"error": str(e)}), 500
-
-@app.route('/api/relationship-types')
-def get_relationship_types():
-    try:
-        with get_neo4j_driver().session() as session:
-            result = session.run('CALL db.relationshipTypes() YIELD relationshipType RETURN relationshipType ORDER BY relationshipType')
-            relationship_types = [record['relationshipType'] for record in result]
-            return jsonify(relationship_types)
-    except Exception as e:
-        app.logger.error(f"Error in get_relationship_types: {str(e)}")
-        return jsonify({"error": str(e)}), 500
-
-@app.route('/api/locations')
-def get_locations():
-    try:
-        with get_neo4j_driver().session() as session:
-            result = session.run('''
-                MATCH (n)
-                WHERE n.location IS NOT NULL
-                RETURN DISTINCT n.location AS location
-                ORDER BY location
-            ''')
-            locations = [record['location'] for record in result]
-            return jsonify(locations)
-    except Exception as e:
-        app.logger.error(f"Error in get_locations: {str(e)}")
-        return jsonify({"error": str(e)}), 500
+    app.run(debug=os.environ.get('FLASK_ENV') == 'development')
