@@ -1,35 +1,41 @@
 <!DOCTYPE html>
 <html>
 <head>
+    <title>Neo4j Network Visualization</title>
+    <script src="https://cdn.amcharts.com/lib/5/index.js"></script>
+    <script src="https://cdn.amcharts.com/lib/5/hierarchy.js"></script>
+    <script src="https://cdn.amcharts.com/lib/5/themes/Animated.js"></script>
     <script src="https://d3js.org/d3.v7.min.js"></script>
     <script src="/static/js/visualization.js"></script>
+    <link rel="stylesheet" href="/static/js/styles.css">
 </head>
 <body>
-    <div id="visualization"></div>
+    <div class="container">
+        <div class="sidebar">
+            <div class="filter-section">
+                <h3>Node Labels</h3>
+                <select id="nodeLabels" multiple size="5"></select>
+            </div>
+
+            <div class="filter-section">
+                <h3>Relationships</h3>
+                <select id="relationships" multiple size="5"></select>
+            </div>
+
+            <div class="filter-section">
+                <h3>Location</h3>
+                <select id="location"></select>
+            </div>
+
+            <button id="applyFilters" class="apply-btn">Apply Filters</button>
+        </div>
+
+        <div class="main-content">
+            <div id="visualization" style="width: 100%; height: 600px;"></div>
+        </div>
+    </div>
 </body>
 </html>
-
-
-
-let root;
-let chart;
-
-// Initialize the visualization
-am5.ready(function() {
-    // Create root element
-    root = am5.Root.new("chartdiv");
-    
-    // Set themes
-    root.setThemes([am5themes_Animated.new(root)]);
-    
-    // Create wrapper container
-    let container = root.container.children.push(
-        am5.Container.new(root, {
-            width: am5.percent(100),
-            height: am5.percent(100),
-            layout: root.verticalLayout
-        })
-    );
     
     // Create network chart
     chart = container.children.push(
@@ -504,33 +510,12 @@ function getNodeColor(label) {
 
 @app.route('/api/labels')
 def get_labels():
-    try:
-        with get_neo4j_driver().session() as session:
-            result = session.run('CALL db.labels() YIELD label RETURN label ORDER BY label')
-            labels = [record['label'] for record in result]
-            return jsonify(labels)
-    except Exception as e:
-        app.logger.error(f"Error in get_labels: {str(e)}")
-        return jsonify({"error": str(e)}), 500
+    # Endpoint to get node labels
 
 @app.route('/api/relationship-types')
 def get_relationship_types():
-    try:
-        with get_neo4j_driver().session() as session:
-            result = session.run('CALL db.relationshipTypes() YIELD relationshipType RETURN relationshipType ORDER BY relationshipType')
-            relationships = [record['relationshipType'] for record in result]
-            return jsonify(relationships)
-    except Exception as e:
-        app.logger.error(f"Error in get_relationship_types: {str(e)}")
-        return jsonify({"error": str(e)}), 500
+    # Endpoint to get relationship types
 
 @app.route('/api/locations')
 def get_locations():
-    try:
-        with get_neo4j_driver().session() as session:
-            result = session.run('MATCH (n) WHERE exists(n.location) RETURN DISTINCT n.location AS location ORDER BY location')
-            locations = [record['location'] for record in result if record['location']]
-            return jsonify(locations)
-    except Exception as e:
-        app.logger.error(f"Error in get_locations: {str(e)}")
-        return jsonify({"error": str(e)}), 500
+    # Endpoint to get locations
