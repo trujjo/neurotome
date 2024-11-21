@@ -85,3 +85,77 @@ def neo4j_status():
 
 if __name__ == "__main__":
     app.run(debug=True)
+
+    @app.route('/api/nodes/filtered', methods=['GET'])
+def get_filtered_nodes():
+    try:
+        labels = request.args.getlist('labels')
+        relationships = request.args.getlist('relationships')
+        location = request.args.get('location')
+
+        query = """
+        MATCH (n)
+        WHERE 1=1
+        """
+        params = {}
+
+        if labels:
+            query += " AND any(label IN $labels WHERE label in labels(n))"
+            params['labels'] = labels
+
+        if location:
+            query += " AND n.location = $location"
+            params['location'] = location
+
+        if relationships:
+            query += """
+            WITH n
+            MATCH (n)-[r]->(m)
+            WHERE type(r) IN $relationships
+            """
+            params['relationships'] = relationships
+        else:
+            query += """
+            WITH n
+            MATCH (n)-[r]->(m)
+            """
+
+        query += " RETURN DISTINCT n, r, m LIMIT 100"
+
+        with get_neo4j_driver().session() as session:
+            result = session.run(query, params)
+            nodes = []
+            relationships = []
+            node_ids = set()
+            
+            for record in result:
+                source = record['n']
+                target = record['m']
+                rel = record['r']
+                
+                for node in (source, target):
+                    if node.id not in node_ids:
+                        nodes.append({
+                            'id': node.id,
+                            'labels': list(node.labels),
+                            'properties': dict(node)
+                        })
+                        node_ids.add(node.id)
+                
+                relationships.append({
+                    'source': source.id,
+                    'target': target.id,
+                    'type': rel.type
+                })
+
+            logger.debug(f"Filtered nodes: {nodes}")
+            logger.debug(f"Filtered relationships: {relationships}")
+            
+            return jsonify({
+                'nodes': nodes,
+                'relationships': relationships
+            })
+
+    except Exception as e:
+        logger.error(f"Error in get_filtered_nodes: {str(e)}")
+        return jsonify({"error": str(e)}), 500

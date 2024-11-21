@@ -242,21 +242,23 @@ function transformNeo4jData(nodes, relationships) {
     return Array.from(nodesMap.values());
 }
 
-// Update visualization with new data
-async function updateVisualization() {
-    const filters = {
-        nodeLabels: Array.from(document.getElementById('nodeLabels').selectedOptions).map(opt => opt.value),
-        relationships: Array.from(document.getElementById('relationships').selectedOptions).map(opt => opt.value),
-        location: document.getElementById('location').value
-    };
-    
-    const data = await fetchGraphData(filters);
-    if (data && data.length > 0) {
-        chart.data.setAll(data);
-    } else {
-        console.log('No data returned from query');
-        chart.data.setAll([]);
-    }
+function updateVisualization() {
+    const nodeLabels = Array.from(document.getElementById('nodeLabels').selectedOptions).map(option => option.value);
+    const relationships = Array.from(document.getElementById('relationships').selectedOptions).map(option => option.value);
+    const location = document.getElementById('location').value;
+
+    const params = new URLSearchParams();
+    nodeLabels.forEach(label => params.append('labels', label));
+    relationships.forEach(rel => params.append('relationships', rel));
+    if (location) params.append('location', location);
+
+    fetch(`/api/nodes/filtered?${params}`)
+        .then(response => response.json())
+        .then(data => {
+            console.log('Received data:', data);
+            visualizeData(data);
+        })
+        .catch(error => console.error('Error:', error));
 }
 
 // Add event listener for the apply filters button
