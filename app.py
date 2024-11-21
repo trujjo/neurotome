@@ -214,9 +214,6 @@ def get_filtered_nodes():
     ]
 }
 
-# Move visualization code to static/js/visualization.js
-# CSS stays in static/js/styles.css
-
 function visualizeData(data) {
     console.log('Visualizing data:', data);
     if (!data || !data.nodes || !data.relationships) {
