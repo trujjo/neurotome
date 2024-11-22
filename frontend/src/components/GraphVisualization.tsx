@@ -20,7 +20,7 @@ const GraphVisualization: React.FC = () => {
     relationships: [],
     systems: []
   });
-  
+
   const visRef = useRef<HTMLDivElement>(null);
 
   const initializeNeoVis = () => {
@@ -53,12 +53,12 @@ const GraphVisualization: React.FC = () => {
 
   const buildCypherQuery = () => {
     let query = 'MATCH (n)';
-    const conditions = [];
+    const conditions: string[] = [];
 
     if (selectedLabel) conditions.push(`n:\`${selectedLabel.replace(/`/g, '``')}\``);
     if (selectedLocation) conditions.push(`n.location = '${selectedLocation.replace(/'/g, "\\'")}'`);
     if (selectedSystem) conditions.push(`n.system = '${selectedSystem.replace(/'/g, "\\'")}'`);
-    
+
     if (conditions.length > 0) {
       query += ' WHERE ' + conditions.join(' AND ');
     }
