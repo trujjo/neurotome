@@ -72,19 +72,24 @@ document.addEventListener('DOMContentLoaded', () => {
             .attr('stroke-width', 1);
 
         // Add nodes
-        const circles = svg.selectAll('circle')
+        const nodes = svg.selectAll('circle')
             .data(data.nodes)
             .enter()
-            .append('circle')
+            .append('g')
+            .attr('class', 'node-group');
+
+        nodes.append('circle')
             .attr('class', d => `node node-${d.size}`)
-            .style('fill', (d, i) => d3.schemeCategory10[i % 10])
-            .call(d3.drag()
-                .on('start', dragStarted)
-                .on('drag', dragged)
-                .on('end', dragEnded));
+            .style('fill', (d, i) => d3.color(d3.schemeCategory10[i % 10]).darker(0.5));
+
+        // Add text labels inside nodes
+        nodes.append('text')
+            .attr('class', 'node-label')
+            .text(d => d.properties.name || d.labels[0])
+            .attr('dy', '.35em');
 
         // Update tooltips to include relationship info
-        circles.append('title')
+        nodes.append('title')
             .text(d => `Labels: ${d.labels.join(', ')}\nProperties: ${JSON.stringify(d.properties)}`);
 
         // Update simulation with both nodes and links
@@ -100,9 +105,13 @@ document.addEventListener('DOMContentLoaded', () => {
                     .attr('x2', d => d.target.x)
                     .attr('y2', d => d.target.y);
 
-                circles
+                nodes.selectAll('circle')
                     .attr('cx', d => d.x)
                     .attr('cy', d => d.y);
+
+                nodes.selectAll('text')
+                    .attr('x', d => d.x)
+                    .attr('y', d => d.y);
             });
 
         simulation.alpha(1).restart();
