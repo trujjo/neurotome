@@ -1,0 +1,36 @@
+
+body {
+    margin: 0;
+    font-family: Arial, sans-serif;
+}
+
+#controls {
+    padding: 20px;
+    background: #f5f5f5;
+}
+
+#filters {
+    display: flex;
+    gap: 10px;
+}
+
+#graph {
+    width: 100vw;
+    height: calc(100vh - 80px);
+}
+
+.node {
+    cursor: pointer;
+}
+
+.node-large {
+    r: 20;
+}
+
+.node-medium {
+    r: 15;
+}
+
+.node-small {
+    r: 10;
+}

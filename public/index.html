@@ -1,0 +1,23 @@
+
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Neo4j Graph Visualization</title>
+    <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+    <div id="controls">
+        <div id="filters">
+            <select id="labelFilter" multiple>
+                <option value="">Loading labels...</option>
+            </select>
+            <input type="text" id="locationFilter" placeholder="Location filter">
+            <input type="text" id="systemFilter" placeholder="System filter">
+            <button id="applyFilters">Apply Filters</button>
+        </div>
+    </div>
+    <div id="graph"></div>
+    <script src="https://d3js.org/d3.v7.min.js"></script>
+    <script src="script.js"></script>
+</body>
+</html>
