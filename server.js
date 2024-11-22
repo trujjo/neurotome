@@ -24,8 +24,8 @@ app.get('/api/labels', async (req, res) => {
 app.get('/api/distinct-values', async (req, res) => {
     const session = driver.session();
     try {
-        const locationResult = await session.run('MATCH (n) WHERE EXISTS(n.location) RETURN DISTINCT n.location');
-        const systemResult = await session.run('MATCH (n) WHERE EXISTS(n.system) RETURN DISTINCT n.system');
+        const locationResult = await session.run('MATCH (n) WHERE n.location IS NOT NULL RETURN DISTINCT n.location');
+        const systemResult = await session.run('MATCH (n) WHERE n.location IS NOT NULL RETURN DISTINCT n.system');
         
         res.json({
             locations: locationResult.records.map(record => record.get(0)),
