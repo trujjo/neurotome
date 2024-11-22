@@ -6,13 +6,17 @@ document.addEventListener('DOMContentLoaded', () => {
     const svg = d3.select('#graph')
         .append('svg')
         .attr('width', width)
-        .attr('height', height);
-    
+        .attr('height', height)
+        .call(d3.zoom().on('zoom', (event) => {
+            svg.attr('transform', event.transform);
+        }))
+        .append('g');
+
     const simulation = d3.forceSimulation()
         .force('center', d3.forceCenter(width / 2, height / 2))
         .force('charge', d3.forceManyBody().strength(-100))
         .force('collide', d3.forceCollide(30));
-    
+
     // Load labels for filter
     fetch('/api/labels')
         .then(response => response.json())
@@ -29,10 +33,8 @@ document.addEventListener('DOMContentLoaded', () => {
         .then(data => {
             const locationSelect = document.getElementById('locationFilter');
             const systemSelect = document.getElementById('systemFilter');
-            
             locationSelect.innerHTML = '<option value="">All Locations</option>' + 
                 data.locations.map(loc => `<option value="${loc}">${loc}</option>`).join('');
-            
             systemSelect.innerHTML = '<option value="">All Systems</option>' + 
                 data.systems.map(sys => `<option value="${sys}">${sys}</option>`).join('');
         });
@@ -58,7 +60,12 @@ document.addEventListener('DOMContentLoaded', () => {
         .then(response => response.json())
         .then(nodes => updateVisualization(nodes));
     });
-    
+
+    // Add fit all button functionality
+    document.getElementById('fitAll').addEventListener('click', () => {
+        fitAll();
+    });
+
     function updateVisualization(data) {
         svg.selectAll('*').remove();
 
@@ -78,9 +85,16 @@ document.addEventListener('DOMContentLoaded', () => {
             .append('g')
             .attr('class', 'node-group');
 
+        const colorMap = {
+            'Person': '#1f77b4',
+            'Location': '#ff7f0e',
+            'Node': '#2ca02c',
+            // Add more mappings as needed
+        };
+
         nodes.append('circle')
             .attr('class', d => `node node-${d.size}`)
-            .style('fill', (d, i) => d3.color(d3.schemeCategory10[i % 10]).darker(0.5));
+            .style('fill', '#1a1a1a'); // Same color as the background
 
         // Add text labels inside nodes
         nodes.append('text')
@@ -116,7 +130,30 @@ document.addEventListener('DOMContentLoaded', () => {
 
         simulation.alpha(1).restart();
     }
-    
+
+    function fitAll() {
+        const bounds = svg.node().getBBox();
+        const parent = svg.node().parentElement;
+        const fullWidth = parent.clientWidth;
+        const fullHeight = parent.clientHeight;
+        const width = bounds.width;
+        const height = bounds.height;
+        const midX = bounds.x + width / 2;
+        const midY = bounds.y + height / 2;
+
+        if (width === 0 || height === 0) return; // nothing to fit
+
+        const scale = 0.85 / Math.max(width / fullWidth, height / fullHeight);
+        const translate = [fullWidth / 2 - scale * midX, fullHeight / 2 - scale * midY];
+
+        svg.transition()
+            .duration(750)
+            .call(
+                d3.zoom().transform,
+                d3.zoomIdentity.translate(translate[0], translate[1]).scale(scale)
+            );
+    }
+
     function dragStarted(event) {
         if (!event.active) simulation.alphaTarget(0.3).restart();
         event.subject.fx = event.subject.x;

@@ -77,6 +77,6 @@ body {
     fill: white;
     text-anchor: middle;
     dominant-baseline: middle;
-    font-size: 12px;
+    font-size: 6px;
     pointer-events: none;
 }
