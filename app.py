@@ -14,7 +14,8 @@ def serve(path):
         return send_from_directory(app.static_folder, path)
     return send_from_directory(app.static_folder, 'index.html')
 
-nn = NeuralNetwork()
+# Replace the simple initialization with layer sizes
+nn = NeuralNetwork(layer_sizes=[2, 4, 1])  # Example: 2 inputs, 4 hidden neurons, 1 output
 
 @app.route('/')
 def home():
