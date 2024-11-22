@@ -1,9 +1,8 @@
-
 from flask import Flask, request, jsonify, send_from_directory
 from flask_cors import CORS
 import os
 import numpy as np
-from neural_network import NeuralNetwork
+from backend.neural_network import NeuralNetwork
 from error_handling import handle_neo4j_error
 
 app = Flask(__name__, static_folder='../frontend/build')
