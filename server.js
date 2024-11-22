@@ -54,8 +54,8 @@ app.post('/api/nodes', async (req, res) => {
         if (conditions.length) {
             query += ' WHERE ' + conditions.join(' AND ');
         }
-        query = query.replace('RETURN n, labels(n)', 
-            'MATCH (n)-[r]->(m) RETURN n, labels(n), collect({rel: r, target: m}) as relationships');
+        // Add MATCH and RETURN clauses for relationships
+        query += ' MATCH (n)-[r]->(m) RETURN n, labels(n), collect({rel: r, target: m}) as relationships';
         
         const result = await session.run(query, { labels, location, system });
         const nodes = new Map();
