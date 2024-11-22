@@ -3,7 +3,6 @@ from flask_cors import CORS
 import os
 import numpy as np
 from backend.neural_network import NeuralNetwork
-from error_handling import handle_neo4j_error
 
 app = Flask(__name__, static_folder='../frontend/build')
 CORS(app)
@@ -22,7 +21,6 @@ def home():
     return 'Hello, World!'
 
 @app.route('/train', methods=['POST'])
-@handle_neo4j_error
 def train():
     data = request.get_json()
     inputs = np.array(data['inputs'])
@@ -33,7 +31,6 @@ def train():
     return jsonify({'status': 'success'})
 
 @app.route('/predict', methods=['POST'])
-@handle_neo4j_error
 def predict():
     data = request.get_json()
     inputs = np.array(data['inputs'])
