@@ -17,10 +17,6 @@ def serve(path):
 # Replace the simple initialization with layer sizes
 nn = NeuralNetwork(layer_sizes=[2, 4, 1])  # Example: 2 inputs, 4 hidden neurons, 1 output
 
-@app.route('/')
-def home():
-    return 'Hello, World!'
-
 @app.route('/train', methods=['POST'])
 def train():
     data = request.get_json()
