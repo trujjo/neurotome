@@ -6,6 +6,10 @@ from error_handling import handle_neo4j_error
 app = Flask(__name__)
 nn = NeuralNetwork()
 
+@app.route('/')
+def home():
+    return 'Hello, World!'
+
 @app.route('/train', methods=['POST'])
 @handle_neo4j_error
 def train():
