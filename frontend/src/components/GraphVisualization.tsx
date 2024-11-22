@@ -1,6 +1,6 @@
 import React, { useEffect, useState, useRef } from 'react';
 import NeoVis from 'neovis.js';
-import { Box, Select, FormControl, InputLabel, MenuItem, Paper } from '@mui/material';
+import { Box, Select, FormControl, InputLabel, MenuItem, Paper, Alert, CircularProgress } from '@mui/material';
 
 interface FilterProps {
   labels: string[];
@@ -20,35 +20,53 @@ const GraphVisualization: React.FC = () => {
     relationships: [],
     systems: []
   });
+  const [error, setError] = useState<string | null>(null);
+  const [loading, setLoading] = useState(false);
 
   const visRef = useRef<HTMLDivElement>(null);
 
   const initializeNeoVis = () => {
-    const config = {
-      containerId: "viz",
-      serverUrl: process.env.REACT_APP_NEO4J_URI,
-      serverUser: process.env.REACT_APP_NEO4J_USER,
-      serverPassword: process.env.REACT_APP_NEO4J_PASSWORD,
-      labels: {
-        [selectedLabel]: {
-          caption: "name",
-          size: "detail",
-          sizeCypher: "CASE WHEN node.detail = 'major' THEN 30 " +
-                      "WHEN node.detail = 'intermediate' THEN 20 " +
-                      "ELSE 10 END"
-        }
-      },
-      relationships: {
-        [selectedRelationship]: {
-          caption: true,
-          thickness: 2
-        }
-      },
-      initial_cypher: buildCypherQuery()
-    };
+    try {
+      setLoading(true);
+      setError(null);
 
-    const viz = new NeoVis(config as any);
-    viz.render();
+      if (!process.env.REACT_APP_NEO4J_URI || 
+          !process.env.REACT_APP_NEO4J_USER || 
+          !process.env.REACT_APP_NEO4J_PASSWORD) {
+        throw new Error('Neo4j configuration is missing');
+      }
+
+      const config = {
+        containerId: "viz",
+        serverUrl: process.env.REACT_APP_NEO4J_URI,
+        serverUser: process.env.REACT_APP_NEO4J_USER,
+        serverPassword: process.env.REACT_APP_NEO4J_PASSWORD,
+        labels: {
+          [selectedLabel]: {
+            caption: "name",
+            size: "detail",
+            sizeCypher: "CASE WHEN node.detail = 'major' THEN 30 " +
+                        "WHEN node.detail = 'intermediate' THEN 20 " +
+                        "ELSE 10 END"
+          }
+        },
+        relationships: {
+          [selectedRelationship]: {
+            caption: true,
+            thickness: 2
+          }
+        },
+        initial_cypher: buildCypherQuery()
+      };
+
+      const viz = new NeoVis(config as any);
+      viz.render()
+        .catch(err => setError(err.message))
+        .finally(() => setLoading(false));
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'An unknown error occurred');
+      setLoading(false);
+    }
   };
 
   const buildCypherQuery = () => {
@@ -97,6 +115,10 @@ const GraphVisualization: React.FC = () => {
 
   return (
     <Paper elevation={3} sx={{ p: 3 }}>
+      {error && (
+        <Alert severity="error" sx={{ mb: 2 }}>{error}</Alert>
+      )}
+      
       <Box sx={{ display: 'flex', gap: 2, mb: 2 }}>
         <FormControl fullWidth>
           <InputLabel>Label</InputLabel>
@@ -155,7 +177,18 @@ const GraphVisualization: React.FC = () => {
         </FormControl>
       </Box>
 
-      <div id="viz" ref={visRef} style={{ height: '600px', width: '100%' }} />
+      <div id="viz" ref={visRef} style={{ height: '600px', width: '100%', position: 'relative' }}>
+        {loading && (
+          <Box sx={{ 
+            position: 'absolute', 
+            top: '50%', 
+            left: '50%', 
+            transform: 'translate(-50%, -50%)'
+          }}>
+            <CircularProgress />
+          </Box>
+        )}
+      </div>
     </Paper>
   );
 };
