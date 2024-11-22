@@ -25,10 +25,10 @@ const GraphVisualization: React.FC = () => {
 
   const initializeNeoVis = () => {
     const config = {
-      container_id: "viz",
-      server_url: process.env.REACT_APP_NEO4J_URI,
-      server_user: process.env.REACT_APP_NEO4J_USER,
-      server_password: process.env.REACT_APP_NEO4J_PASSWORD,
+      containerId: "viz",
+      serverUrl: process.env.REACT_APP_NEO4J_URI,
+      serverUser: process.env.REACT_APP_NEO4J_USER,
+      serverPassword: process.env.REACT_APP_NEO4J_PASSWORD,
       labels: {
         [selectedLabel]: {
           caption: "name",
@@ -47,7 +47,7 @@ const GraphVisualization: React.FC = () => {
       initial_cypher: buildCypherQuery()
     };
 
-    const viz = new NeoVis(config);
+    const viz = new NeoVis(config as any);
     viz.render();
   };
 
@@ -55,9 +55,9 @@ const GraphVisualization: React.FC = () => {
     let query = 'MATCH (n)';
     const conditions = [];
 
-    if (selectedLabel) conditions.push(`n:${selectedLabel}`);
-    if (selectedLocation) conditions.push(`n.location = '${selectedLocation}'`);
-    if (selectedSystem) conditions.push(`n.system = '${selectedSystem}'`);
+    if (selectedLabel) conditions.push(`n:\`${selectedLabel.replace(/`/g, '``')}\``);
+    if (selectedLocation) conditions.push(`n.location = '${selectedLocation.replace(/'/g, "\\'")}'`);
+    if (selectedSystem) conditions.push(`n.system = '${selectedSystem.replace(/'/g, "\\'")}'`);
     
     if (conditions.length > 0) {
       query += ' WHERE ' + conditions.join(' AND ');
