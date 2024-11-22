@@ -1,290 +1,190 @@
-// visualization.js
-const driver = neo4j.driver(
-    'neo4j+s://4e5eeae5.databases.neo4j.io:7687',
-    neo4j.auth.basic('neo4j', 'Poconoco16!')
-);
+// static/js/visualization.js
 
-class GraphVisualization {
-    constructor() {
-        this.width = window.innerWidth - 400; // Accounting for sidebars
-        this.height = window.innerHeight;
-        
-        this.svg = d3.select('#visualization')
-            .append('svg')
-            .attr('width', this.width)
-            .attr('height', this.height);
-            
-        // Add zoom capabilities
-        this.zoom = d3.zoom()
-            .scaleExtent([0.1, 10])
-            .on('zoom', (event) => {
-                this.graphGroup.attr('transform', event.transform);
-            });
-            
-        this.svg.call(this.zoom);
-        
-        // Create a group for graph elements
-        this.graphGroup = this.svg.append('g');
-            
-        this.simulation = d3.forceSimulation()
-            .force('link', d3.forceLink().id(d => d.id).distance(100))
-            .force('charge', d3.forceManyBody().strength(-300))
-            .force('center', d3.forceCenter(this.width / 2, this.height / 2))
-            .force('collision', d3.forceCollide().radius(50));
-            
-        this.nodeFilters = new Set();
-        this.locationFilters = new Set();
-        
-        this.initializeFilters();
-    }
+document.addEventListener('DOMContentLoaded', () => {
+    populateFilters();
+});
 
-    async fetchFilteredData() {
-        const session = driver.session();
-        try {
-            // Build dynamic Cypher query based on filters
-            let query = 'MATCH (n)';
-            const conditions = [];
-            const params = {};
-
-            if (this.nodeFilters.size > 0) {
-                conditions.push(`any(label IN labels(n) WHERE label IN $nodeLabels)`);
-                params.nodeLabels = Array.from(this.nodeFilters);
-            }
-
-            if (this.locationFilters.size > 0) {
-                conditions.push('n.location IN $locations');
-                params.locations = Array.from(this.locationFilters);
-            }
-
-            if (conditions.length > 0) {
-                query += ' WHERE ' + conditions.join(' AND ');
-            }
-
-            // Find relationships between filtered nodes
-            query += `
-                WITH n
-                MATCH (n)-[r]-(m)
-                WHERE id(n) < id(m)
-                RETURN DISTINCT n, r, m
-            `;
-
-            const result = await session.run(query, params);
-            return this.processNeo4jData(result.records);
-        } finally {
-            await session.close();
-        }
-    }
-
-    processNeo4jData(records) {
-        const nodes = new Map();
-        const links = [];
-        
-        records.forEach(record => {
-            const sourceNode = record.get('n');
-            const targetNode = record.get('m');
-            const relationship = record.get('r');
-            
-            // Process source node
-            const sourceId = sourceNode.identity.toString();
-            if (!nodes.has(sourceId)) {
-                nodes.set(sourceId, {
-                    id: sourceId,
-                    labels: sourceNode.labels,
-                    properties: sourceNode.properties,
-                    // Add more node properties as needed
-                });
-            }
-            
-            // Process target node
-            const targetId = targetNode.identity.toString();
-            if (!nodes.has(targetId)) {
-                nodes.set(targetId, {
-                    id: targetId,
-                    labels: targetNode.labels,
-                    properties: targetNode.properties,
-                    // Add more node properties as needed
-                });
-            }
-            
-            // Process relationship
-            links.push({
-                source: sourceId,
-                target: targetId,
-                type: relationship.type,
-                properties: relationship.properties
-            });
-        });
-        
-        return {
-            nodes: Array.from(nodes.values()),
-            links: links
-        };
-    }
-
-    async updateVisualization() {
-        const graphData = await this.fetchFilteredData();
-        
-        // Clear existing visualization
-        this.graphGroup.selectAll('*').remove();
-
-        // Create arrow markers for relationships
-        this.graphGroup.append('defs').selectAll('marker')
-            .data(['end'])
-            .join('marker')
-            .attr('id', 'arrow')
-            .attr('viewBox', '0 -5 10 10')
-            .attr('refX', 15)
-            .attr('refY', 0)
-            .attr('markerWidth', 6)
-            .attr('markerHeight', 6)
-            .attr('orient', 'auto')
-            .append('path')
-            .attr('d', 'M0,-5L10,0L0,5')
-            .attr('fill', '#999');
-
-        // Create links
-        const link = this.graphGroup.append('g')
-            .selectAll('line')
-            .data(graphData.links)
-            .join('line')
-            .attr('class', 'link')
-            .attr('marker-end', 'url(#arrow)');
-
-        // Create nodes
-        const node = this.graphGroup.append('g')
-            .selectAll('.node')
-            .data(graphData.nodes)
-            .join('g')
-            .attr('class', 'node')
-            .call(this.drag(this.simulation));
-
-        // Add circles for nodes
-        node.append('circle')
-            .attr('r', 10)
-            .attr('fill', d => this.getNodeColor(d.labels[0]));
-
-        // Add labels
-        node.append('text')
-            .attr('dx', 15)
-            .attr('dy', '.35em')
-            .text(d => d.properties.name || d.labels[0])
-            .attr('font-size', '12px');
-
-        // Add title on hover
-        node.append('title')
-            .text(d => {
-                const props = Object.entries(d.properties)
-                    .map(([key, value]) => `${key}: ${value}`)
-                    .join('\n');
-                return `Labels: ${d.labels.join(', ')}\n${props}`;
-            });
-
-        // Update simulation
-        this.simulation
-            .nodes(graphData.nodes)
-            .force('link').links(graphData.links);
-
-        // Handle simulation tick
-        this.simulation.on('tick', () => {
-            link
-                .attr('x1', d => d.source.x)
-                .attr('y1', d => d.source.y)
-                .attr('x2', d => d.target.x)
-                .attr('y2', d => d.target.y);
-
-            node
-                .attr('transform', d => `translate(${d.x},${d.y})`);
-        });
-
-        // Restart simulation
-        this.simulation.alpha(1).restart();
-    }
-
-    drag(simulation) {
-        function dragstarted(event) {
-            if (!event.active) simulation.alphaTarget(0.3).restart();
-            event.subject.fx = event.subject.x;
-            event.subject.fy = event.subject.y;
-        }
-        
-        function dragged(event) {
-            event.subject.fx = event.x;
-            event.subject.fy = event.y;
-        }
-        
-        function dragended(event) {
-            if (!event.active) simulation.alphaTarget(0);
-            event.subject.fx = null;
-            event.subject.fy = null;
-        }
-        
-        return d3.drag()
-            .on('start', dragstarted)
-            .on('drag', dragged)
-            .on('end', dragended);
-    }
-
-    async initializeFilters() {
-        const session = driver.session();
-        try {
-            // Fetch all node labels
-            const labelResult = await session.run('CALL db.labels()');
-            const labels = labelResult.records.map(record => record.get(0));
-            
-            // Fetch all locations
-            const locationResult = await session.run('MATCH (n) WHERE exists(n.location) RETURN DISTINCT n.location');
-            const locations = locationResult.records.map(record => record.get(0));
-            
-            this.createFilterCheckboxes('label-filters', labels, this.nodeFilters);
-            this.createFilterCheckboxes('location-filters', locations, this.locationFilters);
-        } finally {
-            await session.close();
-        }
-    }
-
-    createFilterCheckboxes(containerId, items, filterSet) {
-        const container = document.getElementById(containerId);
-        container.innerHTML = ''; // Clear existing checkboxes
-        
-        items.forEach(item => {
-            const div = document.createElement('div');
+// Populate filter dropdowns
+async function populateFilters() {
+    try {
+        // Fetch node labels from backend
+        const labelResponse = await fetch('/api/labels');
+        const labels = await labelResponse.json();
+        const labelFilters = document.getElementById('label-filters');
+        labelFilters.innerHTML = '';
+        labels.forEach(label => {
             const checkbox = document.createElement('input');
             checkbox.type = 'checkbox';
-            checkbox.value = item;
-            checkbox.id = `checkbox-${item}`;
-            
-            checkbox.addEventListener('change', async (e) => {
-                if (e.target.checked) {
-                    filterSet.add(item);
-                } else {
-                    filterSet.delete(item);
-                }
-                await this.updateVisualization();
-            });
-            
-            const label = document.createElement('label');
-            label.htmlFor = `checkbox-${item}`;
-            label.textContent = item;
-            
-            div.appendChild(checkbox);
-            div.appendChild(label);
-            container.appendChild(div);
+            checkbox.id = `label-${label}`;
+            checkbox.value = label;
+            const labelElement = document.createElement('label');
+            labelElement.htmlFor = `label-${label}`;
+            labelElement.textContent = label;
+            labelFilters.appendChild(checkbox);
+            labelFilters.appendChild(labelElement);
+            labelFilters.appendChild(document.createElement('br'));
         });
-    }
 
-    getNodeColor(label) {
-        const colors = {
-            Person: '#ff7f0e',
-            Location: '#2ca02c',
-            Organization: '#1f77b4',
-            Event: '#d62728',
-            Project: '#9467bd',
-            Resource: '#8c564b',
-            Task: '#e377c2'
-        };
-        return colors[label] || '#999';
+        // Fetch locations from backend
+        const locationResponse = await fetch('/api/locations');
+        const locations = await locationResponse.json();
+        const locationFilters = document.getElementById('location-filters');
+        locationFilters.innerHTML = '';
+        locations.forEach(location => {
+            const checkbox = document.createElement('input');
+            checkbox.type = 'checkbox';
+            checkbox.id = `location-${location}`;
+            checkbox.value = location;
+            const labelElement = document.createElement('label');
+            labelElement.htmlFor = `location-${location}`;
+            labelElement.textContent = location;
+            locationFilters.appendChild(checkbox);
+            locationFilters.appendChild(labelElement);
+            locationFilters.appendChild(document.createElement('br'));
+        });
+    } catch (error) {
+        console.error('Error populating filters:', error);
     }
 }
 
-// Initialize the visualization
-const visualization = new GraphVisualization();
+// Fetch graph data based on filters
+async function fetchGraphData(filters) {
+    const params = new URLSearchParams(filters);
+    const response = await fetch(`/api/nodes/filtered?${params}`);
+    return response.json();
+}
+
+// Update the visualization based on selected filters
+function updateVisualization() {
+    const selectedLabels = Array.from(document.querySelectorAll('#label-filters input:checked')).map(checkbox => checkbox.value);
+    const selectedLocations = Array.from(document.querySelectorAll('#location-filters input:checked')).map(checkbox => checkbox.value);
+
+    const filters = {};
+    if (selectedLabels.length) filters.labels = selectedLabels;
+    if (selectedLocations.length) filters.locations = selectedLocations;
+
+    fetchGraphData(filters)
+        .then(data => {
+            console.log('Received data:', data);
+            visualizeData(data);
+        })
+        .catch(error => console.error('Error fetching data:', error));
+}
+
+// Visualize the data using D3.js
+function visualizeData(data) {
+    console.log('Visualizing data:', data);
+    if (!data || !data.nodes || !data.relationships) {
+        console.error('Invalid data format:', data);
+        return;
+    }
+
+    // Clear previous visualization
+    d3.select('#visualization').selectAll('*').remove();
+
+    const width = document.getElementById('visualization').clientWidth || 800;
+    const height = document.getElementById('visualization').clientHeight || 600;
+
+    const svg = d3.select('#visualization')
+        .append('svg')
+        .attr('width', width)
+        .attr('height', height);
+
+    // Create simulation
+    const simulation = d3.forceSimulation(data.nodes)
+        .force('link', d3.forceLink(data.relationships).id(d => d.id).distance(100))
+        .force('charge', d3.forceManyBody().strength(-300))
+        .force('center', d3.forceCenter(width / 2, height / 2))
+        .force('collision', d3.forceCollide().radius(30));
+
+    // Add links
+    const link = svg.append('g')
+        .selectAll('line')
+        .data(data.relationships)
+        .enter()
+        .append('line')
+        .attr('stroke', '#999')
+        .attr('stroke-width', 1)
+        .attr('stroke-opacity', 0.6);
+
+    // Add nodes
+    const node = svg.append('g')
+        .selectAll('circle')
+        .data(data.nodes)
+        .enter()
+        .append('circle')
+        .attr('r', 10)
+        .attr('fill', d => getNodeColor(d.labels[0]))
+        .call(d3.drag()
+            .on('start', dragstarted)
+            .on('drag', dragged)
+            .on('end', dragended));
+
+    // Add labels
+    const labels = svg.append('g')
+        .selectAll('text')
+        .data(data.nodes)
+        .enter()
+        .append('text')
+        .text(d => d.properties.name || d.labels[0])
+        .attr('dx', 12)
+        .attr('dy', '.35em')
+        .style('fill', '#000')
+        .style('font-size', '12px');
+
+    // Simulation tick function
+    simulation.on('tick', () => {
+        link
+            .attr('x1', d => d.source.x)
+            .attr('y1', d => d.source.y)
+            .attr('x2', d => d.target.x)
+            .attr('y2', d => d.target.y);
+
+        node
+            .attr('cx', d => d.x)
+            .attr('cy', d => d.y);
+
+        labels
+            .attr('x', d => d.x)
+            .attr('y', d => d.y);
+    });
+
+    // Drag event handlers
+    function dragstarted(event, d) {
+        if (!event.active) simulation.alphaTarget(0.3).restart();
+        d.fx = d.x;
+        d.fy = d.y;
+    }
+
+    function dragged(event, d) {
+        d.fx = event.x;
+        d.fy = event.y;
+    }
+
+    function dragended(event, d) {
+        if (!event.active) simulation.alphaTarget(0);
+        d.fx = null;
+        d.fy = null;
+    }
+}
+
+// Helper function to assign colors based on node labels
+function getNodeColor(label) {
+    const colors = {
+        'nerve': '#ff7f0e',
+        'bone': '#2ca02c',
+        'neuro': '#d62728',
+        'region': '#9467bd',
+        'viscera': '#8c564b',
+        'muscle': '#e377c2',
+        'sense': '#7f7f7f',
+        'vein': '#bcbd22',
+        'artery': '#17becf',
+        'cv': '#1f77b4',
+        // Add more labels and colors as needed
+    };
+    return colors[label.toLowerCase()] || '#666666';
+}
+
+// Add event listener for the apply filters button
+document.getElementById('applyFilters').addEventListener('click', updateVisualization);
