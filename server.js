@@ -1,4 +1,3 @@
-
 const express = require('express');
 const neo4j = require('neo4j-driver');
 const app = express();
@@ -22,6 +21,21 @@ app.get('/api/labels', async (req, res) => {
     }
 });
 
+app.get('/api/distinct-values', async (req, res) => {
+    const session = driver.session();
+    try {
+        const locationResult = await session.run('MATCH (n) WHERE EXISTS(n.location) RETURN DISTINCT n.location');
+        const systemResult = await session.run('MATCH (n) WHERE EXISTS(n.system) RETURN DISTINCT n.system');
+        
+        res.json({
+            locations: locationResult.records.map(record => record.get(0)),
+            systems: systemResult.records.map(record => record.get(0))
+        });
+    } finally {
+        await session.close();
+    }
+});
+
 app.post('/api/nodes', async (req, res) => {
     const { labels, location, system } = req.body;
     const session = driver.session();
@@ -40,20 +54,55 @@ app.post('/api/nodes', async (req, res) => {
         if (conditions.length) {
             query += ' WHERE ' + conditions.join(' AND ');
         }
-        query += ' RETURN n, labels(n)';
+        query = query.replace('RETURN n, labels(n)', 
+            'MATCH (n)-[r]->(m) RETURN n, labels(n), collect({rel: r, target: m}) as relationships');
         
         const result = await session.run(query, { labels, location, system });
-        const nodes = result.records.map(record => {
+        const nodes = new Map();
+        const relationships = [];
+
+        result.records.forEach(record => {
             const node = record.get('n');
-            return {
-                id: node.identity.toString(),
-                labels: record.get('labels(n)'),
-                properties: node.properties,
-                size: node.properties.detail === 'major' ? 'large' :
-                      node.properties.detail === 'intermediate' ? 'medium' : 'small'
-            };
+            const nodeId = node.identity.toString();
+            
+            // Add node if not already added
+            if (!nodes.has(nodeId)) {
+                nodes.set(nodeId, {
+                    id: nodeId,
+                    labels: record.get('labels(n)'),
+                    properties: node.properties,
+                    size: node.properties.detail === 'major' ? 'large' :
+                          node.properties.detail === 'intermediate' ? 'medium' : 'small'
+                });
+            }
+
+            // Add relationships
+            record.get('relationships').forEach(rel => {
+                relationships.push({
+                    source: nodeId,
+                    target: rel.target.identity.toString(),
+                    type: rel.rel.type,
+                    properties: rel.rel.properties
+                });
+
+                // Add target node if not already added
+                const targetId = rel.target.identity.toString();
+                if (!nodes.has(targetId)) {
+                    nodes.set(targetId, {
+                        id: targetId,
+                        labels: rel.target.labels,
+                        properties: rel.target.properties,
+                        size: rel.target.properties.detail === 'major' ? 'large' :
+                              rel.target.properties.detail === 'intermediate' ? 'medium' : 'small'
+                    });
+                }
+            });
         });
-        res.json(nodes);
+
+        res.json({
+            nodes: Array.from(nodes.values()),
+            relationships: relationships
+        });
     } finally {
         await session.close();
     }

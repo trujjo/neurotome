@@ -1,4 +1,3 @@
-
 document.addEventListener('DOMContentLoaded', () => {
     // Set up the D3 visualization
     const width = window.innerWidth;
@@ -23,6 +22,20 @@ document.addEventListener('DOMContentLoaded', () => {
                 `<option value="${label}">${label}</option>`
             ).join('');
         });
+
+    // Load distinct values for filters
+    fetch('/api/distinct-values')
+        .then(response => response.json())
+        .then(data => {
+            const locationSelect = document.getElementById('locationFilter');
+            const systemSelect = document.getElementById('systemFilter');
+            
+            locationSelect.innerHTML = '<option value="">All Locations</option>' + 
+                data.locations.map(loc => `<option value="${loc}">${loc}</option>`).join('');
+            
+            systemSelect.innerHTML = '<option value="">All Systems</option>' + 
+                data.systems.map(sys => `<option value="${sys}">${sys}</option>`).join('');
+        });
     
     // Handle filter application
     document.getElementById('applyFilters').addEventListener('click', () => {
@@ -46,13 +59,21 @@ document.addEventListener('DOMContentLoaded', () => {
         .then(nodes => updateVisualization(nodes));
     });
     
-    function updateVisualization(nodes) {
-        // Clear existing nodes
+    function updateVisualization(data) {
         svg.selectAll('*').remove();
-        
-        // Add new nodes
+
+        // Add relationships first (so they appear behind nodes)
+        const links = svg.selectAll('line')
+            .data(data.relationships)
+            .enter()
+            .append('line')
+            .attr('class', 'relationship')
+            .attr('stroke', '#999')
+            .attr('stroke-width', 1);
+
+        // Add nodes
         const circles = svg.selectAll('circle')
-            .data(nodes)
+            .data(data.nodes)
             .enter()
             .append('circle')
             .attr('class', d => `node node-${d.size}`)
@@ -61,19 +82,29 @@ document.addEventListener('DOMContentLoaded', () => {
                 .on('start', dragStarted)
                 .on('drag', dragged)
                 .on('end', dragEnded));
-        
-        // Add tooltips
+
+        // Update tooltips to include relationship info
         circles.append('title')
             .text(d => `Labels: ${d.labels.join(', ')}\nProperties: ${JSON.stringify(d.properties)}`);
-        
-        // Update simulation
-        simulation.nodes(nodes)
+
+        // Update simulation with both nodes and links
+        simulation
+            .nodes(data.nodes)
+            .force('link', d3.forceLink(data.relationships)
+                .id(d => d.id)
+                .distance(100))
             .on('tick', () => {
+                links
+                    .attr('x1', d => d.source.x)
+                    .attr('y1', d => d.source.y)
+                    .attr('x2', d => d.target.x)
+                    .attr('y2', d => d.target.y);
+
                 circles
                     .attr('cx', d => d.x)
                     .attr('cy', d => d.y);
             });
-        
+
         simulation.alpha(1).restart();
     }
     
