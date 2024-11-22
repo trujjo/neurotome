@@ -2,7 +2,7 @@
   "dependencies": {
     "@emotion/react": "^11.x.x",
     "@emotion/styled": "^11.x.x",
-    "@mui/material": "^5.x.x",
+    "@mui/material": "^6.1.8",  // Changed from 5.x.x to match lock file
     "d3": "^7.9.0",
     "neo4j-driver": "^5.26.0",
     "neovis.js": "^2.0.2"
