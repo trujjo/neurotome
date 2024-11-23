@@ -18,11 +18,20 @@ body {
 
 #filters select {
     min-width: 150px;
+    min-height: 100px;
     padding: 8px;
     background: #333;
     color: white;
     border: 1px solid #444;
     border-radius: 4px;
+}
+
+#filters select option {
+    padding: 4px;
+}
+
+#filters select option:checked {
+    background: #ff6b3d linear-gradient(0deg, #ff6b3d 0%, #ff6b3d 100%);
 }
 
 #filters button {
@@ -33,6 +42,14 @@ body {
     border: none;
     border-radius: 4px;
     transition: background-color 0.3s;
+}
+
+#resetFilters {
+    background: #666;
+}
+
+#resetFilters:hover {
+    background: #888;
 }
 
 #filters button:hover {
@@ -79,4 +96,37 @@ body {
     dominant-baseline: middle;
     font-size: 6px;
     pointer-events: none;
+}
+
+#detailFilter {
+    margin: 10px 0;
+    padding: 10px;
+    background: #2a2a2a;
+    border-radius: 4px;
+}
+
+#detailFilter h3 {
+    margin: 0 0 10px 0;
+    font-size: 14px;
+    color: #ffffff;
+}
+
+.detail-btn {
+    padding: 8px 15px;
+    margin-right: 10px;
+    cursor: pointer;
+    background: #333;
+    color: white;
+    border: 1px solid #444;
+    border-radius: 4px;
+    transition: background-color 0.3s;
+}
+
+.detail-btn:hover {
+    background: #444;
+}
+
+.detail-btn.selected {
+    background: #ff6b3d;
+    border-color: #ff6b3d;
 }

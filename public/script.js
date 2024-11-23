@@ -18,33 +18,124 @@ document.addEventListener('DOMContentLoaded', () => {
         .force('collide', d3.forceCollide(30));
 
     // Load labels for filter
-    fetch('/api/labels')
-        .then(response => response.json())
-        .then(labels => {
-            const labelSelect = document.getElementById('labelFilter');
-            labelSelect.innerHTML = labels.map(label => 
-                `<option value="${label}">${label}</option>`
-            ).join('');
-        });
+    function loadLabels() {
+        const locations = Array.from(document.getElementById('locationFilter').selectedOptions)
+            .map(option => option.value);
+        const sublocations = Array.from(document.getElementById('sublocationFilter').selectedOptions)
+            .map(option => option.value);
+        const systems = Array.from(document.getElementById('systemFilter').selectedOptions)
+            .map(option => option.value);
+        
+        const params = new URLSearchParams();
+        if (locations.length) params.append('locations', locations.join(','));
+        if (sublocations.length) params.append('sublocations', sublocations.join(','));
+        if (systems.length) params.append('systems', systems.join(','));
+        
+        return fetch('/api/labels?' + params.toString())
+            .then(response => response.json())
+            .then(labels => {
+                const labelSelect = document.getElementById('labelFilter');
+                const currentLabels = Array.from(labelSelect.selectedOptions)
+                    .map(option => option.value)
+                    .filter(label => labels.includes(label));
+                    
+                labelSelect.innerHTML = labels.map(label => 
+                    `<option value="${label}">${label}</option>`
+                ).join('');
+                
+                currentLabels.forEach(label => {
+                    const option = labelSelect.querySelector(`option[value="${label}"]`);
+                    if (option) option.selected = true;
+                });
+            });
+    }
 
-    // Load distinct values for filters
-    fetch('/api/distinct-values')
-        .then(response => response.json())
-        .then(data => {
-            const locationSelect = document.getElementById('locationFilter');
-            const systemSelect = document.getElementById('systemFilter');
+    // Update loadDistinctValues function
+    function loadDistinctValues() {
+        const selectedLabels = Array.from(document.getElementById('labelFilter').selectedOptions)
+            .map(option => option.value);
+        const locations = Array.from(document.getElementById('locationFilter').selectedOptions)
+            .map(option => option.value);
+        const sublocations = Array.from(document.getElementById('sublocationFilter').selectedOptions)
+            .map(option => option.value);
+        const systems = Array.from(document.getElementById('systemFilter').selectedOptions)
+            .map(option => option.value);
+        
+        const params = new URLSearchParams();
+        if (selectedLabels.length === 1) params.append('label', selectedLabels[0]);
+        if (locations.length) params.append('locations', locations.join(','));
+        if (sublocations.length) params.append('sublocations', sublocations.join(','));
+        if (systems.length) params.append('systems', systems.join(','));
+    
+        return fetch('/api/distinct-values?' + params.toString())
+            .then(response => response.json())
+            .then(data => updateFilterOptions(data));
+    }
+
+    function updateFilterOptions(data) {
+        const locationSelect = document.getElementById('locationFilter');
+        const sublocationSelect = document.getElementById('sublocationFilter');
+        const systemSelect = document.getElementById('systemFilter');
+        
+        const currentLocation = locationSelect.value;
+        const currentSublocation = sublocationSelect.value;
+        const currentSystem = systemSelect.value;
+        
+        // Only update options if they're not already set
+        if (!currentLocation || !data.locations.includes(currentLocation)) {
             locationSelect.innerHTML = '<option value="">All Locations</option>' + 
                 data.locations.map(loc => `<option value="${loc}">${loc}</option>`).join('');
-            systemSelect.innerHTML = '<option value="">All Systems</option>' + 
-                data.systems.map(sys => `<option value="${sys}">${sys}</option>`).join('');
-        });
+        }
+        
+        sublocationSelect.innerHTML = '<option value="">All Sublocations</option>' + 
+            data.sublocations.map(subloc => `<option value="${subloc}">${subloc}</option>`).join('');
+        
+        systemSelect.innerHTML = '<option value="">All Systems</option>' + 
+            data.systems.map(sys => `<option value="${sys}">${sys}</option>`).join('');
+        
+        if (currentSublocation && data.sublocations.includes(currentSublocation)) {
+            sublocationSelect.value = currentSublocation;
+        }
+        if (currentSystem && data.systems.includes(currentSystem)) {
+            systemSelect.value = currentSystem;
+        }
+    }
+
+    // Update event listeners
+    const labelFilter = document.getElementById('labelFilter');
+    const locationFilter = document.getElementById('locationFilter');
+    const sublocationFilter = document.getElementById('sublocationFilter');
+    const systemFilter = document.getElementById('systemFilter');
+
+    labelFilter.addEventListener('change', () => {
+        loadDistinctValues().then(() => loadLabels());
+    });
+    
+    locationFilter.addEventListener('change', () => {
+        loadLabels().then(() => loadDistinctValues());
+    });
+    
+    sublocationFilter.addEventListener('change', () => {
+        loadLabels().then(() => loadDistinctValues());
+    });
+    
+    systemFilter.addEventListener('change', () => {
+        loadLabels().then(() => loadDistinctValues());
+    });
+    
+    // Initial load
+    loadLabels().then(() => loadDistinctValues());
     
     // Handle filter application
     document.getElementById('applyFilters').addEventListener('click', () => {
         const selectedLabels = Array.from(document.getElementById('labelFilter').selectedOptions)
             .map(option => option.value);
-        const location = document.getElementById('locationFilter').value;
-        const system = document.getElementById('systemFilter').value;
+        const locations = Array.from(document.getElementById('locationFilter').selectedOptions)
+            .map(option => option.value);
+        const sublocations = Array.from(document.getElementById('sublocationFilter').selectedOptions)
+            .map(option => option.value);
+        const systems = Array.from(document.getElementById('systemFilter').selectedOptions)
+            .map(option => option.value);
         
         fetch('/api/nodes', {
             method: 'POST',
@@ -53,8 +144,9 @@ document.addEventListener('DOMContentLoaded', () => {
             },
             body: JSON.stringify({
                 labels: selectedLabels,
-                location,
-                system
+                locations,
+                sublocations,
+                systems
             })
         })
         .then(response => response.json())
@@ -66,10 +158,25 @@ document.addEventListener('DOMContentLoaded', () => {
         fitAll();
     });
 
+    // Reset functionality
+    document.getElementById('resetFilters').addEventListener('click', () => {
+        // Reset filter selections
+        document.getElementById('labelFilter').innerHTML = '';
+        document.getElementById('locationFilter').value = '';
+        document.getElementById('sublocationFilter').value = '';
+        document.getElementById('systemFilter').value = '';
+
+        // Clear visualization
+        svg.selectAll('*').remove();
+
+        // Reload initial data
+        loadLabels().then(() => loadDistinctValues());
+    });
+
     function updateVisualization(data) {
         svg.selectAll('*').remove();
 
-        // Add relationships first (so they appear behind nodes)
+        // Add relationships first so they appear behind nodes
         const links = svg.selectAll('line')
             .data(data.relationships)
             .enter()
@@ -78,31 +185,25 @@ document.addEventListener('DOMContentLoaded', () => {
             .attr('stroke', '#999')
             .attr('stroke-width', 1);
 
-        // Add nodes
-        const nodes = svg.selectAll('circle')
+        // Create node groups after relationships
+        const nodes = svg.selectAll('g')
             .data(data.nodes)
             .enter()
             .append('g')
             .attr('class', 'node-group');
 
-        const colorMap = {
-            'Person': '#1f77b4',
-            'Location': '#ff7f0e',
-            'Node': '#2ca02c',
-            // Add more mappings as needed
-        };
-
+        // Add node circles
         nodes.append('circle')
             .attr('class', d => `node node-${d.size}`)
-            .style('fill', '#1a1a1a'); // Same color as the background
+            .style('fill', '#1a1a1a');
 
-        // Add text labels inside nodes
+        // Add text labels
         nodes.append('text')
             .attr('class', 'node-label')
             .text(d => d.properties.name || d.labels[0])
             .attr('dy', '.35em');
 
-        // Update tooltips to include relationship info
+        // Add tooltips
         nodes.append('title')
             .text(d => `Labels: ${d.labels.join(', ')}\nProperties: ${JSON.stringify(d.properties)}`);
 
@@ -170,4 +271,92 @@ document.addEventListener('DOMContentLoaded', () => {
         event.subject.fx = null;
         event.subject.fy = null;
     }
+
+    // Add detail button functionality
+    const detailButtons = document.querySelectorAll('.detail-btn');
+    const selectedDetails = new Set(['major']); // Start with comprehensive selected
+
+    detailButtons.forEach(button => {
+        button.addEventListener('click', () => {
+            const detail = button.dataset.detail;
+            
+            // Remove selected class from all buttons
+            detailButtons.forEach(btn => btn.classList.remove('selected'));
+            
+            // Add selected class to clicked button
+            button.classList.add('selected');
+            
+            // Update selectedDetails set
+            selectedDetails.clear();
+            selectedDetails.add(detail);
+            
+            // Trigger filter update
+            document.getElementById('applyFilters').click();
+        });
+    });
+
+    // Modify the existing applyFilters event handler
+    document.getElementById('applyFilters').addEventListener('click', () => {
+        const selectedLabels = Array.from(document.getElementById('labelFilter').selectedOptions)
+            .map(option => option.value);
+        const locations = Array.from(document.getElementById('locationFilter').selectedOptions)
+            .map(option => option.value);
+        const sublocations = Array.from(document.getElementById('sublocationFilter').selectedOptions)
+            .map(option => option.value);
+        const systems = Array.from(document.getElementById('systemFilter').selectedOptions)
+            .map(option => option.value);
+        
+        fetch('/api/nodes', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({
+                labels: selectedLabels,
+                locations,
+                sublocations,
+                systems,
+                detail: Array.from(selectedDetails) // Changed from details to detail
+            })
+        })
+        .then(response => response.json())
+        .then(data => {
+            // Filter nodes based on selected detail levels
+            const filteredData = {
+                nodes: data.nodes.filter(node => selectedDetails.has(node.properties.detail)),
+                relationships: data.relationships.filter(rel => {
+                    const sourceNode = data.nodes.find(n => n.id === rel.source);
+                    const targetNode = data.nodes.find(n => n.id === rel.target);
+                    return selectedDetails.has(sourceNode?.properties.detail) && 
+                           selectedDetails.has(targetNode?.properties.detail);
+                })
+            };
+            updateVisualization(filteredData);
+        });
+    });
+
+    // Update reset functionality
+    document.getElementById('resetFilters').addEventListener('click', () => {
+        // Reset filter selections
+        document.getElementById('labelFilter').innerHTML = '';
+        document.getElementById('locationFilter').value = '';
+        document.getElementById('sublocationFilter').value = '';
+        document.getElementById('systemFilter').value = '';
+
+        // Clear visualization
+        svg.selectAll('*').remove();
+
+        // Reload initial data
+        loadLabels().then(() => loadDistinctValues());
+
+        // Reset detail buttons to default state (comprehensive)
+        detailButtons.forEach(button => {
+            button.classList.remove('selected');
+            if (button.dataset.detail === 'major') {
+                button.classList.add('selected');
+            }
+        });
+        selectedDetails.clear();
+        selectedDetails.add('major');
+    });
 });

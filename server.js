@@ -13,7 +13,31 @@ app.use(express.json());
 app.get('/api/labels', async (req, res) => {
     const session = driver.session();
     try {
-        const result = await session.run('CALL db.labels()');
+        const { locations, sublocations, systems } = req.query;
+        let query = 'MATCH (n)';
+        const conditions = [];
+        const params = {};
+        
+        if (locations) {
+            conditions.push('n.location IN $locations');
+            params.locations = locations.split(',');
+        }
+        if (sublocations) {
+            conditions.push('n.sublocation IN $sublocations');
+            params.sublocations = sublocations.split(',');
+        }
+        if (systems) {
+            conditions.push('n.system IN $systems');
+            params.systems = systems.split(',');
+        }
+        
+        if (conditions.length) {
+            query += ' WHERE ' + conditions.join(' AND ');
+        }
+        
+        query += ' WITH DISTINCT labels(n) as nodeLabels UNWIND nodeLabels as label RETURN DISTINCT label';
+        
+        const result = await session.run(query, params);
         const labels = result.records.map(record => record.get(0));
         res.json(labels);
     } finally {
@@ -24,12 +48,42 @@ app.get('/api/labels', async (req, res) => {
 app.get('/api/distinct-values', async (req, res) => {
     const session = driver.session();
     try {
-        const locationResult = await session.run('MATCH (n) WHERE n.location IS NOT NULL RETURN DISTINCT n.location');
-        const systemResult = await session.run('MATCH (n) WHERE n.location IS NOT NULL RETURN DISTINCT n.system');
+        const { label, locations, sublocations, systems } = req.query;
+        let conditions = [];
+        const params = {};
+
+        let baseQuery = query => {
+            let q = 'MATCH (n) WHERE ' + query + ' IS NOT NULL';
+            if (label) {
+                q += ` AND n:${label}`;
+            }
+            if (locations) {
+                q += ' AND n.location IN $locations';
+                params.locations = locations.split(',');
+            }
+            if (sublocations) {
+                q += ' AND n.sublocation IN $sublocations';
+                params.sublocations = sublocations.split(',');
+            }
+            if (systems) {
+                q += ' AND n.system IN $systems';
+                params.systems = systems.split(',');
+            }
+            return q;
+        };
+
+        const locationQuery = baseQuery('n.location') + ' RETURN DISTINCT n.location';
+        const sublocationQuery = baseQuery('n.sublocation') + ' RETURN DISTINCT n.sublocation';
+        const systemQuery = baseQuery('n.system') + ' RETURN DISTINCT n.system';
+        
+        const locationResult = await session.run(locationQuery, params);
+        const sublocationResult = await session.run(sublocationQuery, params);
+        const systemResult = await session.run(systemQuery, params);
         
         res.json({
-            locations: locationResult.records.map(record => record.get(0)),
-            systems: systemResult.records.map(record => record.get(0))
+            locations: locationResult.records.map(record => record.get(0)).filter(Boolean),
+            sublocations: sublocationResult.records.map(record => record.get(0)).filter(Boolean),
+            systems: systemResult.records.map(record => record.get(0)).filter(Boolean)
         });
     } finally {
         await session.close();
@@ -37,27 +91,40 @@ app.get('/api/distinct-values', async (req, res) => {
 });
 
 app.post('/api/nodes', async (req, res) => {
-    const { labels, location, system } = req.body;
+    const { labels, locations, sublocations, systems, detail } = req.body;
     const session = driver.session();
     try {
         let query = 'MATCH (n)';
         const conditions = [];
+        const params = {};
+
         if (labels && labels.length) {
-            conditions.push(`ANY(label IN labels(n) WHERE label IN $labels)`);
+            conditions.push(`${labels.map(label => `n:${label}`).join(' AND ')}`);
         }
-        if (location) {
-            conditions.push('n.location = $location');
+        if (locations && locations.length) {
+            conditions.push('n.location IN $locations');
+            params.locations = locations;
         }
-        if (system) {
-            conditions.push('n.system = $system');
+        if (sublocations && sublocations.length) {
+            conditions.push('n.sublocation IN $sublocations');
+            params.sublocations = sublocations;
         }
+        if (systems && systems.length) {
+            conditions.push('n.system IN $systems');
+            params.systems = systems;
+        }
+        if (detail && detail.length) {
+            conditions.push('n.detail IN $detail');
+            params.detail = detail;
+        }
+
         if (conditions.length) {
             query += ' WHERE ' + conditions.join(' AND ');
         }
-        // Add MATCH and RETURN clauses for relationships
+        
         query += ' MATCH (n)-[r]->(m) RETURN n, labels(n), collect({rel: r, target: m}) as relationships';
         
-        const result = await session.run(query, { labels, location, system });
+        const result = await session.run(query, params);
         const nodes = new Map();
         const relationships = [];
 

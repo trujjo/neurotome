@@ -10,14 +10,24 @@
             <select id="labelFilter" multiple>
                 <option value="">Loading labels...</option>
             </select>
-            <select id="locationFilter">
+            <select id="locationFilter" multiple>
                 <option value="">Loading locations...</option>
             </select>
-            <select id="systemFilter">
+            <select id="sublocationFilter" multiple>
+                <option value="">Loading sublocations...</option>
+            </select>
+            <select id="systemFilter" multiple>
                 <option value="">Loading systems...</option>
             </select>
             <button id="applyFilters">Apply Filters</button>
             <button id="fitAll">Fit All</button>
+            <button id="resetFilters">Reset</button>
+        </div>
+        <div id="detailFilter">
+            <h3>Detail Level</h3>
+            <button class="detail-btn selected" data-detail="major">comprehensive</button>
+            <button class="detail-btn" data-detail="intermediate">meticulous</button>
+            <button class="detail-btn" data-detail="minor">precise</button>
         </div>
     </div>
     <div id="graph"></div>

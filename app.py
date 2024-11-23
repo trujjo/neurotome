@@ -24,20 +24,51 @@ def serve_file(path):
 # API Endpoints
 @app.route('/api/labels', methods=['GET'])
 def get_labels():
+    location = request.args.get('location')
+    
     with driver.session() as session:
-        result = session.run("CALL db.labels()")
+        if location:
+            query = """
+                MATCH (n) 
+                WHERE n.location = $location 
+                WITH DISTINCT labels(n) as nodeLabels 
+                UNWIND nodeLabels as label 
+                RETURN DISTINCT label
+            """
+            result = session.run(query, {"location": location})
+        else:
+            result = session.run("CALL db.labels()")
+            
         labels = [record[0] for record in result]
         return jsonify(labels)
 
 @app.route('/api/distinct-values', methods=['GET'])
 def get_distinct_values():
+    label = request.args.get('label')
+    location = request.args.get('location')
+    
     with driver.session() as session:
-        location_result = session.run("MATCH (n) WHERE n.location IS NOT NULL RETURN DISTINCT n.location")
-        system_result = session.run("MATCH (n) WHERE n.location IS NOT NULL RETURN DISTINCT n.system")
+        location_query = "MATCH (n) WHERE n.location IS NOT NULL"
+        system_query = "MATCH (n) WHERE n.system IS NOT NULL"
+        params = {}
+        
+        if label:
+            location_query += f" AND n:{label}"
+            system_query += f" AND n:{label}"
+            
+        if location:
+            system_query += " AND n.location = $location"
+            params['location'] = location
+            
+        location_query += " RETURN DISTINCT n.location"
+        system_query += " RETURN DISTINCT n.system"
+        
+        location_result = session.run(location_query, params)
+        system_result = session.run(system_query, params)
         
         return jsonify({
-            'locations': [record[0] for record in location_result],
-            'systems': [record[0] for record in system_result]
+            'locations': [record[0] for record in location_result if record[0]],
+            'systems': [record[0] for record in system_result if record[0]]
         })
 
 @app.route('/api/nodes', methods=['POST'])
@@ -53,8 +84,7 @@ def get_nodes():
         params = {}
         
         if labels:
-            conditions.append("ANY(label IN labels(n) WHERE label IN $labels)")
-            params['labels'] = labels
+            conditions.append(' AND '.join(f"n:{label}" for label in labels))
         if location:
             conditions.append('n.location = $location')
             params['location'] = location
