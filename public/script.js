@@ -1,4 +1,28 @@
 document.addEventListener('DOMContentLoaded', () => {
+    // Initialize sidebar toggle functionality
+    const filterToggle = document.getElementById('filterToggle');
+    const filterContent = document.getElementById('filterContent');
+    const arrow = filterToggle.querySelector('.arrow');
+
+    filterToggle.addEventListener('click', () => {
+        filterContent.classList.toggle('collapsed');
+        arrow.style.transform = filterContent.classList.contains('collapsed') 
+            ? 'rotate(-90deg)' 
+            : 'rotate(0deg)';
+    });
+
+    // Ensure filterContent is visible by default
+    filterContent.classList.remove('collapsed');
+    filterToggle.classList.remove('collapsed');
+
+    // Add loading indicators
+    ['labelButtons', 'locationButtons', 'sublocationButtons', 'systemButtons'].forEach(id => {
+        const container = document.getElementById(id);
+        if (container) {
+            container.innerHTML = '<h3>' + id.replace('Buttons', '') + '</h3><div class="loading">Loading...</div>';
+        }
+    });
+
     const width = window.innerWidth;
     const height = window.innerHeight - 80;
     
@@ -64,7 +88,7 @@ document.addEventListener('DOMContentLoaded', () => {
             });
         });
 
-    // Load labels for filter
+    // Modified loadLabels function to preserve selections
     function loadLabels() {
         const locations = Array.from(document.getElementById('locationFilter').selectedOptions)
             .map(option => option.value);
@@ -77,23 +101,33 @@ document.addEventListener('DOMContentLoaded', () => {
         if (locations.length) params.append('locations', locations.join(','));
         if (sublocations.length) params.append('sublocations', sublocations.join(','));
         if (systems.length) params.append('systems', systems.join(','));
-        
+
         return fetch('/api/labels?' + params.toString())
-            .then(response => response.json())
+            .then(response => {
+                if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
+                return response.json();
+            })
             .then(labels => {
                 const labelSelect = document.getElementById('labelFilter');
-                const currentLabels = Array.from(labelSelect.selectedOptions)
-                    .map(option => option.value)
-                    .filter(label => labels.includes(label));
-                    
-                labelSelect.innerHTML = labels.map(label => 
-                    `<option value="${label}">${label}</option>`
-                ).join('');
+                const currentSelections = Array.from(labelSelect.selectedOptions).map(opt => opt.value);
                 
-                currentLabels.forEach(label => {
-                    const option = labelSelect.querySelector(`option[value="${label}"]`);
-                    if (option) option.selected = true;
-                });
+                // Only update if we have new labels
+                if (Array.isArray(labels) && labels.length > 0) {
+                    // Keep the current selections that are still valid
+                    labelSelect.innerHTML = labels
+                        .map(label => `<option value="${label}"${
+                            currentSelections.includes(label) ? ' selected' : ''
+                        }>${label}</option>`)
+                        .join('');
+                    
+                    // Update sidebar buttons
+                    updateSidebarButtons('labelButtons', labels);
+                }
+                return labels;
+            })
+            .catch(error => {
+                console.error('Error loading labels:', error);
+                return [];
             });
     }
 
@@ -119,33 +153,94 @@ document.addEventListener('DOMContentLoaded', () => {
             .then(data => updateFilterOptions(data));
     }
 
+    // Modify updateFilterOptions to ensure it's actually updating
     function updateFilterOptions(data) {
+        console.log('Updating filters with data:', data); // Debug log
+        
+        // Update dropdowns
         const locationSelect = document.getElementById('locationFilter');
         const sublocationSelect = document.getElementById('sublocationFilter');
         const systemSelect = document.getElementById('systemFilter');
         
-        const currentLocation = locationSelect.value;
-        const currentSublocation = sublocationSelect.value;
-        const currentSystem = systemSelect.value;
-        
-        // Only update options if they're not already set
-        if (!currentLocation || !data.locations.includes(currentLocation)) {
-            locationSelect.innerHTML = '<option value="">All Locations</option>' + 
-                data.locations.map(loc => `<option value="${loc}">${loc}</option>`).join('');
+        if (locationSelect && data.locations) {
+            locationSelect.innerHTML = data.locations
+                .map(loc => `<option value="${loc}">${loc}</option>`)
+                .join('');
         }
         
-        sublocationSelect.innerHTML = '<option value="">All Sublocations</option>' + 
-            data.sublocations.map(subloc => `<option value="${subloc}">${subloc}</option>`).join('');
-        
-        systemSelect.innerHTML = '<option value="">All Systems</option>' + 
-            data.systems.map(sys => `<option value="${sys}">${sys}</option>`).join('');
-        
-        if (currentSublocation && data.sublocations.includes(currentSublocation)) {
-            sublocationSelect.value = currentSublocation;
+        if (sublocationSelect && data.sublocations) {
+            sublocationSelect.innerHTML = data.sublocations
+                .map(subloc => `<option value="${subloc}">${subloc}</option>`)
+                .join('');
         }
-        if (currentSystem && data.systems.includes(currentSystem)) {
-            systemSelect.value = currentSystem;
+        
+        if (systemSelect && data.systems) {
+            systemSelect.innerHTML = data.systems
+                .map(sys => `<option value="${sys}">${sys}</option>`)
+                .join('');
         }
+
+        // Update sidebar buttons
+        updateSidebarButtons('labelButtons', data.labels || []);
+        updateSidebarButtons('locationButtons', data.locations || []);
+        updateSidebarButtons('sublocationButtons', data.sublocations || []);
+        updateSidebarButtons('systemButtons', data.systems || []);
+    }
+
+    // Modified updateSidebarButtons function to handle button states correctly
+    function updateSidebarButtons(containerId, items) {
+        const container = document.getElementById(containerId);
+        if (!container) {
+            console.error(`Container ${containerId} not found`);
+            return;
+        }
+
+        console.log(`Updating ${containerId} with items:`, items); // Debug log
+
+        const header = container.querySelector('h3') || document.createElement('h3');
+        header.textContent = containerId.replace('Buttons', '');
+        
+        container.innerHTML = '';
+        container.appendChild(header);
+
+        if (!Array.isArray(items) || items.length === 0) {
+            container.innerHTML += '<div class="loading">No items available</div>';
+            return;
+        }
+
+        // Get corresponding filter select element
+        const filterId = containerId.replace('Buttons', 'Filter');
+        const filterSelect = document.getElementById(filterId);
+        
+        items.forEach(item => {
+            if (!item) return;
+            
+            const button = document.createElement('button');
+            button.className = 'sidebar-btn';
+            button.textContent = item;
+            button.dataset.value = item;
+            
+            // Check if this value is selected in the corresponding filter
+            if (filterSelect) {
+                const isSelected = Array.from(filterSelect.selectedOptions)
+                    .some(option => option.value === item);
+                if (isSelected) button.classList.add('selected');
+            }
+            
+            button.addEventListener('click', () => {
+                button.classList.toggle('selected');
+                if (filterSelect) {
+                    Array.from(filterSelect.options).forEach(opt => {
+                        if (opt.value === item) {
+                            opt.selected = button.classList.contains('selected');
+                        }
+                    });
+                    filterSelect.dispatchEvent(new Event('change'));
+                }
+            });
+            
+            container.appendChild(button);
+        });
     }
 
     // Update event listeners
@@ -155,19 +250,19 @@ document.addEventListener('DOMContentLoaded', () => {
     const systemFilter = document.getElementById('systemFilter');
 
     labelFilter.addEventListener('change', () => {
-        loadDistinctValues().then(() => loadLabels());
+        loadDistinctValues();  // Remove the loadLabels call here
     });
     
     locationFilter.addEventListener('change', () => {
-        loadLabels().then(() => loadDistinctValues());
+        loadLabels();  // Keep this single call
     });
     
     sublocationFilter.addEventListener('change', () => {
-        loadLabels().then(() => loadDistinctValues());
+        loadLabels();  // Keep this single call
     });
     
     systemFilter.addEventListener('change', () => {
-        loadLabels().then(() => loadDistinctValues());
+        loadLabels();  // Keep this single call
     });
     
     // Initial load
@@ -270,11 +365,7 @@ document.addEventListener('DOMContentLoaded', () => {
             .call(d3.drag()  // Add drag behavior
                 .on('start', dragStarted)
                 .on('drag', dragged)
-                .on('end', dragEnded))
-            .on('dblclick', (event, d) => {
-                event.stopPropagation(); // Prevent double click from triggering zoom
-                zoomToNode(d);
-            });
+                .on('end', dragEnded));
 
         // Enable dragging on the background
         svg.call(d3.drag()
@@ -295,14 +386,21 @@ document.addEventListener('DOMContentLoaded', () => {
 
         // Add node circles
         nodes.append('circle')
-            .attr('class', d => `node node-${d.size}`)
+            .attr('class', 'node')
+            .attr('r', d => d.size === 'large' ? 30 : d.size === 'medium' ? 20 : 15)
             .style('fill', '#1a1a1a');
 
-        // Add text labels
+        // Add text labels with dynamic font sizing
         nodes.append('text')
             .attr('class', 'node-label')
             .text(d => d.properties.name || d.labels[0])
-            .attr('dy', '.35em');
+            .attr('dy', '.35em')
+            .style('font-size', d => {
+                const baseSize = d.size === 'large' ? 14 : d.size === 'medium' ? 12 : 10;
+                const textLength = (d.properties.name || d.labels[0]).length;
+                const nodeRadius = d.size === 'large' ? 30 : d.size === 'medium' ? 20 : 15;
+                return `${Math.min(baseSize, (nodeRadius * 1.8) / textLength)}px`;
+            });
 
         // Add tooltips
         nodes.append('title')
@@ -331,20 +429,6 @@ document.addEventListener('DOMContentLoaded', () => {
             });
 
         simulation.alpha(1).restart();
-    }
-
-    function zoomToNode(node) {
-        const transform = d3.zoomTransform(svg.node());
-        const scale = 2; // Zoom level - adjust this value to zoom in more or less
-        const x = -node.x * scale + width / 2;
-        const y = -node.y * scale + height / 2;
-
-        svg.transition()
-            .duration(750)
-            .call(
-                d3.zoom().transform,
-                d3.zoomIdentity.translate(x, y).scale(scale)
-            );
     }
 
     function fitAll() {
@@ -414,7 +498,11 @@ document.addEventListener('DOMContentLoaded', () => {
 
     // Add detail button functionality
     const detailButtons = document.querySelectorAll('.detail-btn');
-    const selectedDetails = new Set(['major']); // Start with comprehensive selected
+    // Detail levels are hierarchical:
+    // - comprehensive: shows base level data
+    // - meticulous: shows base + intermediate detail
+    // - precise: shows all levels of detail
+    const selectedDetails = new Set(['comprehensive']); // Start with base level selected
 
     detailButtons.forEach(button => {
         button.addEventListener('click', () => {
@@ -426,9 +514,18 @@ document.addEventListener('DOMContentLoaded', () => {
             // Add selected class to clicked button
             button.classList.add('selected');
             
-            // Update selectedDetails set
+            // Update selectedDetails set based on hierarchy
             selectedDetails.clear();
-            selectedDetails.add(detail);
+            if (detail === 'precise') {
+                selectedDetails.add('comprehensive');
+                selectedDetails.add('meticulous');
+                selectedDetails.add('precise');
+            } else if (detail === 'meticulous') {
+                selectedDetails.add('comprehensive');
+                selectedDetails.add('meticulous');
+            } else {
+                selectedDetails.add('comprehensive');
+            }
             
             // Trigger filter update
             document.getElementById('applyFilters').click();
@@ -467,8 +564,9 @@ document.addEventListener('DOMContentLoaded', () => {
                 relationships: data.relationships.filter(rel => {
                     const sourceNode = data.nodes.find(n => n.id === rel.source);
                     const targetNode = data.nodes.find(n => n.id === rel.target);
-                    return selectedDetails.has(sourceNode?.properties.detail) && 
-                           selectedDetails.has(targetNode?.properties.detail);
+                    return sourceNode && targetNode && 
+                           selectedDetails.has(sourceNode.properties.detail) && 
+                           selectedDetails.has(targetNode.properties.detail);
                 })
             };
             updateVisualization(filteredData);
@@ -508,4 +606,9 @@ document.addEventListener('DOMContentLoaded', () => {
     d3.select('#graph').on('dblclick', () => {
         fitAll();
     });
+
+    // Make sure initial load is triggered
+    loadLabels()
+        .then(() => loadDistinctValues())
+        .catch(error => console.error('Error loading initial data:', error));
 });

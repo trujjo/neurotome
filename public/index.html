@@ -5,36 +5,64 @@
     <link rel="stylesheet" href="styles.css">
 </head>
 <body>
-    <div id="controls">
-        <div id="filters">
-            <select id="labelFilter" multiple>
-                <option value="">Loading labels...</option>
-            </select>
-            <select id="locationFilter" multiple>
-                <option value="">Loading locations...</option>
-            </select>
-            <select id="sublocationFilter" multiple>
-                <option value="">Loading sublocations...</option>
-            </select>
-            <select id="systemFilter" multiple>
-                <option value="">Loading systems...</option>
-            </select>
-            <button id="applyFilters">Apply Filters</button>
-            <button id="fitAll">Fit All</button>
-            <button id="resetFilters">Reset</button>
+    <div class="layout-container">
+        <div id="sidebar">
+            <button id="filterToggle" class="filter-toggle">
+                <span>Filters</span>
+                <span class="arrow">▼</span>
+            </button>
+            <div id="filterContent" class="filter-content">
+                <div id="labelButtons" class="button-group">
+                    <h3>Labels</h3>
+                    <!-- Buttons will be added dynamically -->
+                </div>
+                <div id="locationButtons" class="button-group">
+                    <h3>Locations</h3>
+                    <!-- Buttons will be added dynamically -->
+                </div>
+                <div id="sublocationButtons" class="button-group">
+                    <h3>Sublocations</h3>
+                    <!-- Buttons will be added dynamically -->
+                </div>
+                <div id="systemButtons" class="button-group">
+                    <h3>Systems</h3>
+                    <!-- Buttons will be added dynamically -->
+                </div>
+            </div>
         </div>
-        <div id="detailFilter">
-            <h3>Detail Level</h3>
-            <button class="detail-btn selected" data-detail="major">comprehensive</button>
-            <button class="detail-btn" data-detail="intermediate">meticulous</button>
-            <button class="detail-btn" data-detail="minor">precise</button>
-        </div>
-        <div id="graphStats">
-            <div>Nodes: <span id="nodeCount">0</span></div>
-            <div>Relationships: <span id="relationshipCount">0</span></div>
+        <div class="main-content">
+            <div id="controls">
+                <div id="filters">
+                    <select id="labelFilter" multiple>
+                        <option value="">Loading labels...</option>
+                    </select>
+                    <select id="locationFilter" multiple>
+                        <option value="">Loading locations...</option>
+                    </select>
+                    <select id="sublocationFilter" multiple>
+                        <option value="">Loading sublocations...</option>
+                    </select>
+                    <select id="systemFilter" multiple>
+                        <option value="">Loading systems...</option>
+                    </select>
+                    <button id="applyFilters">Apply Filters</button>
+                    <button id="fitAll">Fit All</button>
+                    <button id="resetFilters">Reset</button>
+                </div>
+                <div id="detailFilter">
+                    <h3>Detail Level</h3>
+                    <button class="detail-btn selected" data-detail="comprehensive">comprehensive</button>
+                    <button class="detail-btn" data-detail="meticulous">meticulous</button>
+                    <button class="detail-btn" data-detail="precise">precise</button>
+                </div>
+                <div id="graphStats">
+                    <div>Nodes: <span id="nodeCount">0</span></div>
+                    <div>Relationships: <span id="relationshipCount">0</span></div>
+                </div>
+            </div>
+            <div id="graph"></div>
         </div>
     </div>
-    <div id="graph"></div>
     <script src="https://d3js.org/d3.v7.min.js"></script>
     <script src="script.js"></script>
 </body>
