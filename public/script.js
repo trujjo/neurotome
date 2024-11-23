@@ -1,21 +1,68 @@
 document.addEventListener('DOMContentLoaded', () => {
-    // Set up the D3 visualization
     const width = window.innerWidth;
     const height = window.innerHeight - 80;
     
+    // Create the SVG and add zoom behavior
     const svg = d3.select('#graph')
         .append('svg')
         .attr('width', width)
-        .attr('height', height)
-        .call(d3.zoom().on('zoom', (event) => {
-            svg.attr('transform', event.transform);
-        }))
-        .append('g');
+        .attr('height', height);
+
+    // Create a container group for all content
+    const container = svg.append('g');
+
+    // Add zoom behavior
+    const zoom = d3.zoom()
+        .scaleExtent([0.1, 4])
+        .on('zoom', (event) => {
+            container.attr('transform', event.transform);
+        });
+
+    svg.call(zoom);
+
+    // Disable double-click zoom since we use it for node focusing
+    svg.on('dblclick.zoom', null);
+
+    // Add grid
+    const gridSize = 50; // Size of grid cells
+    const numXLines = Math.ceil(width / gridSize);
+    const numYLines = Math.ceil(height / gridSize);
+
+    // Add vertical grid lines
+    for (let i = 0; i <= numXLines; i++) {
+        container.append('line')
+            .attr('class', 'grid-line')
+            .attr('x1', i * gridSize)
+            .attr('y1', 0)
+            .attr('x2', i * gridSize)
+            .attr('y2', height)
+            .style('stroke', '#2a2a2a')
+            .style('stroke-width', '1px');
+    }
+
+    // Add horizontal grid lines
+    for (let i = 0; i <= numYLines; i++) {
+        container.append('line')
+            .attr('class', 'grid-line')
+            .attr('x1', 0)
+            .attr('y1', i * gridSize)
+            .attr('x2', width)
+            .attr('y2', i * gridSize)
+            .style('stroke', '#2a2a2a')
+            .style('stroke-width', '1px');
+    }
 
     const simulation = d3.forceSimulation()
         .force('center', d3.forceCenter(width / 2, height / 2))
         .force('charge', d3.forceManyBody().strength(-100))
-        .force('collide', d3.forceCollide(30));
+        .force('collide', d3.forceCollide(30))
+        .on('tick', () => {
+            // Keep nodes within bounds
+            simulation.nodes().forEach(d => {
+                d.x = Math.max(30, Math.min(width - 30, d.x));
+                d.y = Math.max(30, Math.min(height - 30, d.y));
+            });
+        });
 
     // Load labels for filter
     function loadLabels() {
@@ -167,17 +214,46 @@ document.addEventListener('DOMContentLoaded', () => {
         document.getElementById('systemFilter').value = '';
 
         // Clear visualization
-        svg.selectAll('*').remove();
+        container.selectAll('*').remove();
+
+        // Reset counters
+        document.getElementById('nodeCount').textContent = '0';
+        document.getElementById('relationshipCount').textContent = '0';
 
         // Reload initial data
         loadLabels().then(() => loadDistinctValues());
+
+        // Reset detail buttons to default state (comprehensive)
+        detailButtons.forEach(button => {
+            button.classList.remove('selected');
+            if (button.dataset.detail === 'major') {
+                button.classList.add('selected');
+            }
+        });
+        selectedDetails.clear();
+        selectedDetails.add('major');
     });
 
     function updateVisualization(data) {
-        svg.selectAll('*').remove();
+        // Clear the container instead of all SVG
+        container.selectAll('*').remove();
+        
+        // Update counters
+        document.getElementById('nodeCount').textContent = data.nodes.length;
+        document.getElementById('relationshipCount').textContent = data.relationships.length;
+
+        // Position nodes based on their stored coordinates or let simulation handle it
+        data.nodes.forEach(node => {
+            if (node.properties.x !== undefined && node.properties.y !== undefined) {
+                node.x = parseFloat(node.properties.x);
+                node.y = parseFloat(node.properties.y);
+                node.fx = node.x; // Fix position if coordinates exist
+                node.fy = node.y;
+            }
+        });
 
         // Add relationships first so they appear behind nodes
-        const links = svg.selectAll('line')
+        const links = container.selectAll('line')
             .data(data.relationships)
             .enter()
             .append('line')
@@ -186,11 +262,36 @@ document.addEventListener('DOMContentLoaded', () => {
             .attr('stroke-width', 1);
 
         // Create node groups after relationships
-        const nodes = svg.selectAll('g')
+        const nodes = container.selectAll('g')
             .data(data.nodes)
             .enter()
             .append('g')
-            .attr('class', 'node-group');
+            .attr('class', 'node-group')
+            .call(d3.drag()  // Add drag behavior
+                .on('start', dragStarted)
+                .on('drag', dragged)
+                .on('end', dragEnded))
+            .on('dblclick', (event, d) => {
+                event.stopPropagation(); // Prevent double click from triggering zoom
+                zoomToNode(d);
+            });
+
+        // Enable dragging on the background
+        svg.call(d3.drag()
+            .on('start', function(event) {
+                // Only start drag if we click the background
+                if (event.target.tagName === 'svg') {
+                    const transform = d3.zoomTransform(svg.node());
+                    event.subject = { x: transform.x, y: transform.y };
+                }
+            })
+            .on('drag', function(event) {
+                // Only drag if we started on the background
+                if (event.subject) {
+                    const transform = d3.zoomTransform(svg.node());
+                    svg.attr('transform', `translate(${event.x}, ${event.y}) scale(${transform.k})`);
+                }
+            }));
 
         // Add node circles
         nodes.append('circle')
@@ -232,21 +333,55 @@ document.addEventListener('DOMContentLoaded', () => {
         simulation.alpha(1).restart();
     }
 
+    function zoomToNode(node) {
+        const transform = d3.zoomTransform(svg.node());
+        const scale = 2; // Zoom level - adjust this value to zoom in more or less
+        const x = -node.x * scale + width / 2;
+        const y = -node.y * scale + height / 2;
+
+        svg.transition()
+            .duration(750)
+            .call(
+                d3.zoom().transform,
+                d3.zoomIdentity.translate(x, y).scale(scale)
+            );
+    }
+
     function fitAll() {
-        const bounds = svg.node().getBBox();
+        const nodes = simulation.nodes();
+        if (nodes.length === 0) return; // nothing to fit
+
+        // Calculate the actual bounds of all nodes
+        const bounds = {
+            minX: d3.min(nodes, d => d.x),
+            maxX: d3.max(nodes, d => d.x),
+            minY: d3.min(nodes, d => d.y),
+            maxY: d3.max(nodes, d => d.y)
+        };
+
         const parent = svg.node().parentElement;
         const fullWidth = parent.clientWidth;
         const fullHeight = parent.clientHeight;
-        const width = bounds.width;
-        const height = bounds.height;
-        const midX = bounds.x + width / 2;
-        const midY = bounds.y + height / 2;
+        
+        // Calculate width and height with padding
+        const padding = 50;
+        const width = bounds.maxX - bounds.minX + padding * 2;
+        const height = bounds.maxY - bounds.minY + padding * 2;
+        
+        // Calculate center points
+        const midX = bounds.minX + width / 2;
+        const midY = bounds.minY + height / 2;
 
-        if (width === 0 || height === 0) return; // nothing to fit
+        // Calculate scale with some padding
+        const scale = 0.95 / Math.max(width / fullWidth, height / fullHeight);
+        
+        // Calculate translation to center the graph
+        const translate = [
+            fullWidth / 2 - scale * midX,
+            fullHeight / 2 - scale * midY
+        ];
 
-        const scale = 0.85 / Math.max(width / fullWidth, height / fullHeight);
-        const translate = [fullWidth / 2 - scale * midX, fullHeight / 2 - scale * midY];
-
+        // Apply transform to the svg (not container)
         svg.transition()
             .duration(750)
             .call(
@@ -268,6 +403,11 @@ document.addEventListener('DOMContentLoaded', () => {
     
     function dragEnded(event) {
         if (!event.active) simulation.alphaTarget(0);
+        // Store new position if node was dragged
+        if (event.subject.x !== event.subject.fx || event.subject.y !== event.subject.fy) {
+            event.subject.properties.x = event.subject.x;
+            event.subject.properties.y = event.subject.y;
+        }
         event.subject.fx = null;
         event.subject.fy = null;
     }
@@ -344,7 +484,11 @@ document.addEventListener('DOMContentLoaded', () => {
         document.getElementById('systemFilter').value = '';
 
         // Clear visualization
-        svg.selectAll('*').remove();
+        container.selectAll('*').remove();
+
+        // Reset counters
+        document.getElementById('nodeCount').textContent = '0';
+        document.getElementById('relationshipCount').textContent = '0';
 
         // Reload initial data
         loadLabels().then(() => loadDistinctValues());
@@ -358,5 +502,10 @@ document.addEventListener('DOMContentLoaded', () => {
         });
         selectedDetails.clear();
         selectedDetails.add('major');
+    });
+
+    // Add background double-click to reset zoom
+    d3.select('#graph').on('dblclick', () => {
+        fitAll();
     });
 });
