@@ -258,3 +258,44 @@ body {
     text-align: center;
     font-style: italic;
 }
+
+.location-group {
+    margin-bottom: 10px;
+}
+
+.location-btn {
+    width: 100%;
+    text-align: left;
+    padding: 8px;
+    background: #333;
+    color: white;
+    border: 1px solid #444;
+    cursor: pointer;
+}
+
+.sublocation-container {
+    margin-left: 20px;
+    margin-top: 4px;
+}
+
+.sublocation-btn {
+    width: calc(100% - 20px);
+    text-align: left;
+    padding: 6px;
+    background: #2a2a2a;
+    color: white;
+    border: 1px solid #393939;
+    cursor: pointer;
+    font-size: 0.9em;
+}
+
+.location-btn:hover,
+.sublocation-btn:hover {
+    background: #444;
+}
+
+.location-btn.selected,
+.sublocation-btn.selected {
+    background: #ff6b3d;
+    border-color: #ff6b3d;
+}

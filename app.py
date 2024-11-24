@@ -24,52 +24,72 @@ def serve_file(path):
 # API Endpoints
 @app.route('/api/labels', methods=['GET'])
 def get_labels():
-    location = request.args.get('location')
-    
     with driver.session() as session:
-        if location:
-            query = """
-                MATCH (n) 
-                WHERE n.location = $location 
-                WITH DISTINCT labels(n) as nodeLabels 
-                UNWIND nodeLabels as label 
-                RETURN DISTINCT label
-            """
-            result = session.run(query, {"location": location})
-        else:
-            result = session.run("CALL db.labels()")
-            
+        # Simple query to get all labels without filtering
+        result = session.run("CALL db.labels()")
         labels = [record[0] for record in result]
         return jsonify(labels)
 
 @app.route('/api/distinct-values', methods=['GET'])
 def get_distinct_values():
     label = request.args.get('label')
-    location = request.args.get('location')
+    is_explore = request.args.get('explore') == 'true'
     
     with driver.session() as session:
-        location_query = "MATCH (n) WHERE n.location IS NOT NULL"
-        system_query = "MATCH (n) WHERE n.system IS NOT NULL"
-        params = {}
-        
-        if label:
-            location_query += f" AND n:{label}"
-            system_query += f" AND n:{label}"
+        if is_explore:
+            # Location tree query with optional label filter
+            location_query = """
+                MATCH (n)
+                WHERE n.location IS NOT NULL
+                {}
+                WITH DISTINCT n.location as location
+                OPTIONAL MATCH (m)
+                WHERE m.sublocation IS NOT NULL 
+                AND m.location = location
+                {}
+                RETURN location, collect(DISTINCT m.sublocation) as sublocations
+                ORDER BY location
+            """.format(
+                f"AND n:{label}" if label else "",
+                f"AND m:{label}" if label else ""
+            )
             
-        if location:
-            system_query += " AND n.location = $location"
-            params['location'] = location
+            location_result = session.run(location_query)
+            locations_data = [(record["location"], record["sublocations"]) 
+                            for record in location_result if record["location"]]
+
+            # System query with optional label filter
+            system_query = f"""
+                MATCH (n) 
+                WHERE n.system IS NOT NULL
+                {f"AND n:{label}" if label else ""}
+                RETURN DISTINCT n.system 
+                ORDER BY n.system
+            """
+            system_result = session.run(system_query)
             
-        location_query += " RETURN DISTINCT n.location"
-        system_query += " RETURN DISTINCT n.system"
-        
-        location_result = session.run(location_query, params)
-        system_result = session.run(system_query, params)
-        
-        return jsonify({
-            'locations': [record[0] for record in location_result if record[0]],
-            'systems': [record[0] for record in system_result if record[0]]
-        })
+            return jsonify({
+                'locationTree': locations_data,
+                'systems': [record[0] for record in system_result if record[0]]
+            })
+        else:
+            # Property queries with optional label filter
+            def get_property_values(property_name):
+                query = f"""
+                    MATCH (n)
+                    WHERE n.{property_name} IS NOT NULL
+                    {f"AND n:{label}" if label else ""}
+                    RETURN DISTINCT n.{property_name}
+                    ORDER BY n.{property_name}
+                """
+                result = session.run(query)
+                return [record[0] for record in result if record[0]]
+
+            return jsonify({
+                'locations': get_property_values('location'),
+                'sublocations': get_property_values('sublocation'),
+                'systems': get_property_values('system')
+            })
 
 @app.route('/api/nodes', methods=['POST'])
 def get_nodes():
@@ -110,8 +130,8 @@ def get_nodes():
                     'id': node_id,
                     'labels': record['labels(n)'],
                     'properties': dict(node.items()),
-                    'size': 'large' if node.get('detail') == 'major' else 
-                           'medium' if node.get('detail') == 'intermediate' else 'small'
+                    'size': 'large' if node.get('detail') == 'comprehensive' else 
+                           'medium' if node.get('detail') == 'meticulous' else 'small'
                 }
             
             for rel in record['relationships']:
@@ -129,8 +149,8 @@ def get_nodes():
                         'id': target_id,
                         'labels': list(target.labels),
                         'properties': dict(target.items()),
-                        'size': 'large' if target.get('detail') == 'major' else
-                               'medium' if target.get('detail') == 'intermediate' else 'small'
+                        'size': 'large' if target.get('detail') == 'comprehensive' else
+                               'medium' if target.get('detail') == 'meticulous' else 'small'
                     }
         
         return jsonify({

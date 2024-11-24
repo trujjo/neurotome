@@ -16,10 +16,11 @@ document.addEventListener('DOMContentLoaded', () => {
     filterToggle.classList.remove('collapsed');
 
     // Add loading indicators
-    ['labelButtons', 'locationButtons', 'sublocationButtons', 'systemButtons'].forEach(id => {
+    ['labelButtons', 'locationButtons', 'sublocationButtons', 'systemButtons',
+     'exploreLabelButtons', 'exploreLocationButtons', 'exploreSublocationButtons', 'exploreSystemButtons'].forEach(id => {
         const container = document.getElementById(id);
         if (container) {
-            container.innerHTML = '<h3>' + id.replace('Buttons', '') + '</h3><div class="loading">Loading...</div>';
+            container.innerHTML = '<h3>' + id.replace('Buttons', '').replace('explore', '') + '</h3><div class="loading">Loading...</div>';
         }
     });
 
@@ -88,37 +89,27 @@ document.addEventListener('DOMContentLoaded', () => {
             });
         });
 
-    // Modified loadLabels function to preserve selections
+    // Simplified loadLabels function - remove hyper-filtering
     function loadLabels() {
-        const locations = Array.from(document.getElementById('locationFilter').selectedOptions)
-            .map(option => option.value);
-        const sublocations = Array.from(document.getElementById('sublocationFilter').selectedOptions)
-            .map(option => option.value);
-        const systems = Array.from(document.getElementById('systemFilter').selectedOptions)
-            .map(option => option.value);
-        
-        const params = new URLSearchParams();
-        if (locations.length) params.append('locations', locations.join(','));
-        if (sublocations.length) params.append('sublocations', sublocations.join(','));
-        if (systems.length) params.append('systems', systems.join(','));
-
-        return fetch('/api/labels?' + params.toString())
+        return fetch('/api/labels')
             .then(response => {
                 if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
                 return response.json();
             })
             .then(labels => {
                 const labelSelect = document.getElementById('labelFilter');
-                const currentSelections = Array.from(labelSelect.selectedOptions).map(opt => opt.value);
                 
-                // Only update if we have new labels
                 if (Array.isArray(labels) && labels.length > 0) {
-                    // Keep the current selections that are still valid
-                    labelSelect.innerHTML = labels
-                        .map(label => `<option value="${label}"${
-                            currentSelections.includes(label) ? ' selected' : ''
-                        }>${label}</option>`)
-                        .join('');
+                    // Clear existing options
+                    labelSelect.innerHTML = '';
+                    
+                    // Add new options
+                    labels.forEach(label => {
+                        const option = document.createElement('option');
+                        option.value = label;
+                        option.textContent = label;
+                        labelSelect.appendChild(option);
+                    });
                     
                     // Update sidebar buttons
                     updateSidebarButtons('labelButtons', labels);
@@ -131,22 +122,14 @@ document.addEventListener('DOMContentLoaded', () => {
             });
     }
 
-    // Update loadDistinctValues function
-    function loadDistinctValues() {
-        const selectedLabels = Array.from(document.getElementById('labelFilter').selectedOptions)
-            .map(option => option.value);
-        const locations = Array.from(document.getElementById('locationFilter').selectedOptions)
-            .map(option => option.value);
-        const sublocations = Array.from(document.getElementById('sublocationFilter').selectedOptions)
-            .map(option => option.value);
-        const systems = Array.from(document.getElementById('systemFilter').selectedOptions)
-            .map(option => option.value);
+    // Update loadDistinctValues function to cache labels
+    function loadDistinctValues(isExplore = false) {
+        const selectedLabel = Array.from(document.getElementById('labelFilter').selectedOptions)
+            .map(option => option.value)[0]; // Only use first selected label
         
         const params = new URLSearchParams();
-        if (selectedLabels.length === 1) params.append('label', selectedLabels[0]);
-        if (locations.length) params.append('locations', locations.join(','));
-        if (sublocations.length) params.append('sublocations', sublocations.join(','));
-        if (systems.length) params.append('systems', systems.join(','));
+        if (selectedLabel) params.append('label', selectedLabel);
+        if (isExplore) params.append('explore', 'true');
     
         return fetch('/api/distinct-values?' + params.toString())
             .then(response => response.json())
@@ -154,10 +137,88 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     // Modify updateFilterOptions to ensure it's actually updating
-    function updateFilterOptions(data) {
-        console.log('Updating filters with data:', data); // Debug log
-        
-        // Update dropdowns
+    function updateFilterOptions(data, prefix = '') {
+        if (prefix === 'explore') {
+            // Handle explore view with hierarchical structure
+            const exploreLocationContainer = document.getElementById('exploreLocationButtons');
+            exploreLocationContainer.innerHTML = '<h3>Locations</h3>';
+            
+            // Don't update labels in explore view, they should stay constant
+            const exploreLabelButtons = document.getElementById('exploreLabelButtons');
+            if (!exploreLabelButtons.hasChildNodes()) {
+                // Only populate labels once when empty
+                updateSidebarButtons('exploreLabelButtons', data.labels || []);
+            }
+            
+            if (data.locationTree) {
+                data.locationTree.forEach(([location, sublocations]) => {
+                    const locationGroup = document.createElement('div');
+                    locationGroup.className = 'location-group';
+                    
+                    // Create location button
+                    const locationBtn = document.createElement('button');
+                    locationBtn.className = 'sidebar-btn location-btn';
+                    locationBtn.textContent = location;
+                    locationBtn.dataset.value = location;
+                    locationGroup.appendChild(locationBtn);
+                    
+                    // Create sublocation container
+                    if (sublocations && sublocations.length) {
+                        const sublocationContainer = document.createElement('div');
+                        sublocationContainer.className = 'sublocation-container';
+                        
+                        sublocations.forEach(sublocation => {
+                            const sublocationBtn = document.createElement('button');
+                            sublocationBtn.className = 'sidebar-btn sublocation-btn';
+                            sublocationBtn.textContent = sublocation;
+                            sublocationBtn.dataset.value = sublocation;
+                            sublocationBtn.dataset.parent = location;
+                            sublocationContainer.appendChild(sublocationBtn);
+                        });
+                        
+                        locationGroup.appendChild(sublocationContainer);
+                    }
+                    
+                    exploreLocationContainer.appendChild(locationGroup);
+                });
+            }
+
+            // Update systems separately
+            updateSidebarButtons('exploreSystemButtons', data.systems || []);
+        } else {
+            // Original filter update logic
+            console.log('Updating filters with data:', data); // Debug log
+            
+            // Regular filter view - don't update labels here either
+            const labelButtons = document.getElementById('labelButtons');
+            if (!labelButtons.hasChildNodes()) {
+                // Only populate labels once when empty
+                updateSidebarButtons('labelButtons', data.labels || []);
+            }
+            
+            // Update dropdowns
+            updateDropdowns(data);
+
+            // Update both main filters and explore filters
+            const sections = ['', 'explore'];
+            
+            sections.forEach(prefix => {
+                const labelButtons = prefix + 'labelButtons';
+                const locationButtons = prefix + 'locationButtons';
+                const sublocationButtons = prefix + 'sublocationButtons';
+                const systemButtons = prefix + 'systemButtons';
+
+                // Update sidebar buttons for both sections
+                updateSidebarButtons(labelButtons, data.labels || []);
+                updateSidebarButtons(locationButtons, data.locations || []);
+                updateSidebarButtons(sublocationButtons, data.sublocations || []);
+                updateSidebarButtons(systemButtons, data.systems || []);
+            });
+        }
+    }
+
+    // New helper function to update dropdowns
+    function updateDropdowns(data) {
         const locationSelect = document.getElementById('locationFilter');
         const sublocationSelect = document.getElementById('sublocationFilter');
         const systemSelect = document.getElementById('systemFilter');
@@ -179,26 +240,20 @@ document.addEventListener('DOMContentLoaded', () => {
                 .map(sys => `<option value="${sys}">${sys}</option>`)
                 .join('');
         }
-
-        // Update sidebar buttons
-        updateSidebarButtons('labelButtons', data.labels || []);
-        updateSidebarButtons('locationButtons', data.locations || []);
-        updateSidebarButtons('sublocationButtons', data.sublocations || []);
-        updateSidebarButtons('systemButtons', data.systems || []);
     }
 
-    // Modified updateSidebarButtons function to handle button states correctly
+    // Modified updateSidebarButtons function to handle button states independently
     function updateSidebarButtons(containerId, items) {
+        if (containerId === 'labelButtons') return; // Skip labels handling here
+
         const container = document.getElementById(containerId);
         if (!container) {
             console.error(`Container ${containerId} not found`);
             return;
         }
 
-        console.log(`Updating ${containerId} with items:`, items); // Debug log
-
         const header = container.querySelector('h3') || document.createElement('h3');
-        header.textContent = containerId.replace('Buttons', '');
+        header.textContent = containerId.replace('Buttons', '').replace('explore', '');
         
         container.innerHTML = '';
         container.appendChild(header);
@@ -208,10 +263,6 @@ document.addEventListener('DOMContentLoaded', () => {
             return;
         }
 
-        // Get corresponding filter select element
-        const filterId = containerId.replace('Buttons', 'Filter');
-        const filterSelect = document.getElementById(filterId);
-        
         items.forEach(item => {
             if (!item) return;
             
@@ -220,23 +271,9 @@ document.addEventListener('DOMContentLoaded', () => {
             button.textContent = item;
             button.dataset.value = item;
             
-            // Check if this value is selected in the corresponding filter
-            if (filterSelect) {
-                const isSelected = Array.from(filterSelect.selectedOptions)
-                    .some(option => option.value === item);
-                if (isSelected) button.classList.add('selected');
-            }
-            
             button.addEventListener('click', () => {
+                // Toggle button selection independently
                 button.classList.toggle('selected');
-                if (filterSelect) {
-                    Array.from(filterSelect.options).forEach(opt => {
-                        if (opt.value === item) {
-                            opt.selected = button.classList.contains('selected');
-                        }
-                    });
-                    filterSelect.dispatchEvent(new Event('change'));
-                }
             });
             
             container.appendChild(button);
@@ -250,7 +287,8 @@ document.addEventListener('DOMContentLoaded', () => {
     const systemFilter = document.getElementById('systemFilter');
 
     labelFilter.addEventListener('change', () => {
-        loadDistinctValues();  // Remove the loadLabels call here
+        // Only update values affected by label selection
+        loadDistinctValues(false);  // Don't reload labels
     });
     
     locationFilter.addEventListener('change', () => {
@@ -611,4 +649,219 @@ document.addEventListener('DOMContentLoaded', () => {
     loadLabels()
         .then(() => loadDistinctValues())
         .catch(error => console.error('Error loading initial data:', error));
+
+    // Add explore toggle functionality
+    const exploreToggle = document.getElementById('exploreToggle');
+    const exploreContent = document.getElementById('exploreContent');
+    const exploreArrow = exploreToggle.querySelector('.arrow');
+
+    exploreToggle.addEventListener('click', () => {
+        exploreContent.classList.toggle('collapsed');
+        exploreArrow.style.transform = exploreContent.classList.contains('collapsed') 
+            ? 'rotate(-90deg)' 
+            : 'rotate(0deg)';
+        
+        // Load explore values when opening the explore section
+        if (!exploreContent.classList.contains('collapsed')) {
+            loadDistinctValues(true);
+        }
+    });
+
+    // Add explore filter functionality
+    function applyExploreFilters() {
+        const selectedLabels = Array.from(document.getElementById('labelFilter').selectedOptions)
+            .map(option => option.value);
+        const selectedLocations = Array.from(document.getElementsByClassName('location-btn'))
+            .filter(btn => btn.classList.contains('selected'))
+            .map(btn => btn.dataset.value);
+        const selectedSublocations = Array.from(document.getElementsByClassName('sublocation-btn'))
+            .filter(btn => btn.classList.contains('selected'))
+            .map(btn => btn.dataset.value);
+        const selectedSystems = Array.from(document.getElementsByClassName('system-btn'))
+            .filter(btn => btn.classList.contains('selected'))
+            .map(btn => btn.dataset.value);
+        
+        // Update main filters to match explore selection
+        updateMainFilters(selectedLabels, selectedLocations, selectedSublocations, selectedSystems);
+        
+        // Trigger the main filter application
+        document.getElementById('applyFilters').click();
+    }
+
+    // Helper function to update main filters based on explore selection
+    function updateMainFilters(labels, locations, sublocations, systems) {
+        setMultiSelectValues('labelFilter', labels);
+        setMultiSelectValues('locationFilter', locations);
+        setMultiSelectValues('sublocationFilter', sublocations);
+        setMultiSelectValues('systemFilter', systems);
+    }
+
+    function setMultiSelectValues(selectId, values) {
+        const select = document.getElementById(selectId);
+        Array.from(select.options).forEach(option => {
+            option.selected = values.includes(option.value);
+        });
+    }
+
+    // Update explore button click handlers
+    exploreContent.addEventListener('click', event => {
+        const target = event.target;
+        if (target.matches('.location-btn, .sublocation-btn, .system-btn')) {
+            target.classList.toggle('selected');
+            applyExploreFilters();
+        }
+    });
+
+    // Modify loadLabels function to handle both main filters and sidebar
+    function loadLabels() {
+        return fetch('/api/labels')
+            .then(response => {
+                if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
+                return response.json();
+            })
+            .then(labels => {
+                // Update both main filter and sidebar
+                const labelSelect = document.getElementById('labelFilter');
+                const labelButtons = document.getElementById('labelButtons');
+                
+                if (Array.isArray(labels) && labels.length > 0) {
+                    // Clear existing options/buttons
+                    labelSelect.innerHTML = '';
+                    labelButtons.innerHTML = '<h3>Labels</h3>';
+                    
+                    // Add options to main filter
+                    labels.forEach(label => {
+                        const option = document.createElement('option');
+                        option.value = label;
+                        option.textContent = label;
+                        labelSelect.appendChild(option);
+                        
+                        // Add corresponding button to sidebar
+                        const button = document.createElement('button');
+                        button.className = 'sidebar-btn';
+                        button.textContent = label;
+                        button.dataset.value = label;
+                        
+                        // Sync button state with select option
+                        button.addEventListener('click', () => {
+                            button.classList.toggle('selected');
+                            const option = labelSelect.querySelector(`option[value="${label}"]`);
+                            option.selected = button.classList.contains('selected');
+                            labelSelect.dispatchEvent(new Event('change'));
+                        });
+                        
+                        labelButtons.appendChild(button);
+                    });
+                    
+                    // Add change listener to main filter to sync with sidebar
+                    labelSelect.addEventListener('change', () => {
+                        const selectedValues = Array.from(labelSelect.selectedOptions).map(opt => opt.value);
+                        const buttons = labelButtons.querySelectorAll('.sidebar-btn');
+                        buttons.forEach(btn => {
+                            btn.classList.toggle('selected', selectedValues.includes(btn.dataset.value));
+                        });
+                    });
+                }
+                return labels;
+            })
+            .catch(error => {
+                console.error('Error loading labels:', error);
+                return [];
+            });
+    }
+
+    // Similar modification for loadDistinctValues to sync filters
+    function loadDistinctValues(isExplore = false) {
+        const selectedLabel = Array.from(document.getElementById('labelFilter').selectedOptions)
+            .map(option => option.value)[0]; // Only use first selected label
+        
+        const params = new URLSearchParams();
+        if (selectedLabel) params.append('label', selectedLabel);
+        if (isExplore) params.append('explore', 'true');
+    
+        return fetch('/api/distinct-values?' + params.toString())
+            .then(response => response.json())
+            .then(data => updateFilterOptions(data));
+    }
+
+    // Update the updateFilterOptions function
+    function updateFilterOptions(data, prefix = '') {
+        if (prefix === 'explore') {
+            // Handle explore view with hierarchical structure
+            const exploreLocationContainer = document.getElementById('exploreLocationButtons');
+            exploreLocationContainer.innerHTML = '<h3>Locations</h3>';
+            
+            // Don't update labels in explore view, they should stay constant
+            const exploreLabelButtons = document.getElementById('exploreLabelButtons');
+            if (!exploreLabelButtons.hasChildNodes()) {
+                // Only populate labels once when empty
+                updateSidebarButtons('exploreLabelButtons', data.labels || []);
+            }
+            
+            if (data.locationTree) {
+                data.locationTree.forEach(([location, sublocations]) => {
+                    const locationGroup = document.createElement('div');
+                    locationGroup.className = 'location-group';
+                    
+                    // Create location button
+                    const locationBtn = document.createElement('button');
+                    locationBtn.className = 'sidebar-btn location-btn';
+                    locationBtn.textContent = location;
+                    locationBtn.dataset.value = location;
+                    locationGroup.appendChild(locationBtn);
+                    
+                    // Create sublocation container
+                    if (sublocations && sublocations.length) {
+                        const sublocationContainer = document.createElement('div');
+                        sublocationContainer.className = 'sublocation-container';
+                        
+                        sublocations.forEach(sublocation => {
+                            const sublocationBtn = document.createElement('button');
+                            sublocationBtn.className = 'sidebar-btn sublocation-btn';
+                            sublocationBtn.textContent = sublocation;
+                            sublocationBtn.dataset.value = sublocation;
+                            sublocationBtn.dataset.parent = location;
+                            sublocationContainer.appendChild(sublocationBtn);
+                        });
+                        
+                        locationGroup.appendChild(sublocationContainer);
+                    }
+                    
+                    exploreLocationContainer.appendChild(locationGroup);
+                });
+            }
+
+            // Update systems separately
+            updateSidebarButtons('exploreSystemButtons', data.systems || []);
+        } else {
+            // Original filter update logic
+            console.log('Updating filters with data:', data); // Debug log
+            
+            // Regular filter view - don't update labels here either
+            const labelButtons = document.getElementById('labelButtons');
+            if (!labelButtons.hasChildNodes()) {
+                // Only populate labels once when empty
+                updateSidebarButtons('labelButtons', data.labels || []);
+            }
+            
+            // Update dropdowns
+            updateDropdowns(data);
+
+            // Update both main filters and explore filters
+            const sections = ['', 'explore'];
+            
+            sections.forEach(prefix => {
+                const labelButtons = prefix + 'labelButtons';
+                const locationButtons = prefix + 'locationButtons';
+                const sublocationButtons = prefix + 'sublocationButtons';
+                const systemButtons = prefix + 'systemButtons';
+
+                // Update sidebar buttons for both sections
+                updateSidebarButtons(labelButtons, data.labels || []);
+                updateSidebarButtons(locationButtons, data.locations || []);
+                updateSidebarButtons(sublocationButtons, data.sublocations || []);
+                updateSidebarButtons(systemButtons, data.systems || []);
+            });
+        }
+    }
 });

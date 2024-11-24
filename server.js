@@ -48,42 +48,51 @@ app.get('/api/labels', async (req, res) => {
 app.get('/api/distinct-values', async (req, res) => {
     const session = driver.session();
     try {
-        const { label, locations, sublocations, systems } = req.query;
-        let conditions = [];
-        const params = {};
-
-        let baseQuery = query => {
-            let q = 'MATCH (n) WHERE ' + query + ' IS NOT NULL';
-            if (label) {
-                q += ` AND n:${label}`;
-            }
-            if (locations) {
-                q += ' AND n.location IN $locations';
-                params.locations = locations.split(',');
-            }
-            if (sublocations) {
-                q += ' AND n.sublocation IN $sublocations';
-                params.sublocations = sublocations.split(',');
-            }
-            if (systems) {
-                q += ' AND n.system IN $systems';
-                params.systems = systems.split(',');
-            }
-            return q;
+        const { label } = req.query;
+        
+        // Simpler property queries with better error handling
+        const propertyQuery = (property) => {
+            return {
+                text: `
+                    MATCH (n)
+                    ${label ? 'WHERE n:' + label : ''} 
+                    WITH n
+                    WHERE n.${property} IS NOT NULL
+                    RETURN DISTINCT n.${property} AS value
+                    ORDER BY value`,
+                params: {}
+            };
         };
 
-        const locationQuery = baseQuery('n.location') + ' RETURN DISTINCT n.location';
-        const sublocationQuery = baseQuery('n.sublocation') + ' RETURN DISTINCT n.sublocation';
-        const systemQuery = baseQuery('n.system') + ' RETURN DISTINCT n.system';
-        
-        const locationResult = await session.run(locationQuery, params);
-        const sublocationResult = await session.run(sublocationQuery, params);
-        const systemResult = await session.run(systemQuery, params);
-        
-        res.json({
-            locations: locationResult.records.map(record => record.get(0)).filter(Boolean),
-            sublocations: sublocationResult.records.map(record => record.get(0)).filter(Boolean),
-            systems: systemResult.records.map(record => record.get(0)).filter(Boolean)
+        try {
+            // Run queries one at a time to avoid session conflicts
+            const locationQuery = propertyQuery('location');
+            const sublocationQuery = propertyQuery('sublocation');
+            const systemQuery = propertyQuery('system');
+
+            const locationResult = await session.run(locationQuery.text, locationQuery.params);
+            const sublocationResult = await session.run(sublocationQuery.text, sublocationQuery.params);
+            const systemResult = await session.run(systemQuery.text, systemQuery.params);
+
+            const response = {
+                locations: locationResult.records.map(record => record.get('value')).filter(Boolean),
+                sublocations: sublocationResult.records.map(record => record.get('value')).filter(Boolean),
+                systems: systemResult.records.map(record => record.get('value')).filter(Boolean)
+            };
+
+            res.json(response);
+        } catch (error) {
+            console.error('Neo4j query error:', error);
+            res.status(500).json({ 
+                error: 'Database query failed',
+                details: error.message 
+            });
+        }
+    } catch (error) {
+        console.error('Server error:', error);
+        res.status(500).json({ 
+            error: 'Server error occurred',
+            details: error.message 
         });
     } finally {
         await session.close();
@@ -93,14 +102,16 @@ app.get('/api/distinct-values', async (req, res) => {
 app.post('/api/nodes', async (req, res) => {
     const { labels, locations, sublocations, systems, detail } = req.body;
     const session = driver.session();
+    
     try {
-        let query = 'MATCH (n)';
+        // Build label pattern and query
+        const labelPattern = labels && labels.length 
+            ? ':' + labels.join(':')
+            : '';
+
         const conditions = [];
         const params = {};
 
-        if (labels && labels.length) {
-            conditions.push(`${labels.map(label => `n:${label}`).join(' AND ')}`);
-        }
         if (locations && locations.length) {
             conditions.push('n.location IN $locations');
             params.locations = locations;
@@ -118,12 +129,12 @@ app.post('/api/nodes', async (req, res) => {
             params.detail = detail;
         }
 
-        if (conditions.length) {
-            query += ' WHERE ' + conditions.join(' AND ');
-        }
-        
-        query += ' MATCH (n)-[r]->(m) RETURN n, labels(n), collect({rel: r, target: m}) as relationships';
-        
+        const query = `
+            MATCH (n${labelPattern})
+            ${conditions.length ? 'WHERE ' + conditions.join(' AND ') : ''}
+            MATCH (n)-[r]->(m)
+            RETURN n, labels(n), collect({rel: r, target: m}) as relationships`;
+
         const result = await session.run(query, params);
         const nodes = new Map();
         const relationships = [];
@@ -138,12 +149,12 @@ app.post('/api/nodes', async (req, res) => {
                     id: nodeId,
                     labels: record.get('labels(n)'),
                     properties: node.properties,
-                    size: node.properties.detail === 'major' ? 'large' :
-                          node.properties.detail === 'intermediate' ? 'medium' : 'small'
+                    size: node.properties.detail === 'comprehensive' ? 'large' :
+                          node.properties.detail === 'meticulous' ? 'medium' : 'small'
                 });
             }
 
-            // Add relationships
+            // Add relationships and target nodes
             record.get('relationships').forEach(rel => {
                 relationships.push({
                     source: nodeId,
@@ -159,8 +170,8 @@ app.post('/api/nodes', async (req, res) => {
                         id: targetId,
                         labels: rel.target.labels,
                         properties: rel.target.properties,
-                        size: rel.target.properties.detail === 'major' ? 'large' :
-                              rel.target.properties.detail === 'intermediate' ? 'medium' : 'small'
+                        size: rel.target.properties.detail === 'comprehensive' ? 'large' :
+                              rel.target.properties.detail === 'meticulous' ? 'medium' : 'small'
                     });
                 }
             });
