@@ -1,0 +1,75 @@
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Neurotome</title>
+    <style>
+        body {
+            margin: 0;
+            height: 100vh;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            background: linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%);
+            font-family: 'Arial', sans-serif;
+        }
+        .container {
+            display: flex;
+            gap: 2rem;
+            padding: 2rem;
+        }
+        .button {
+            padding: 1.5rem 3rem;
+            font-size: 1.2rem;
+            border: none;
+            border-radius: 10px;
+            background: white;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.1);
+            cursor: pointer;
+            transition: all 0.3s ease;
+            position: relative;
+        }
+        .button:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 6px 20px rgba(0,0,0,0.15);
+        }
+        .button:hover .tooltip {
+            opacity: 1;
+            visibility: visible;
+        }
+        .tooltip {
+            position: absolute;
+            bottom: 120%;
+            left: 50%;
+            transform: translateX(-50%);
+            padding: 0.8rem;
+            background: rgba(0,0,0,0.8);
+            color: white;
+            border-radius: 5px;
+            font-size: 0.9rem;
+            white-space: nowrap;
+            opacity: 0;
+            visibility: hidden;
+            transition: all 0.3s ease;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <button class="button">
+            Option 1
+            <span class="tooltip">Description for Option 1</span>
+        </button>
+        <button class="button">
+            Option 2
+            <span class="tooltip">Description for Option 2</span>
+        </button>
+        <button class="button">
+            Option 3
+            <span class="tooltip">Description for Option 3</span>
+        </button>
+    </div>
+</body>
+</html>
