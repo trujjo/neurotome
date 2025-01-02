@@ -6,69 +6,151 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Neurotome</title>
     <style>
+        :root {
+            --primary-green: #2ecc71;
+            --hover-green: #27ae60;
+            --dark-green: #1a5d3a;
+            --light-bg: #f8f9fa;
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
         body {
             margin: 0;
             height: 100vh;
             display: flex;
             justify-content: center;
             align-items: center;
-            background: linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%);
-            font-family: 'Arial', sans-serif;
+            background: linear-gradient(135deg, var(--light-bg) 0%, #e8f5e9 100%);
+            font-family: 'Segoe UI', 'Arial', sans-serif;
+            color: #333;
         }
+
         .container {
             display: flex;
             gap: 2rem;
             padding: 2rem;
+            backdrop-filter: blur(10px);
+            background: rgba(255, 255, 255, 0.1);
+            border-radius: 20px;
+            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.1);
         }
+
         .button {
             padding: 1.5rem 3rem;
-            font-size: 1.2rem;
+            font-size: 1.1rem;
+            font-weight: 500;
             border: none;
-            border-radius: 10px;
+            border-radius: 12px;
             background: white;
-            box-shadow: 0 4px 15px rgba(0,0,0,0.1);
+            color: var(--dark-green);
+            box-shadow: 0 4px 15px rgba(46, 204, 113, 0.1);
             cursor: pointer;
-            transition: all 0.3s ease;
+            transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
             position: relative;
+            overflow: hidden;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            min-width: 200px;
         }
+
+        .button::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: var(--primary-green);
+            transform: scaleX(0);
+            transform-origin: right;
+            transition: transform 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+            z-index: 1;
+        }
+
         .button:hover {
             transform: translateY(-5px);
-            box-shadow: 0 6px 20px rgba(0,0,0,0.15);
+            box-shadow: 0 8px 25px rgba(46, 204, 113, 0.2);
+            color: white;
         }
-        .button:hover .tooltip {
-            opacity: 1;
-            visibility: visible;
+
+        .button:hover::before {
+            transform: scaleX(1);
+            transform-origin: left;
         }
+
+        .button span {
+            position: relative;
+            z-index: 2;
+            transition: all 0.4s ease;
+        }
+
         .tooltip {
             position: absolute;
             bottom: 120%;
             left: 50%;
             transform: translateX(-50%);
-            padding: 0.8rem;
-            background: rgba(0,0,0,0.8);
+            padding: 0.8rem 1.2rem;
+            background: rgba(0, 0, 0, 0.8);
             color: white;
-            border-radius: 5px;
+            border-radius: 8px;
             font-size: 0.9rem;
             white-space: nowrap;
             opacity: 0;
             visibility: hidden;
             transition: all 0.3s ease;
+            box-shadow: 0 4px 15px rgba(0, 0, 0, 0.2);
+        }
+
+        .tooltip::after {
+            content: '';
+            position: absolute;
+            top: 100%;
+            left: 50%;
+            transform: translateX(-50%);
+            border-width: 8px;
+            border-style: solid;
+            border-color: rgba(0, 0, 0, 0.8) transparent transparent transparent;
+        }
+
+        .button:hover .tooltip {
+            opacity: 1;
+            visibility: visible;
+            bottom: 130%;
+        }
+
+        @media (max-width: 768px) {
+            .container {
+                flex-direction: column;
+                padding: 1.5rem;
+                gap: 1.5rem;
+            }
+
+            .button {
+                padding: 1.2rem 2rem;
+                min-width: 180px;
+            }
         }
     </style>
 </head>
 <body>
     <div class="container">
         <button class="button">
-            Option 1
-            <span class="tooltip">Description for Option 1</span>
+            <span>Explore Brain</span>
+            <span class="tooltip">Interactive 3D brain visualization</span>
         </button>
         <button class="button">
-            Option 2
-            <span class="tooltip">Description for Option 2</span>
+            <span>Search Database</span>
+            <span class="tooltip">Search neuroanatomical structures</span>
         </button>
         <button class="button">
-            Option 3
-            <span class="tooltip">Description for Option 3</span>
+            <span>Learn More</span>
+            <span class="tooltip">Educational resources and documentation</span>
         </button>
     </div>
 </body>
