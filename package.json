@@ -6,13 +6,11 @@
   "scripts": {
     "start": "node server.js",
     "build": "npm install",
-    "postinstall": "npm run build",
-    "dev": "nodemon server.js",
-    "test": "jest"
+    "dev": "nodemon server.js"
   },
   "engines": {
-    "node": "16.x",
-    "npm": "8.x"
+    "node": ">=16.0.0",
+    "npm": ">=8.0.0"
   },
   "dependencies": {
     "express": "^4.17.1",
@@ -21,7 +19,6 @@
     "path": "^0.12.7"
   },
   "devDependencies": {
-    "nodemon": "^2.0.15",
-    "jest": "^27.4.7"
+    "nodemon": "^2.0.15"
   }
 }
