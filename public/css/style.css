@@ -90,3 +90,116 @@ button:hover {
     margin-top: 1rem;
     color: #666;
 }
+/* Active Navigation Link */
+nav ul li a.active {
+    background: #444;
+    border-radius: 4px;
+}
+
+/* Explore Page Styles */
+.explore-page {
+    grid-template-columns: 250px 1fr;
+}
+
+.filters {
+    background: white;
+    padding: 1rem;
+    border-radius: 8px;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+}
+
+.filter-group {
+    margin-bottom: 1.5rem;
+}
+
+.filter-group label {
+    display: block;
+    margin: 0.5rem 0;
+}
+
+/* Search Page Styles */
+.search-page {
+    display: block;
+    max-width: 1200px;
+    margin: 0 auto;
+    padding: 2rem;
+}
+
+.search-container {
+    margin-bottom: 2rem;
+}
+
+.search-box {
+    display: flex;
+    gap: 1rem;
+    margin-bottom: 1rem;
+}
+
+.search-box input {
+    flex: 1;
+    padding: 0.5rem;
+    font-size: 1.1rem;
+    border: 2px solid #ddd;
+    border-radius: 4px;
+}
+
+.search-filters {
+    display: flex;
+    gap: 1rem;
+}
+
+.search-filters select {
+    padding: 0.5rem;
+    border: 1px solid #ddd;
+    border-radius: 4px;
+}
+
+/* Learn Page Styles */
+.learn-page {
+    display: block;
+    max-width: 1200px;
+    margin: 0 auto;
+    padding: 2rem;
+}
+
+.path-cards {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+    gap: 2rem;
+    margin: 2rem 0;
+}
+
+.path-card {
+    background: white;
+    padding: 1.5rem;
+    border-radius: 8px;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+}
+
+.path-card h3 {
+    margin-bottom: 1rem;
+}
+
+.path-card ul {
+    margin: 1rem 0;
+    padding-left: 1.5rem;
+}
+
+.path-card button {
+    width: 100%;
+    margin-top: 1rem;
+}
+
+.resource-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+    gap: 1.5rem;
+    margin-top: 1.5rem;
+}
+
+.resource-item {
+    background: white;
+    padding: 1.5rem;
+    border-radius: 8px;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+}
