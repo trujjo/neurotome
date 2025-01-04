@@ -1,0 +1,54 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Search - Neurotome</title>
+    <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+    <nav>
+        <div class="logo">Neurotome</div>
+        <ul>
+            <li><a href="/">Home</a></li>
+            <li><a href="/explore">Explore</a></li>
+            <li><a href="/search" class="active">Search</a></li>
+            <li><a href="/learn">Learn</a></li>
+        </ul>
+    </nav>
+
+    <main class="search-page">
+        <div class="search-container">
+            <div class="search-box">
+                <input type="text" id="search-input" placeholder="Search brain regions, functions, or conditions...">
+                <button id="search-button">Search</button>
+            </div>
+            
+            <div class="search-filters">
+                <select id="category-filter">
+                    <option value="">All Categories</option>
+                    <option value="region">Brain Regions</option>
+                    <option value="function">Functions</option>
+                    <option value="condition">Conditions</option>
+                </select>
+                
+                <select id="sort-filter">
+                    <option value="relevance">Sort by Relevance</option>
+                    <option value="az">A-Z</option>
+                    <option value="za">Z-A</option>
+                </select>
+            </div>
+        </div>
+
+        <div class="search-results">
+            <h2>Search Results</h2>
+            <div id="results-list">
+                <!-- Results will be populated by JavaScript -->
+                <p class="initial-message">Enter a search term above to begin</p>
+            </div>
+        </div>
+    </main>
+
+    <script src="js/search.js"></script>
+</body>
+</html>
