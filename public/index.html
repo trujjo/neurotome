@@ -1,0 +1,41 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Neurotome - Brain Anatomy Visualization</title>
+    <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+    <nav>
+        <div class="logo">Neurotome</div>
+        <ul>
+            <li><a href="/">Home</a></li>
+            <li><a href="/explore">Explore</a></li>
+            <li><a href="/search">Search</a></li>
+            <li><a href="/learn">Learn</a></li>
+        </ul>
+    </nav>
+
+    <main>
+        <div id="viewer-container">
+            <div id="brain-viewer"></div>
+            <div id="controls">
+                <button id="rotate">Rotate</button>
+                <button id="zoom">Zoom</button>
+                <button id="reset">Reset</button>
+            </div>
+        </div>
+        <div id="info-panel">
+            <h2>Brain Region Information</h2>
+            <div id="region-info">
+                Select a region to view details
+            </div>
+        </div>
+    </main>
+
+    <script src="js/three.min.js"></script>
+    <script src="js/brain-viewer.js"></script>
+    <script src="js/main.js"></script>
+</body>
+</html>
