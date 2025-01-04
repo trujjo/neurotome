@@ -1,79 +1,172 @@
-
-    <!DOCTYPE html>
-    <html lang="en">
+<!DOCTYPE html>
+<html lang="en">
     <head>
         <meta charset="UTF-8">
         <meta name="viewport" content="width=device-width, initial-scale=1.0">
-        <title>Dynamic Dermatome Visualization</title>
+        <title>Spine-Like Dermatome Visualization</title>
         <style>
-            body { 
+            body {
                 font-family: Arial, sans-serif;
                 margin: 20px;
                 background: #f5f5f5;
             }
+
             .container {
                 display: flex;
                 gap: 20px;
-                max-width: 1200px;
+                max-width: 1400px;
                 margin: 0 auto;
-                flex-direction: column;
             }
-            .controls {
+
+            .spine-container {
                 display: flex;
-                gap: 20px;
+                flex-direction: column;
+                gap: 0px;
                 padding: 20px;
                 background: white;
                 border-radius: 8px;
                 box-shadow: 0 2px 4px rgba(0,0,0,0.1);
-                flex-wrap: wrap;
-                justify-content: center;
+                min-width: 200px;
             }
-            .spinal-column {
-                display: flex;
-                flex-direction: column;
-                gap: 5px;
-                min-width: 150px;
+
+            .section {
+                margin-bottom: 10px;
             }
-            .column-title {
+
+            .section-title {
                 font-weight: bold;
                 text-align: center;
-                margin-bottom: 10px;
-                color: #333;
-                padding: 5px;
-                background: #f8f8f8;
+                margin: 15px 0 5px 0;
+                color: white;
+                padding: 8px;
                 border-radius: 4px;
             }
+
+            /* Color coding for different sections */
+            .Cervical .section-title {
+                background: #2196F3;
+            }
+
+            .Thoracic .section-title {
+                background: #4CAF50;
+            }
+
+            .Lumbar .section-title {
+                background: #FF9800;
+            }
+
+            .Sacral .section-title {
+                background: #9C27B0;
+            }
+
+            .Other .section-title {
+                background: #607D8B;
+            }
+
             .level-row {
                 display: flex;
-                gap: 5px;
+                justify-content: space-between;
+                /* This ensures L is closer to the center */
                 align-items: center;
-                margin-bottom: 5px;
-                justify-content: center;
+                padding: 4px;
+                background: #f8f8f8;
+                border-radius: 4px;
+                margin: 2px 0;
             }
+
             .level-label {
-                width: 40px;
-                text-align: right;
+                text-align: center;
+                /* Center the level label */
                 font-weight: bold;
                 color: #666;
+                flex-grow: 1;
+                /* This ensures the label is centered by taking available space */
+                padding: 0 10px;
+                /* Add some padding to give it space from the buttons */
             }
+
             .spinal-button {
-                padding: 8px 15px;
-                border: 2px solid #2196F3;
+                padding: 6px 12px;
+                border: 2px solid;
                 background: white;
-                color: #2196F3;
                 border-radius: 4px;
                 cursor: pointer;
                 transition: all 0.3s ease;
-                min-width: 40px;
+                min-width: 35px;
                 font-weight: bold;
             }
-            .spinal-button:hover {
+
+            /* Color coding for buttons */
+            .Cervical .spinal-button {
+                border-color: #2196F3;
+                color: #2196F3;
+            }
+
+            .Thoracic .spinal-button {
+                border-color: #4CAF50;
+                color: #4CAF50;
+            }
+
+            .Lumbar .spinal-button {
+                border-color: #FF9800;
+                color: #FF9800;
+            }
+
+            .Sacral .spinal-button {
+                border-color: #9C27B0;
+                color: #9C27B0;
+            }
+
+            .Other .spinal-button {
+                border-color: #607D8B;
+                color: #607D8B;
+            }
+
+            .Cervical .spinal-button:hover {
                 background: #E3F2FD;
             }
-            .spinal-button.active {
+
+            .Thoracic .spinal-button:hover {
+                background: #E8F5E9;
+            }
+
+            .Lumbar .spinal-button:hover {
+                background: #FFF3E0;
+            }
+
+            .Sacral .spinal-button:hover {
+                background: #F3E5F5;
+            }
+
+            .Other .spinal-button:hover {
+                background: #ECEFF1;
+            }
+
+            .Cervical .spinal-button.active {
                 background: #2196F3;
                 color: white;
             }
+
+            .Thoracic .spinal-button.active {
+                background: #4CAF50;
+                color: white;
+            }
+
+            .Lumbar .spinal-button.active {
+                background: #FF9800;
+                color: white;
+            }
+
+            .Sacral .spinal-button.active {
+                background: #9C27B0;
+                color: white;
+            }
+
+            .Other .spinal-button.active {
+                background: #607D8B;
+                color: white;
+            }
+
             .visualization {
                 flex: 1;
                 height: 800px;
@@ -84,21 +177,47 @@
                 margin: 20px;
                 overflow: hidden;
             }
+
             .dermatome-highlight {
                 position: absolute;
                 width: 20px;
                 height: 20px;
-                background: rgba(33, 150, 243, 0.3);
-                border: 2px solid rgba(33, 150, 243, 0.5);
+                border: 2px solid;
                 border-radius: 50%;
                 transform: translate(-50%, -50%);
                 transition: all 0.3s ease;
             }
-            .dermatome-highlight.active {
-                background: rgba(33, 150, 243, 0.5);
-                border-color: rgba(33, 150, 243, 0.8);
-                box-shadow: 0 0 10px rgba(33, 150, 243, 0.3);
+
+            /* Color coding for highlights */
+            .dermatome-highlight[data-level^="c"] {
+                background: rgba(33, 150, 243, 0.3);
+                border-color: rgba(33, 150, 243, 0.5);
             }
+
+            .dermatome-highlight[data-level^="t"] {
+                background: rgba(76, 175, 80, 0.3);
+                border-color: rgba(76, 175, 80, 0.5);
+            }
+
+            .dermatome-highlight[data-level^="l"] {
+                background: rgba(255, 152, 0, 0.3);
+                border-color: rgba(255, 152, 0, 0.5);
+            }
+
+            .dermatome-highlight[data-level^="s"] {
+                background: rgba(156, 39, 176, 0.3);
+                border-color: rgba(156, 39, 176, 0.5);
+            }
+
+            .dermatome-highlight[data-level="coccygeal"] {
+                background: rgba(96, 125, 139, 0.3);
+                border-color: rgba(96, 125, 139, 0.5);
+            }
+
+            .dermatome-highlight.active {
+                box-shadow: 0 0 10px rgba(0, 0, 0, 0.3);
+            }
+
             .tooltip {
                 position: absolute;
                 background: rgba(0, 0, 0, 0.8);
@@ -110,306 +229,669 @@
                 z-index: 1000;
                 display: none;
             }
+
+            .small-button {
+                width: 24px !important;
+                height: 24px !important;
+                font-size: 10px !important;
+                padding: 2px !important;
+                margin: 2px !important;
+                display: block !important;
+                border: 1px solid #ddd;
+                border-radius: 4px;
+                cursor: pointer;
+                color: white;
+                transition: all 0.2s ease;
+            }
+
+            .small-button:hover {
+                opacity: 0.8;
+            }
+
+            .section-title {
+                cursor: pointer;
+                transition: all 0.2s ease;
+            }
+
+            .section-title:hover {
+                opacity: 0.8;
+            }
+
+            .section-title.selected {
+                background: #ff0000 !important;
+                border-color: #cc0000 !important;
+                color: white !important;
+            }
+
+            .small-button.selected, .spinal-button.selected {
+                background: #ff0000 !important;
+                border-color: #cc0000 !important;
+                color: white !important;
+            }
+
+            /* Section-specific button colors */
+            .Cervical .small-button {
+                background: #2196F3;
+                border-color: #1976D2;
+            }
+
+            .Thoracic .small-button {
+                background: #4CAF50;
+                border-color: #388E3C;
+            }
+
+            .Lumbar .small-button {
+                background: #FF9800;
+                border-color: #F57C00;
+            }
+
+            .Sacral .small-button {
+                background: #9C27B0;
+                border-color: #7B1FA2;
+            }
+
+            .Other .small-button {
+                background: #607D8B;
+                border-color: #455A64;
+            }
+
+            .button-group {
+                display: inline-flex;
+                flex-direction: column;
+                margin: 0 5px;
+                vertical-align: middle;
+                gap: 2px;
+            }
+
+            .spinal-button {
+                height: 84px !important;
+                display: flex !important;
+                align-items: center !important;
+                justify-content: center !important;
+                font-size: 16px !important;
+                font-weight: bold !important;
+            }
+
+            /* Add spine-like connector */
+            .spine-line {
+                position: absolute;
+                left: 50%;
+                top: 0;
+                bottom: 0;
+                width: 4px;
+                background: #ddd;
+                transform: translateX(-50%);
+                z-index: 0;
+            }
         </style>
+        <script>
+            document.addEventListener('DOMContentLoaded', function() {
+                // Function to toggle button selected state
+                function toggleButton(button, state) {
+                    if (state === undefined) {
+                        button.classList.toggle('selected');
+                    } else {
+                        if (state) {
+                            button.classList.add('selected');
+                        } else {
+                            button.classList.remove('selected');
+                        }
+                    }
+                }
+
+                // Function to check if all VPT buttons are selected for a side
+                function checkVPTButtons(level, side) {
+                    const vptButtons = document.querySelectorAll(`.small-button[data-level="${level}"][data-side="${side}"]`);
+                    return Array.from(vptButtons).every(btn => btn.classList.contains('selected'));
+                }
+
+                // Function to toggle all VPT buttons for a side
+                function toggleVPTButtons(level, side, state) {
+                    const vptButtons = document.querySelectorAll(`.small-button[data-level="${level}"][data-side="${side}"]`);
+                    vptButtons.forEach(btn => toggleButton(btn, state));
+                }
+
+                // Function to toggle all buttons in a section
+                function toggleSectionButtons(section, state) {
+                    // Toggle all small buttons (V,P,T)
+                    const smallButtons = section.querySelectorAll('.small-button');
+                    smallButtons.forEach(btn => toggleButton(btn, state));
+
+                    // Toggle all spinal buttons (L,R)
+                    const spinalButtons = section.querySelectorAll('.spinal-button');
+                    spinalButtons.forEach(btn => toggleButton(btn, state));
+                }
+
+                // Add click handlers to section titles
+                document.querySelectorAll('.section-title').forEach(title => {
+                    title.addEventListener('click', function() {
+                        const section = this.parentElement;
+                        toggleButton(this);
+                        toggleSectionButtons(section, this.classList.contains('selected'));
+                    });
+                }
+                );
+
+                // Add click handlers to all buttons
+                document.querySelectorAll('.small-button, .spinal-button').forEach(button => {
+                    button.addEventListener('click', function() {
+                        const level = this.dataset.level;
+                        const side = this.dataset.side;
+
+                        // Toggle this button
+                        toggleButton(this);
+
+                        if (this.classList.contains('spinal-button')) {
+                            // If L/R button clicked, toggle all VPT buttons on that side
+                            toggleVPTButtons(level, side, this.classList.contains('selected'));
+                        } else {
+                            // If VPT button clicked, check if all VPT are selected
+                            if (checkVPTButtons(level, side)) {
+                                // Select the corresponding L/R button
+                                const spinalButton = document.querySelector(`.spinal-button[data-level="${level}"][data-side="${side}"]`);
+                                toggleButton(spinalButton, true);
+                            } else {
+                                // Unselect the corresponding L/R button
+                                const spinalButton = document.querySelector(`.spinal-button[data-level="${level}"][data-side="${side}"]`);
+                                toggleButton(spinalButton, false);
+                            }
+                        }
+
+                        // Check if all buttons in section are selected
+                        const section = this.closest('.section');
+                        const allButtons = section.querySelectorAll('.small-button, .spinal-button');
+                        const allSelected = Array.from(allButtons).every(btn => btn.classList.contains('selected'));
+                        toggleButton(section.querySelector('.section-title'), allSelected);
+                    });
+                }
+                );
+            });
+        </script>
     </head>
     <body>
         <div class="container">
-            <div class="controls">
-    
-                <div class="spinal-column">
-                    <div class="column-title">Cervical</div>
-            
+            <div class="spine-container">
+                <div class="section Cervical">
+                    <div class="section-title">Cervical</div>
                     <div class="level-row">
-                        <span class="level-label">C2</span>
+                        <button class="spinal-button left" data-level="c1" data-side="left">L</button>
+                        <div class="button-group">
+                            <button class="small-button vibration" data-level="c1" data-side="left">V</button>
+                            <button class="small-button pressure" data-level="c1" data-side="left">P</button>
+                            <button class="small-button temperature" data-level="c1" data-side="left">T</button>
+                        </div>
+                        <span class="level-label">C1</span>
+                        <div class="button-group">
+                            <button class="small-button vibration" data-level="c1" data-side="right">V</button>
+                            <button class="small-button pressure" data-level="c1" data-side="right">P</button>
+                            <button class="small-button temperature" data-level="c1" data-side="right">T</button>
+                        </div>
+                        <button class="spinal-button right" data-level="c1" data-side="right">R</button>
+                    </div>
+                    <div class="level-row">
                         <button class="spinal-button left" data-level="c2" data-side="left">L</button>
+                        <div class="button-group">
+                            <button class="small-button vibration" data-level="c2" data-side="left">V</button>
+                            <button class="small-button pressure" data-level="c2" data-side="left">P</button>
+                            <button class="small-button temperature" data-level="c2" data-side="left">T</button>
+                        </div>
+                        <span class="level-label">C2</span>
+                        <div class="button-group">
+                            <button class="small-button vibration" data-level="c2" data-side="right">V</button>
+                            <button class="small-button pressure" data-level="c2" data-side="right">P</button>
+                            <button class="small-button temperature" data-level="c2" data-side="right">T</button>
+                        </div>
                         <button class="spinal-button right" data-level="c2" data-side="right">R</button>
                     </div>
-                
                     <div class="level-row">
-                        <span class="level-label">C3</span>
                         <button class="spinal-button left" data-level="c3" data-side="left">L</button>
+                        <div class="button-group">
+                            <button class="small-button vibration" data-level="c3" data-side="left">V</button>
+                            <button class="small-button pressure" data-level="c3" data-side="left">P</button>
+                            <button class="small-button temperature" data-level="c3" data-side="left">T</button>
+                        </div>
+                        <span class="level-label">C3</span>
+                        <div class="button-group">
+                            <button class="small-button vibration" data-level="c3" data-side="right">V</button>
+                            <button class="small-button pressure" data-level="c3" data-side="right">P</button>
+                            <button class="small-button temperature" data-level="c3" data-side="right">T</button>
+                        </div>
                         <button class="spinal-button right" data-level="c3" data-side="right">R</button>
                     </div>
-                
                     <div class="level-row">
-                        <span class="level-label">C4</span>
                         <button class="spinal-button left" data-level="c4" data-side="left">L</button>
+                        <div class="button-group">
+                            <button class="small-button vibration" data-level="c4" data-side="left">V</button>
+                            <button class="small-button pressure" data-level="c4" data-side="left">P</button>
+                            <button class="small-button temperature" data-level="c4" data-side="left">T</button>
+                        </div>
+                        <span class="level-label">C4</span>
+                        <div class="button-group">
+                            <button class="small-button vibration" data-level="c4" data-side="right">V</button>
+                            <button class="small-button pressure" data-level="c4" data-side="right">P</button>
+                            <button class="small-button temperature" data-level="c4" data-side="right">T</button>
+                        </div>
                         <button class="spinal-button right" data-level="c4" data-side="right">R</button>
                     </div>
-                
                     <div class="level-row">
-                        <span class="level-label">C5</span>
                         <button class="spinal-button left" data-level="c5" data-side="left">L</button>
+                        <div class="button-group">
+                            <button class="small-button vibration" data-level="c5" data-side="left">V</button>
+                            <button class="small-button pressure" data-level="c5" data-side="left">P</button>
+                            <button class="small-button temperature" data-level="c5" data-side="left">T</button>
+                        </div>
+                        <span class="level-label">C5</span>
+                        <div class="button-group">
+                            <button class="small-button vibration" data-level="c5" data-side="right">V</button>
+                            <button class="small-button pressure" data-level="c5" data-side="right">P</button>
+                            <button class="small-button temperature" data-level="c5" data-side="right">T</button>
+                        </div>
                         <button class="spinal-button right" data-level="c5" data-side="right">R</button>
                     </div>
-                
                     <div class="level-row">
-                        <span class="level-label">C6</span>
                         <button class="spinal-button left" data-level="c6" data-side="left">L</button>
+                        <div class="button-group">
+                            <button class="small-button vibration" data-level="c6" data-side="left">V</button>
+                            <button class="small-button pressure" data-level="c6" data-side="left">P</button>
+                            <button class="small-button temperature" data-level="c6" data-side="left">T</button>
+                        </div>
+                        <span class="level-label">C6</span>
+                        <div class="button-group">
+                            <button class="small-button vibration" data-level="c6" data-side="right">V</button>
+                            <button class="small-button pressure" data-level="c6" data-side="right">P</button>
+                            <button class="small-button temperature" data-level="c6" data-side="right">T</button>
+                        </div>
                         <button class="spinal-button right" data-level="c6" data-side="right">R</button>
                     </div>
-                
                     <div class="level-row">
-                        <span class="level-label">C7</span>
                         <button class="spinal-button left" data-level="c7" data-side="left">L</button>
+                        <div class="button-group">
+                            <button class="small-button vibration" data-level="c7" data-side="left">V</button>
+                            <button class="small-button pressure" data-level="c7" data-side="left">P</button>
+                            <button class="small-button temperature" data-level="c7" data-side="left">T</button>
+                        </div>
+                        <span class="level-label">C7</span>
+                        <div class="button-group">
+                            <button class="small-button vibration" data-level="c7" data-side="right">V</button>
+                            <button class="small-button pressure" data-level="c7" data-side="right">P</button>
+                            <button class="small-button temperature" data-level="c7" data-side="right">T</button>
+                        </div>
                         <button class="spinal-button right" data-level="c7" data-side="right">R</button>
                     </div>
-                
                     <div class="level-row">
-                        <span class="level-label">C8</span>
                         <button class="spinal-button left" data-level="c8" data-side="left">L</button>
+                        <div class="button-group">
+                            <button class="small-button vibration" data-level="c8" data-side="left">V</button>
+                            <button class="small-button pressure" data-level="c8" data-side="left">P</button>
+                            <button class="small-button temperature" data-level="c8" data-side="left">T</button>
+                        </div>
+                        <span class="level-label">C8</span>
+                        <div class="button-group">
+                            <button class="small-button vibration" data-level="c8" data-side="right">V</button>
+                            <button class="small-button pressure" data-level="c8" data-side="right">P</button>
+                            <button class="small-button temperature" data-level="c8" data-side="right">T</button>
+                        </div>
                         <button class="spinal-button right" data-level="c8" data-side="right">R</button>
                     </div>
-                
                 </div>
-            
-                <div class="spinal-column">
-                    <div class="column-title">Thoracic</div>
-            
+                <div class="section Thoracic">
+                    <div class="section-title">Thoracic</div>
                     <div class="level-row">
-                        <span class="level-label">T1</span>
                         <button class="spinal-button left" data-level="t1" data-side="left">L</button>
+                        <div class="button-group">
+                            <button class="small-button vibration" data-level="t1" data-side="left">V</button>
+                            <button class="small-button pressure" data-level="t1" data-side="left">P</button>
+                            <button class="small-button temperature" data-level="t1" data-side="left">T</button>
+                        </div>
+                        <span class="level-label">T1</span>
+                        <div class="button-group">
+                            <button class="small-button vibration" data-level="t1" data-side="right">V</button>
+                            <button class="small-button pressure" data-level="t1" data-side="right">P</button>
+                            <button class="small-button temperature" data-level="t1" data-side="right">T</button>
+                        </div>
                         <button class="spinal-button right" data-level="t1" data-side="right">R</button>
                     </div>
-                
                     <div class="level-row">
-                        <span class="level-label">T2</span>
                         <button class="spinal-button left" data-level="t2" data-side="left">L</button>
+                        <div class="button-group">
+                            <button class="small-button vibration" data-level="t2" data-side="left">V</button>
+                            <button class="small-button pressure" data-level="t2" data-side="left">P</button>
+                            <button class="small-button temperature" data-level="t2" data-side="left">T</button>
+                        </div>
+                        <span class="level-label">T2</span>
+                        <div class="button-group">
+                            <button class="small-button vibration" data-level="t2" data-side="right">V</button>
+                            <button class="small-button pressure" data-level="t2" data-side="right">P</button>
+                            <button class="small-button temperature" data-level="t2" data-side="right">T</button>
+                        </div>
                         <button class="spinal-button right" data-level="t2" data-side="right">R</button>
                     </div>
-                
                     <div class="level-row">
-                        <span class="level-label">T3</span>
                         <button class="spinal-button left" data-level="t3" data-side="left">L</button>
+                        <div class="button-group">
+                            <button class="small-button vibration" data-level="t3" data-side="left">V</button>
+                            <button class="small-button pressure" data-level="t3" data-side="left">P</button>
+                            <button class="small-button temperature" data-level="t3" data-side="left">T</button>
+                        </div>
+                        <span class="level-label">T3</span>
+                        <div class="button-group">
+                            <button class="small-button vibration" data-level="t3" data-side="right">V</button>
+                            <button class="small-button pressure" data-level="t3" data-side="right">P</button>
+                            <button class="small-button temperature" data-level="t3" data-side="right">T</button>
+                        </div>
                         <button class="spinal-button right" data-level="t3" data-side="right">R</button>
                     </div>
-                
                     <div class="level-row">
-                        <span class="level-label">T4</span>
                         <button class="spinal-button left" data-level="t4" data-side="left">L</button>
+                        <div class="button-group">
+                            <button class="small-button vibration" data-level="t4" data-side="left">V</button>
+                            <button class="small-button pressure" data-level="t4" data-side="left">P</button>
+                            <button class="small-button temperature" data-level="t4" data-side="left">T</button>
+                        </div>
+                        <span class="level-label">T4</span>
+                        <div class="button-group">
+                            <button class="small-button vibration" data-level="t4" data-side="right">V</button>
+                            <button class="small-button pressure" data-level="t4" data-side="right">P</button>
+                            <button class="small-button temperature" data-level="t4" data-side="right">T</button>
+                        </div>
                         <button class="spinal-button right" data-level="t4" data-side="right">R</button>
                     </div>
-                
                     <div class="level-row">
-                        <span class="level-label">T5</span>
                         <button class="spinal-button left" data-level="t5" data-side="left">L</button>
+                        <div class="button-group">
+                            <button class="small-button vibration" data-level="t5" data-side="left">V</button>
+                            <button class="small-button pressure" data-level="t5" data-side="left">P</button>
+                            <button class="small-button temperature" data-level="t5" data-side="left">T</button>
+                        </div>
+                        <span class="level-label">T5</span>
+                        <div class="button-group">
+                            <button class="small-button vibration" data-level="t5" data-side="right">V</button>
+                            <button class="small-button pressure" data-level="t5" data-side="right">P</button>
+                            <button class="small-button temperature" data-level="t5" data-side="right">T</button>
+                        </div>
                         <button class="spinal-button right" data-level="t5" data-side="right">R</button>
                     </div>
-                
                     <div class="level-row">
-                        <span class="level-label">T6</span>
                         <button class="spinal-button left" data-level="t6" data-side="left">L</button>
+                        <div class="button-group">
+                            <button class="small-button vibration" data-level="t6" data-side="left">V</button>
+                            <button class="small-button pressure" data-level="t6" data-side="left">P</button>
+                            <button class="small-button temperature" data-level="t6" data-side="left">T</button>
+                        </div>
+                        <span class="level-label">T6</span>
+                        <div class="button-group">
+                            <button class="small-button vibration" data-level="t6" data-side="right">V</button>
+                            <button class="small-button pressure" data-level="t6" data-side="right">P</button>
+                            <button class="small-button temperature" data-level="t6" data-side="right">T</button>
+                        </div>
                         <button class="spinal-button right" data-level="t6" data-side="right">R</button>
                     </div>
-                
                     <div class="level-row">
-                        <span class="level-label">T7</span>
                         <button class="spinal-button left" data-level="t7" data-side="left">L</button>
+                        <div class="button-group">
+                            <button class="small-button vibration" data-level="t7" data-side="left">V</button>
+                            <button class="small-button pressure" data-level="t7" data-side="left">P</button>
+                            <button class="small-button temperature" data-level="t7" data-side="left">T</button>
+                        </div>
+                        <span class="level-label">T7</span>
+                        <div class="button-group">
+                            <button class="small-button vibration" data-level="t7" data-side="right">V</button>
+                            <button class="small-button pressure" data-level="t7" data-side="right">P</button>
+                            <button class="small-button temperature" data-level="t7" data-side="right">T</button>
+                        </div>
                         <button class="spinal-button right" data-level="t7" data-side="right">R</button>
                     </div>
-                
                     <div class="level-row">
-                        <span class="level-label">T8</span>
                         <button class="spinal-button left" data-level="t8" data-side="left">L</button>
+                        <div class="button-group">
+                            <button class="small-button vibration" data-level="t8" data-side="left">V</button>
+                            <button class="small-button pressure" data-level="t8" data-side="left">P</button>
+                            <button class="small-button temperature" data-level="t8" data-side="left">T</button>
+                        </div>
+                        <span class="level-label">T8</span>
+                        <div class="button-group">
+                            <button class="small-button vibration" data-level="t8" data-side="right">V</button>
+                            <button class="small-button pressure" data-level="t8" data-side="right">P</button>
+                            <button class="small-button temperature" data-level="t8" data-side="right">T</button>
+                        </div>
                         <button class="spinal-button right" data-level="t8" data-side="right">R</button>
                     </div>
-                
                     <div class="level-row">
-                        <span class="level-label">T9</span>
                         <button class="spinal-button left" data-level="t9" data-side="left">L</button>
+                        <div class="button-group">
+                            <button class="small-button vibration" data-level="t9" data-side="left">V</button>
+                            <button class="small-button pressure" data-level="t9" data-side="left">P</button>
+                            <button class="small-button temperature" data-level="t9" data-side="left">T</button>
+                        </div>
+                        <span class="level-label">T9</span>
+                        <div class="button-group">
+                            <button class="small-button vibration" data-level="t9" data-side="right">V</button>
+                            <button class="small-button pressure" data-level="t9" data-side="right">P</button>
+                            <button class="small-button temperature" data-level="t9" data-side="right">T</button>
+                        </div>
                         <button class="spinal-button right" data-level="t9" data-side="right">R</button>
                     </div>
-                
                     <div class="level-row">
-                        <span class="level-label">T10</span>
                         <button class="spinal-button left" data-level="t10" data-side="left">L</button>
+                        <div class="button-group">
+                            <button class="small-button vibration" data-level="t10" data-side="left">V</button>
+                            <button class="small-button pressure" data-level="t10" data-side="left">P</button>
+                            <button class="small-button temperature" data-level="t10" data-side="left">T</button>
+                        </div>
+                        <span class="level-label">T10</span>
+                        <div class="button-group">
+                            <button class="small-button vibration" data-level="t10" data-side="right">V</button>
+                            <button class="small-button pressure" data-level="t10" data-side="right">P</button>
+                            <button class="small-button temperature" data-level="t10" data-side="right">T</button>
+                        </div>
                         <button class="spinal-button right" data-level="t10" data-side="right">R</button>
                     </div>
-                
                     <div class="level-row">
-                        <span class="level-label">T11</span>
                         <button class="spinal-button left" data-level="t11" data-side="left">L</button>
+                        <div class="button-group">
+                            <button class="small-button vibration" data-level="t11" data-side="left">V</button>
+                            <button class="small-button pressure" data-level="t11" data-side="left">P</button>
+                            <button class="small-button temperature" data-level="t11" data-side="left">T</button>
+                        </div>
+                        <span class="level-label">T11</span>
+                        <div class="button-group">
+                            <button class="small-button vibration" data-level="t11" data-side="right">V</button>
+                            <button class="small-button pressure" data-level="t11" data-side="right">P</button>
+                            <button class="small-button temperature" data-level="t11" data-side="right">T</button>
+                        </div>
                         <button class="spinal-button right" data-level="t11" data-side="right">R</button>
                     </div>
-                
                     <div class="level-row">
-                        <span class="level-label">T12</span>
                         <button class="spinal-button left" data-level="t12" data-side="left">L</button>
+                        <div class="button-group">
+                            <button class="small-button vibration" data-level="t12" data-side="left">V</button>
+                            <button class="small-button pressure" data-level="t12" data-side="left">P</button>
+                            <button class="small-button temperature" data-level="t12" data-side="left">T</button>
+                        </div>
+                        <span class="level-label">T12</span>
+                        <div class="button-group">
+                            <button class="small-button vibration" data-level="t12" data-side="right">V</button>
+                            <button class="small-button pressure" data-level="t12" data-side="right">P</button>
+                            <button class="small-button temperature" data-level="t12" data-side="right">T</button>
+                        </div>
                         <button class="spinal-button right" data-level="t12" data-side="right">R</button>
                     </div>
-                
                 </div>
-            
-                <div class="spinal-column">
-                    <div class="column-title">Lumbar</div>
-            
+                <div class="section Lumbar">
+                    <div class="section-title">Lumbar</div>
                     <div class="level-row">
-                        <span class="level-label">L1</span>
                         <button class="spinal-button left" data-level="l1" data-side="left">L</button>
+                        <div class="button-group">
+                            <button class="small-button vibration" data-level="l1" data-side="left">V</button>
+                            <button class="small-button pressure" data-level="l1" data-side="left">P</button>
+                            <button class="small-button temperature" data-level="l1" data-side="left">T</button>
+                        </div>
+                        <span class="level-label">L1</span>
+                        <div class="button-group">
+                            <button class="small-button vibration" data-level="l1" data-side="right">V</button>
+                            <button class="small-button pressure" data-level="l1" data-side="right">P</button>
+                            <button class="small-button temperature" data-level="l1" data-side="right">T</button>
+                        </div>
                         <button class="spinal-button right" data-level="l1" data-side="right">R</button>
                     </div>
-                
                     <div class="level-row">
-                        <span class="level-label">L2</span>
                         <button class="spinal-button left" data-level="l2" data-side="left">L</button>
+                        <div class="button-group">
+                            <button class="small-button vibration" data-level="l2" data-side="left">V</button>
+                            <button class="small-button pressure" data-level="l2" data-side="left">P</button>
+                            <button class="small-button temperature" data-level="l2" data-side="left">T</button>
+                        </div>
+                        <span class="level-label">L2</span>
+                        <div class="button-group">
+                            <button class="small-button vibration" data-level="l2" data-side="right">V</button>
+                            <button class="small-button pressure" data-level="l2" data-side="right">P</button>
+                            <button class="small-button temperature" data-level="l2" data-side="right">T</button>
+                        </div>
                         <button class="spinal-button right" data-level="l2" data-side="right">R</button>
                     </div>
-                
                     <div class="level-row">
-                        <span class="level-label">L3</span>
                         <button class="spinal-button left" data-level="l3" data-side="left">L</button>
+                        <div class="button-group">
+                            <button class="small-button vibration" data-level="l3" data-side="left">V</button>
+                            <button class="small-button pressure" data-level="l3" data-side="left">P</button>
+                            <button class="small-button temperature" data-level="l3" data-side="left">T</button>
+                        </div>
+                        <span class="level-label">L3</span>
+                        <div class="button-group">
+                            <button class="small-button vibration" data-level="l3" data-side="right">V</button>
+                            <button class="small-button pressure" data-level="l3" data-side="right">P</button>
+                            <button class="small-button temperature" data-level="l3" data-side="right">T</button>
+                        </div>
                         <button class="spinal-button right" data-level="l3" data-side="right">R</button>
                     </div>
-                
                     <div class="level-row">
-                        <span class="level-label">L4</span>
                         <button class="spinal-button left" data-level="l4" data-side="left">L</button>
+                        <div class="button-group">
+                            <button class="small-button vibration" data-level="l4" data-side="left">V</button>
+                            <button class="small-button pressure" data-level="l4" data-side="left">P</button>
+                            <button class="small-button temperature" data-level="l4" data-side="left">T</button>
+                        </div>
+                        <span class="level-label">L4</span>
+                        <div class="button-group">
+                            <button class="small-button vibration" data-level="l4" data-side="right">V</button>
+                            <button class="small-button pressure" data-level="l4" data-side="right">P</button>
+                            <button class="small-button temperature" data-level="l4" data-side="right">T</button>
+                        </div>
                         <button class="spinal-button right" data-level="l4" data-side="right">R</button>
                     </div>
-                
                     <div class="level-row">
-                        <span class="level-label">L5</span>
                         <button class="spinal-button left" data-level="l5" data-side="left">L</button>
+                        <div class="button-group">
+                            <button class="small-button vibration" data-level="l5" data-side="left">V</button>
+                            <button class="small-button pressure" data-level="l5" data-side="left">P</button>
+                            <button class="small-button temperature" data-level="l5" data-side="left">T</button>
+                        </div>
+                        <span class="level-label">L5</span>
+                        <div class="button-group">
+                            <button class="small-button vibration" data-level="l5" data-side="right">V</button>
+                            <button class="small-button pressure" data-level="l5" data-side="right">P</button>
+                            <button class="small-button temperature" data-level="l5" data-side="right">T</button>
+                        </div>
                         <button class="spinal-button right" data-level="l5" data-side="right">R</button>
                     </div>
-                
                 </div>
-            
-                <div class="spinal-column">
-                    <div class="column-title">Sacral</div>
-            
+                <div class="section Sacral">
+                    <div class="section-title">Sacral</div>
                     <div class="level-row">
-                        <span class="level-label">S1</span>
                         <button class="spinal-button left" data-level="s1" data-side="left">L</button>
+                        <div class="button-group">
+                            <button class="small-button vibration" data-level="s1" data-side="left">V</button>
+                            <button class="small-button pressure" data-level="s1" data-side="left">P</button>
+                            <button class="small-button temperature" data-level="s1" data-side="left">T</button>
+                        </div>
+                        <span class="level-label">S1</span>
+                        <div class="button-group">
+                            <button class="small-button vibration" data-level="s1" data-side="right">V</button>
+                            <button class="small-button pressure" data-level="s1" data-side="right">P</button>
+                            <button class="small-button temperature" data-level="s1" data-side="right">T</button>
+                        </div>
                         <button class="spinal-button right" data-level="s1" data-side="right">R</button>
                     </div>
-                
                     <div class="level-row">
-                        <span class="level-label">S2</span>
                         <button class="spinal-button left" data-level="s2" data-side="left">L</button>
+                        <div class="button-group">
+                            <button class="small-button vibration" data-level="s2" data-side="left">V</button>
+                            <button class="small-button pressure" data-level="s2" data-side="left">P</button>
+                            <button class="small-button temperature" data-level="s2" data-side="left">T</button>
+                        </div>
+                        <span class="level-label">S2</span>
+                        <div class="button-group">
+                            <button class="small-button vibration" data-level="s2" data-side="right">V</button>
+                            <button class="small-button pressure" data-level="s2" data-side="right">P</button>
+                            <button class="small-button temperature" data-level="s2" data-side="right">T</button>
+                        </div>
                         <button class="spinal-button right" data-level="s2" data-side="right">R</button>
                     </div>
-                
                     <div class="level-row">
-                        <span class="level-label">S3</span>
                         <button class="spinal-button left" data-level="s3" data-side="left">L</button>
+                        <div class="button-group">
+                            <button class="small-button vibration" data-level="s3" data-side="left">V</button>
+                            <button class="small-button pressure" data-level="s3" data-side="left">P</button>
+                            <button class="small-button temperature" data-level="s3" data-side="left">T</button>
+                        </div>
+                        <span class="level-label">S3</span>
+                        <div class="button-group">
+                            <button class="small-button vibration" data-level="s3" data-side="right">V</button>
+                            <button class="small-button pressure" data-level="s3" data-side="right">P</button>
+                            <button class="small-button temperature" data-level="s3" data-side="right">T</button>
+                        </div>
                         <button class="spinal-button right" data-level="s3" data-side="right">R</button>
                     </div>
-                
                     <div class="level-row">
-                        <span class="level-label">S4</span>
                         <button class="spinal-button left" data-level="s4" data-side="left">L</button>
+                        <div class="button-group">
+                            <button class="small-button vibration" data-level="s4" data-side="left">V</button>
+                            <button class="small-button pressure" data-level="s4" data-side="left">P</button>
+                            <button class="small-button temperature" data-level="s4" data-side="left">T</button>
+                        </div>
+                        <span class="level-label">S4</span>
+                        <div class="button-group">
+                            <button class="small-button vibration" data-level="s4" data-side="right">V</button>
+                            <button class="small-button pressure" data-level="s4" data-side="right">P</button>
+                            <button class="small-button temperature" data-level="s4" data-side="right">T</button>
+                        </div>
                         <button class="spinal-button right" data-level="s4" data-side="right">R</button>
                     </div>
-                
                     <div class="level-row">
-                        <span class="level-label">S5</span>
                         <button class="spinal-button left" data-level="s5" data-side="left">L</button>
+                        <div class="button-group">
+                            <button class="small-button vibration" data-level="s5" data-side="left">V</button>
+                            <button class="small-button pressure" data-level="s5" data-side="left">P</button>
+                            <button class="small-button temperature" data-level="s5" data-side="left">T</button>
+                        </div>
+                        <span class="level-label">S5</span>
+                        <div class="button-group">
+                            <button class="small-button vibration" data-level="s5" data-side="right">V</button>
+                            <button class="small-button pressure" data-level="s5" data-side="right">P</button>
+                            <button class="small-button temperature" data-level="s5" data-side="right">T</button>
+                        </div>
                         <button class="spinal-button right" data-level="s5" data-side="right">R</button>
                     </div>
-                
                 </div>
-            
-                <div class="spinal-column">
-                    <div class="column-title">Other</div>
-            
+                <div class="section Other">
+                    <div class="section-title">Coccygeal</div>
                     <div class="level-row">
-                        <span class="level-label">COCCYGEAL</span>
-                        <button class="spinal-button left" data-level="coccygeal" data-side="left">L</button>
-                        <button class="spinal-button right" data-level="coccygeal" data-side="right">R</button>
+                        <button class="spinal-button left" data-level="co" data-side="left">L</button>
+                        <div class="button-group">
+                            <button class="small-button vibration" data-level="co" data-side="left">V</button>
+                            <button class="small-button pressure" data-level="co" data-side="left">P</button>
+                            <button class="small-button temperature" data-level="co" data-side="left">T</button>
+                        </div>
+                        <span class="level-label">CO</span>
+                        <div class="button-group">
+                            <button class="small-button vibration" data-level="co" data-side="right">V</button>
+                            <button class="small-button pressure" data-level="co" data-side="right">P</button>
+                            <button class="small-button temperature" data-level="co" data-side="right">T</button>
+                        </div>
+                        <button class="spinal-button right" data-level="co" data-side="right">R</button>
                     </div>
-                
                 </div>
-            
-            </div>
-            <div id="visualization" class="visualization">
-                <div id="tooltip" class="tooltip"></div>
             </div>
         </div>
-
-        <script>
-            // Dermatome data from database
-            const dermatomes = [{"name": "left c2 dermatome", "x": 31.29, "y": 810.0, "location": "thorax", "sublocation": "thoracic spine", "direction": "left"}, {"name": "left c3 dermatome", "x": 31.57, "y": 785.0, "location": "thorax", "sublocation": "thoracic spine", "direction": "left"}, {"name": "left c4 dermatome", "x": 27.15, "y": 760.0, "location": "thorax", "sublocation": "thoracic spine", "direction": "left"}, {"name": "left c5 dermatome", "x": 15.98, "y": 735.0, "location": "thorax", "sublocation": "thoracic spine", "direction": "left"}, {"name": "left c6 dermatome", "x": 28.04, "y": 710.0, "location": "thorax", "sublocation": "thoracic spine", "direction": "left"}, {"name": "left c7 dermatome", "x": 12.84, "y": 685.0, "location": "thorax", "sublocation": "thoracic spine", "direction": "left"}, {"name": "left c8 dermatome", "x": 9.15, "y": 660.0, "location": "thorax", "sublocation": "thoracic spine", "direction": "left"}, {"name": "left coccygeal dermatome", "x": 47.97950521, "y": 617.9449328, "location": "thorax", "sublocation": "thoracic spine", "direction": "left"}, {"name": "left l1 dermatome", "x": 45.06616991, "y": 582.208763, "location": "thorax", "sublocation": "thoracic spine", "direction": "left"}, {"name": "left l2 dermatome", "x": 54.44178061, "y": 565.9691178, "location": "thorax", "sublocation": "thoracic spine", "direction": "left"}, {"name": "left l3 dermatome", "x": 46.1052987, "y": 623.936467, "location": "thorax", "sublocation": "thoracic spine", "direction": "left"}, {"name": "left l4 dermatome", "x": 48.16074071, "y": 607.6094786, "location": "thorax", "sublocation": "thoracic spine", "direction": "left"}, {"name": "left l5 dermatome", "x": 40.3950484, "y": 621.2566161, "location": "thorax", "sublocation": "thoracic spine", "direction": "left"}, {"name": "left s1 dermatome", "x": 59.48728394, "y": 574.2330754, "location": "thorax", "sublocation": "thoracic spine", "direction": "left"}, {"name": "left s2 dermatome", "x": 68.5586666, "y": 628.979674, "location": "thorax", "sublocation": "thoracic spine", "direction": "left"}, {"name": "left s3 dermatome", "x": 54.11768998, "y": 600.1000416, "location": "thorax", "sublocation": "thoracic spine", "direction": "left"}, {"name": "left s4 dermatome", "x": 59.06327483, "y": 627.4473086, "location": "thorax", "sublocation": "thoracic spine", "direction": "left"}, {"name": "left s5 dermatome", "x": 43.21239896, "y": 589.4392444, "location": "thorax", "sublocation": "thoracic spine", "direction": "left"}, {"name": "left t1 dermatome", "x": 48.87200872, "y": 601.3932063, "location": "thorax", "sublocation": "thoracic spine", "direction": "left"}, {"name": "left t10 dermatome", "x": 57.28360138, "y": 546.0989745, "location": "thorax", "sublocation": "thoracic spine", "direction": "left"}, {"name": "left t11 dermatome", "x": 42.19010399, "y": 613.7662475, "location": "thorax", "sublocation": "thoracic spine", "direction": "left"}, {"name": "left t12 dermatome", "x": 64.01447985, "y": 618.8450792, "location": "thorax", "sublocation": "thoracic spine", "direction": "left"}, {"name": "left t2 dermatome", "x": 45.03660561, "y": 576.7671596, "location": "thorax", "sublocation": "thoracic spine", "direction": "left"}, {"name": "left t3 dermatome", "x": 38.16443316, "y": 627.7237873, "location": "thorax", "sublocation": "thoracic spine", "direction": "left"}, {"name": "left t4 dermatome", "x": 64.81201133, "y": 598.3102782, "location": "thorax", "sublocation": "thoracic spine", "direction": "left"}, {"name": "left t5 dermatome", "x": 60.93179281, "y": 612.4309722, "location": "thorax", "sublocation": "thoracic spine", "direction": "left"}, {"name": "left t6 dermatome", "x": 41.97128035, "y": 590.7889636, "location": "thorax", "sublocation": "thoracic spine", "direction": "left"}, {"name": "left t7 dermatome", "x": 42.79204503, "y": 618.0879791, "location": "thorax", "sublocation": "thoracic spine", "direction": "left"}, {"name": "left t8 dermatome", "x": 43.21213496, "y": 589.3027717, "location": "thorax", "sublocation": "thoracic spine", "direction": "left"}, {"name": "left t9 dermatome", "x": 43.99139655, "y": 573.4128705, "location": "thorax", "sublocation": "thoracic spine", "direction": "left"}, {"name": "right c2 dermatome", "x": -31.29, "y": 810.0, "location": "thorax", "sublocation": "thoracic spine", "direction": "right"}, {"name": "right c3 dermatome", "x": -31.57, "y": 785.0, "location": "thorax", "sublocation": "thoracic spine", "direction": "right"}, {"name": "right c4 dermatome", "x": -27.15, "y": 760.0, "location": "thorax", "sublocation": "thoracic spine", "direction": "right"}, {"name": "right c5 dermatome", "x": -15.98, "y": 735.0, "location": "thorax", "sublocation": "thoracic spine", "direction": "right"}, {"name": "right c6 dermatome", "x": -28.04, "y": 710.0, "location": "thorax", "sublocation": "thoracic spine", "direction": "right"}, {"name": "right c7 dermatome", "x": -12.84, "y": 685.0, "location": "thorax", "sublocation": "thoracic spine", "direction": "right"}, {"name": "right c8 dermatome", "x": -9.15, "y": 660.0, "location": "thorax", "sublocation": "thoracic spine", "direction": "right"}, {"name": "right coccygeal dermatome", "x": -47.97950521, "y": 617.9449328, "location": "thorax", "sublocation": "thoracic spine", "direction": "right"}, {"name": "right l1 dermatome", "x": -45.06616991, "y": 582.208763, "location": "thorax", "sublocation": "thoracic spine", "direction": "right"}, {"name": "right l2 dermatome", "x": -54.44178061, "y": 565.9691178, "location": "thorax", "sublocation": "thoracic spine", "direction": "right"}, {"name": "right l3 dermatome", "x": -46.1052987, "y": 623.936467, "location": "thorax", "sublocation": "thoracic spine", "direction": "right"}, {"name": "right l4 dermatome", "x": -48.16074071, "y": 607.6094786, "location": "thorax", "sublocation": "thoracic spine", "direction": "right"}, {"name": "right l5 dermatome", "x": -40.3950484, "y": 621.2566161, "location": "thorax", "sublocation": "thoracic spine", "direction": "right"}, {"name": "right s1 dermatome", "x": -59.48728394, "y": 574.2330754, "location": "thorax", "sublocation": "thoracic spine", "direction": "right"}, {"name": "right s2 dermatome", "x": -68.5586666, "y": 628.979674, "location": "thorax", "sublocation": "thoracic spine", "direction": "right"}, {"name": "right s3 dermatome", "x": -54.11768998, "y": 600.1000416, "location": "thorax", "sublocation": "thoracic spine", "direction": "right"}, {"name": "right s4 dermatome", "x": -59.06327483, "y": 627.4473086, "location": "thorax", "sublocation": "thoracic spine", "direction": "right"}, {"name": "right s5 dermatome", "x": -43.21239896, "y": 589.4392444, "location": "thorax", "sublocation": "thoracic spine", "direction": "right"}, {"name": "right t1 dermatome", "x": -48.87200872, "y": 601.3932063, "location": "thorax", "sublocation": "thoracic spine", "direction": "right"}, {"name": "right t10 dermatome", "x": -57.28360138, "y": 546.0989745, "location": "thorax", "sublocation": "thoracic spine", "direction": "right"}, {"name": "right t11 dermatome", "x": -42.19010399, "y": 613.7662475, "location": "thorax", "sublocation": "thoracic spine", "direction": "right"}, {"name": "right t12 dermatome", "x": -64.01447985, "y": 618.8450792, "location": "thorax", "sublocation": "thoracic spine", "direction": "right"}, {"name": "right t2 dermatome", "x": -45.03660561, "y": 576.7671596, "location": "thorax", "sublocation": "thoracic spine", "direction": "right"}, {"name": "right t3 dermatome", "x": -38.16443316, "y": 627.7237873, "location": "thorax", "sublocation": "thoracic spine", "direction": "right"}, {"name": "right t4 dermatome", "x": -64.81201133, "y": 598.3102782, "location": "thorax", "sublocation": "thoracic spine", "direction": "right"}, {"name": "right t5 dermatome", "x": -60.93179281, "y": 612.4309722, "location": "thorax", "sublocation": "thoracic spine", "direction": "right"}, {"name": "right t6 dermatome", "x": -41.97128035, "y": 590.7889636, "location": "thorax", "sublocation": "thoracic spine", "direction": "right"}, {"name": "right t7 dermatome", "x": -42.79204503, "y": 618.0879791, "location": "thorax", "sublocation": "thoracic spine", "direction": "right"}, {"name": "right t8 dermatome", "x": -43.21213496, "y": 589.3027717, "location": "thorax", "sublocation": "thoracic spine", "direction": "right"}, {"name": "right t9 dermatome", "x": -43.99139655, "y": 573.4128705, "location": "thorax", "sublocation": "thoracic spine", "direction": "right"}];
-            let activeDermatomes = new Set();
-            const tooltip = document.getElementById('tooltip');
-
-            document.querySelectorAll('.spinal-button').forEach(button => {
-                button.addEventListener('click', function() {
-                    const level = this.dataset.level;
-                    const side = this.dataset.side;
-                    const dermatomeKey = `${side} ${level} dermatome`;
-                    
-                    this.classList.toggle('active');
-                    
-                    if (this.classList.contains('active')) {
-                        activeDermatomes.add(dermatomeKey);
-                    } else {
-                        activeDermatomes.delete(dermatomeKey);
-                    }
-                    
-                    updateVisualization();
-                });
-
-                // Add hover effect
-                button.addEventListener('mouseover', function() {
-                    const level = this.dataset.level;
-                    const side = this.dataset.side;
-                    const dermatomeKey = `${side} ${level} dermatome`;
-                    
-                    // Show temporary highlight
-                    const dermatome = dermatomes.find(d => d.name === dermatomeKey);
-                    if (dermatome) {
-                        const highlight = document.createElement('div');
-                        highlight.className = 'dermatome-highlight temp';
-                        highlight.style.left = dermatome.x + '%';
-                        highlight.style.top = dermatome.y + '%';
-                        document.getElementById('visualization').appendChild(highlight);
-                        
-                        // Show tooltip
-                        tooltip.style.display = 'block';
-                        tooltip.textContent = dermatomeKey;
-                        tooltip.style.left = `${dermatome.x}%`;
-                        tooltip.style.top = `${parseFloat(dermatome.y) - 2}%`;
-                    }
-                });
-
-                button.addEventListener('mouseout', function() {
-                    // Remove temporary highlights
-                    document.querySelectorAll('.dermatome-highlight.temp').forEach(el => el.remove());
-                    tooltip.style.display = 'none';
-                });
-            });
-
-            function updateVisualization() {
-                // Remove all highlights except tooltip
-                document.querySelectorAll('.dermatome-highlight:not(.temp)').forEach(el => el.remove());
-                
-                // Add highlights for active dermatomes
-                activeDermatomes.forEach(dermatomeKey => {
-                    const dermatome = dermatomes.find(d => d.name === dermatomeKey);
-                    if (dermatome) {
-                        const highlight = document.createElement('div');
-                        highlight.className = 'dermatome-highlight active';
-                        highlight.style.left = dermatome.x + '%';
-                        highlight.style.top = dermatome.y + '%';
-                        
-                        // Add hover effect for active highlights
-                        highlight.addEventListener('mouseover', function() {
-                            tooltip.style.display = 'block';
-                            tooltip.textContent = dermatomeKey;
-                            tooltip.style.left = `${dermatome.x}%`;
-                            tooltip.style.top = `${parseFloat(dermatome.y) - 2}%`;
-                        });
-                        
-                        highlight.addEventListener('mouseout', function() {
-                            tooltip.style.display = 'none';
-                        });
-                        
-                        document.getElementById('visualization').appendChild(highlight);
-                    }
-                });
-            }
-        </script>
     </body>
-    </html>
-    
+</html>
