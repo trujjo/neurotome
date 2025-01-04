@@ -1,0 +1,20 @@
+{
+  "name": "neurotome",
+  "version": "1.0.0",
+  "description": "Interactive brain anatomy visualization platform",
+  "main": "src/index.js",
+  "scripts": {
+    "start": "node src/index.js",
+    "dev": "nodemon src/index.js",
+    "test": "jest"
+  },
+  "dependencies": {
+    "express": "^4.17.1",
+    "three": "^0.137.0",
+    "d3": "^7.0.0"
+  },
+  "devDependencies": {
+    "nodemon": "^2.0.15",
+    "jest": "^27.4.7"
+  }
+}
