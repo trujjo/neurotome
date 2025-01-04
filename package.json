@@ -5,16 +5,20 @@
   "main": "server.js",
   "scripts": {
     "start": "node server.js",
+    "build": "npm install",
+    "postinstall": "npm run build",
     "dev": "nodemon server.js",
     "test": "jest"
   },
   "engines": {
-    "node": "16.x"
+    "node": "16.x",
+    "npm": "8.x"
   },
   "dependencies": {
     "express": "^4.17.1",
     "three": "^0.137.0",
-    "d3": "^7.0.0"
+    "d3": "^7.0.0",
+    "path": "^0.12.7"
   },
   "devDependencies": {
     "nodemon": "^2.0.15",
