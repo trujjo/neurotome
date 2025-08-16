@@ -332,6 +332,9 @@
 
             <div class="section">
                 <h3>🔗 Relationships</h3>
+                <div id="relationship-filter-status" style="font-size: 0.8em; color: #666; margin-bottom: 0.5rem;">
+                    Click relationships to filter
+                </div>
                 <ul class="relationship-list" id="relationship-list">
                     <li class="loading">Loading relationships...</li>
                 </ul>
@@ -344,11 +347,14 @@
                 <button class="btn" id="refresh-btn">🔄 Refresh</button>
                 <button class="btn secondary" id="reset-zoom-btn">🎯 Reset Zoom</button>
                 <button class="btn secondary" id="toggle-labels-btn">🏷️ Toggle Labels</button>
+                <button class="btn secondary" id="clear-filters-btn">🧹 Clear Filters</button>
                 <select id="layout-select" class="btn">
                     <option value="force">Force Layout</option>
+                    <option value="coordinates">Coordinate Layout</option>
                     <option value="circle">Circle Layout</option>
                     <option value="grid">Grid Layout</option>
                 </select>
+                <div id="layout-status" style="font-size: 0.8em; color: #666; margin-top: 0.5rem;"></div>
             </div>
             <div id="graph-container">
                 <div class="loading" id="graph-loading">
@@ -383,6 +389,7 @@
             constructor() {
                 this.selectedLabel = null;
                 this.selectedNode = null;
+                this.selectedRelationships = new Set(); // Track selected relationships
                 this.showLabels = true;
                 this.simulation = null;
                 this.svg = null;
@@ -495,6 +502,13 @@
                         ${rel}
                     </li>
                 `).join('');
+
+                // Add click listeners for relationship selection
+                relationshipList.querySelectorAll('.relationship-item').forEach(item => {
+                    item.addEventListener('click', () => {
+                        this.toggleRelationship(item.dataset.relationship);
+                    });
+                });
             }
 
             async selectLabel(label) {
@@ -508,13 +522,73 @@
                 await this.loadGraphData();
             }
 
+            async toggleRelationship(relationshipType) {
+                const relationshipItem = document.querySelector(`[data-relationship="${relationshipType}"]`);
+                
+                if (this.selectedRelationships.has(relationshipType)) {
+                    // Remove from selection
+                    this.selectedRelationships.delete(relationshipType);
+                    relationshipItem.classList.remove('active');
+                } else {
+                    // Add to selection
+                    this.selectedRelationships.add(relationshipType);
+                    relationshipItem.classList.add('active');
+                }
+                
+                // Update status indicator
+                this.updateFilterStatus();
+                
+                // Reload graph data with new filters
+                await this.loadGraphData();
+            }
+
+            async clearFilters() {
+                // Clear selected label
+                this.selectedLabel = null;
+                document.querySelectorAll('.label-item').forEach(item => {
+                    item.classList.remove('active');
+                });
+
+                // Clear selected relationships
+                this.selectedRelationships.clear();
+                document.querySelectorAll('.relationship-item').forEach(item => {
+                    item.classList.remove('active');
+                });
+
+                // Update status indicator
+                this.updateFilterStatus();
+
+                // Reload graph data without filters
+                await this.loadGraphData();
+            }
+
+            updateFilterStatus() {
+                const statusDiv = document.getElementById('relationship-filter-status');
+                if (this.selectedRelationships.size > 0) {
+                    const selectedRels = Array.from(this.selectedRelationships).join(', ');
+                    statusDiv.innerHTML = `🔍 Active filters: ${selectedRels}`;
+                    statusDiv.style.color = '#2196f3';
+                } else {
+                    statusDiv.innerHTML = 'Click relationships to filter';
+                    statusDiv.style.color = '#666';
+                }
+            }
+
             async loadGraphData() {
                 document.getElementById('graph-loading').style.display = 'block';
                 
                 try {
-                    const url = this.selectedLabel 
-                        ? `/api/graph?label=${this.selectedLabel}&limit=100`
-                        : '/api/graph?limit=100';
+                    // Build URL with filters
+                    let url = '/api/graph?limit=100';
+                    
+                    if (this.selectedLabel) {
+                        url += `&label=${this.selectedLabel}`;
+                    }
+                    
+                    if (this.selectedRelationships.size > 0) {
+                        const relationshipsParam = Array.from(this.selectedRelationships).join(',');
+                        url += `&relationships=${encodeURIComponent(relationshipsParam)}`;
+                    }
                     
                     const response = await fetch(url);
                     const data = await response.json();
@@ -567,11 +641,29 @@
                 // Color scale for different node labels
                 const colorScale = d3.scaleOrdinal(d3.schemeCategory10);
 
-                // Create simulation
-                this.simulation = d3.forceSimulation(data.nodes)
-                    .force('link', d3.forceLink(data.links).id(d => d.id).distance(100))
-                    .force('charge', d3.forceManyBody().strength(-300))
-                    .force('center', d3.forceCenter(width / 2, height / 2));
+                // Check if we should use coordinate layout
+                const useCoordinates = this.currentLayout === 'coordinates' && this.hasCoordinates(data.nodes);
+                
+                // Update layout status
+                this.updateLayoutStatus(useCoordinates, data.nodes.length);
+
+                // Prepare node positions for coordinate layout
+                if (useCoordinates) {
+                    this.setupCoordinateLayout(data.nodes, width, height);
+                }
+
+                // Create simulation only for force layouts
+                if (!useCoordinates) {
+                    this.simulation = d3.forceSimulation(data.nodes)
+                        .force('link', d3.forceLink(data.links).id(d => d.id).distance(100))
+                        .force('charge', d3.forceManyBody().strength(-300))
+                        .force('center', d3.forceCenter(width / 2, height / 2));
+                } else {
+                    // For coordinate layout, stop any existing simulation
+                    if (this.simulation) {
+                        this.simulation.stop();
+                    }
+                }
 
                 // Create links
                 const link = g.selectAll('.link')
@@ -605,22 +697,172 @@
                     this.selectNode(d);
                 });
 
-                // Update positions on simulation tick
-                this.simulation.on('tick', () => {
-                    link
-                        .attr('x1', d => d.source.x)
-                        .attr('y1', d => d.source.y)
-                        .attr('x2', d => d.target.x)
-                        .attr('y2', d => d.target.y);
+                if (useCoordinates) {
+                    // Position nodes and links immediately using coordinates
+                    this.updateCoordinatePositions(link, node, labels);
+                } else {
+                    // Update positions on simulation tick for force layouts
+                    this.simulation.on('tick', () => {
+                        link
+                            .attr('x1', d => d.source.x)
+                            .attr('y1', d => d.source.y)
+                            .attr('x2', d => d.target.x)
+                            .attr('y2', d => d.target.y);
 
-                    node
-                        .attr('cx', d => d.x)
-                        .attr('cy', d => d.y);
+                        node
+                            .attr('cx', d => d.x)
+                            .attr('cy', d => d.y);
 
-                    labels
-                        .attr('x', d => d.x)
-                        .attr('y', d => d.y + 20);
+                        labels
+                            .attr('x', d => d.x)
+                            .attr('y', d => d.y + 20);
+                    });
+                }
+            }
+
+            hasCoordinates(nodes) {
+                // Check if nodes have coordinate properties
+                // Look for common coordinate property names
+                const coordinateProps = ['x', 'y', 'X', 'Y', 'coord_x', 'coord_y', 'position_x', 'position_y'];
+                
+                return nodes.some(node => {
+                    const props = node.properties || {};
+                    const hasX = coordinateProps.some(prop => props.hasOwnProperty(prop) && 
+                        typeof props[prop] === 'number' && !isNaN(props[prop]));
+                    const hasY = coordinateProps.some(prop => prop.includes('y') || prop.includes('Y')) && 
+                        coordinateProps.some(prop => props.hasOwnProperty(prop) && 
+                        typeof props[prop] === 'number' && !isNaN(props[prop]));
+                    return hasX && hasY;
                 });
+            }
+
+            setupCoordinateLayout(nodes, width, height) {
+                // Find coordinate properties and scale them to fit the viewport
+                const coordinateProps = ['x', 'y', 'X', 'Y', 'coord_x', 'coord_y', 'position_x', 'position_y'];
+                
+                // Extract coordinate values
+                const coordinates = nodes.map(node => {
+                    const props = node.properties || {};
+                    let x = null, y = null;
+                    
+                    // Find X coordinate
+                    for (let prop of coordinateProps) {
+                        if ((prop.includes('x') || prop.includes('X')) && 
+                            props.hasOwnProperty(prop) && 
+                            typeof props[prop] === 'number' && !isNaN(props[prop])) {
+                            x = props[prop];
+                            break;
+                        }
+                    }
+                    
+                    // Find Y coordinate
+                    for (let prop of coordinateProps) {
+                        if ((prop.includes('y') || prop.includes('Y')) && 
+                            props.hasOwnProperty(prop) && 
+                            typeof props[prop] === 'number' && !isNaN(props[prop])) {
+                            y = props[prop];
+                            break;
+                        }
+                    }
+                    
+                    return { x, y };
+                }).filter(coord => coord.x !== null && coord.y !== null);
+
+                if (coordinates.length === 0) return;
+
+                // Calculate bounds
+                const xExtent = d3.extent(coordinates, d => d.x);
+                const yExtent = d3.extent(coordinates, d => d.y);
+
+                // Create scales with padding
+                const padding = 50;
+                const xScale = d3.scaleLinear()
+                    .domain(xExtent)
+                    .range([padding, width - padding]);
+                
+                const yScale = d3.scaleLinear()
+                    .domain(yExtent)
+                    .range([height - padding, padding]); // Invert Y for SVG coordinate system
+
+                // Apply scaled coordinates to nodes
+                nodes.forEach(node => {
+                    const props = node.properties || {};
+                    let originalX = null, originalY = null;
+                    
+                    // Find original coordinates
+                    for (let prop of coordinateProps) {
+                        if ((prop.includes('x') || prop.includes('X')) && 
+                            props.hasOwnProperty(prop) && 
+                            typeof props[prop] === 'number' && !isNaN(props[prop])) {
+                            originalX = props[prop];
+                            break;
+                        }
+                    }
+                    
+                    for (let prop of coordinateProps) {
+                        if ((prop.includes('y') || prop.includes('Y')) && 
+                            props.hasOwnProperty(prop) && 
+                            typeof props[prop] === 'number' && !isNaN(props[prop])) {
+                            originalY = props[prop];
+                            break;
+                        }
+                    }
+                    
+                    if (originalX !== null && originalY !== null) {
+                        node.x = xScale(originalX);
+                        node.y = yScale(originalY);
+                        node.fx = node.x; // Fix position
+                        node.fy = node.y;
+                    }
+                });
+            }
+
+            updateCoordinatePositions(link, node, labels) {
+                // Position nodes using their calculated coordinates
+                node
+                    .attr('cx', d => d.x || 0)
+                    .attr('cy', d => d.y || 0);
+
+                labels
+                    .attr('x', d => d.x || 0)
+                    .attr('y', d => (d.y || 0) + 20);
+
+                // Position links - get the actual data arrays
+                const nodeData = node.data();
+                const linkData = link.data();
+
+                link
+                    .attr('x1', d => {
+                        const sourceNode = nodeData.find(n => n.id === d.source);
+                        return sourceNode ? sourceNode.x : 0;
+                    })
+                    .attr('y1', d => {
+                        const sourceNode = nodeData.find(n => n.id === d.source);
+                        return sourceNode ? sourceNode.y : 0;
+                    })
+                    .attr('x2', d => {
+                        const targetNode = nodeData.find(n => n.id === d.target);
+                        return targetNode ? targetNode.x : 0;
+                    })
+                    .attr('y2', d => {
+                        const targetNode = nodeData.find(n => n.id === d.target);
+                        return targetNode ? targetNode.y : 0;
+                    });
+            }
+
+            updateLayoutStatus(useCoordinates, nodeCount) {
+                const statusDiv = document.getElementById('layout-status');
+                if (this.currentLayout === 'coordinates') {
+                    if (useCoordinates) {
+                        statusDiv.innerHTML = `📍 Using node coordinates for ${nodeCount} nodes`;
+                        statusDiv.style.color = '#28a745';
+                    } else {
+                        statusDiv.innerHTML = '⚠️ No coordinate data found, using force layout';
+                        statusDiv.style.color = '#ffc107';
+                    }
+                } else {
+                    statusDiv.innerHTML = '';
+                }
             }
 
             selectNode(node) {
@@ -720,6 +962,11 @@
                         .style('display', this.showLabels ? 'block' : 'none');
                 });
 
+                // Clear filters button
+                document.getElementById('clear-filters-btn').addEventListener('click', () => {
+                    this.clearFilters();
+                });
+
                 // Layout selector
                 document.getElementById('layout-select').addEventListener('change', (e) => {
                     this.currentLayout = e.target.value;
@@ -782,6 +1029,12 @@
             }
 
             applyLayout() {
+                if (this.currentLayout === 'coordinates') {
+                    // Reload graph data to apply coordinate layout
+                    this.loadGraphData();
+                    return;
+                }
+
                 if (!this.simulation) return;
 
                 const width = this.svg.attr('width');
@@ -804,7 +1057,9 @@
             }
 
             dragstarted(event, d) {
-                if (!event.active) this.simulation.alphaTarget(0.3).restart();
+                if (this.simulation && !event.active) {
+                    this.simulation.alphaTarget(0.3).restart();
+                }
                 d.fx = d.x;
                 d.fy = d.y;
             }
@@ -815,9 +1070,17 @@
             }
 
             dragended(event, d) {
-                if (!event.active) this.simulation.alphaTarget(0);
-                d.fx = null;
-                d.fy = null;
+                if (this.simulation && !event.active) {
+                    this.simulation.alphaTarget(0);
+                }
+                // For coordinate layout, keep the position fixed
+                if (this.currentLayout === 'coordinates') {
+                    d.fx = event.x;
+                    d.fy = event.y;
+                } else {
+                    d.fx = null;
+                    d.fy = null;
+                }
             }
         }
 
