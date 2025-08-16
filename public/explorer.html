@@ -1,0 +1,830 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Neo4j Database Explorer - Neurotome</title>
+    <script src="https://d3js.org/d3.v7.min.js"></script>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: #333;
+            overflow-x: hidden;
+        }
+
+        .header {
+            background: rgba(255, 255, 255, 0.95);
+            backdrop-filter: blur(10px);
+            padding: 1rem 2rem;
+            box-shadow: 0 2px 20px rgba(0,0,0,0.1);
+            position: sticky;
+            top: 0;
+            z-index: 1000;
+        }
+
+        .header h1 {
+            color: #4a5568;
+            font-size: 2rem;
+            font-weight: 700;
+        }
+
+        .container {
+            display: grid;
+            grid-template-columns: 300px 1fr 350px;
+            height: calc(100vh - 80px);
+            gap: 1rem;
+            padding: 1rem;
+        }
+
+        .sidebar {
+            background: rgba(255, 255, 255, 0.95);
+            backdrop-filter: blur(10px);
+            border-radius: 12px;
+            padding: 1.5rem;
+            box-shadow: 0 8px 32px rgba(0,0,0,0.1);
+            overflow-y: auto;
+        }
+
+        .main-content {
+            background: rgba(255, 255, 255, 0.95);
+            backdrop-filter: blur(10px);
+            border-radius: 12px;
+            padding: 1.5rem;
+            box-shadow: 0 8px 32px rgba(0,0,0,0.1);
+            overflow: hidden;
+            display: flex;
+            flex-direction: column;
+        }
+
+        .details-panel {
+            background: rgba(255, 255, 255, 0.95);
+            backdrop-filter: blur(10px);
+            border-radius: 12px;
+            padding: 1.5rem;
+            box-shadow: 0 8px 32px rgba(0,0,0,0.1);
+            overflow-y: auto;
+        }
+
+        .section {
+            margin-bottom: 2rem;
+        }
+
+        .section h3 {
+            color: #4a5568;
+            margin-bottom: 1rem;
+            font-size: 1.2rem;
+            border-bottom: 2px solid #e2e8f0;
+            padding-bottom: 0.5rem;
+        }
+
+        .search-box {
+            width: 100%;
+            padding: 0.75rem;
+            border: 2px solid #e2e8f0;
+            border-radius: 8px;
+            font-size: 1rem;
+            transition: border-color 0.3s ease;
+            margin-bottom: 1rem;
+        }
+
+        .search-box:focus {
+            outline: none;
+            border-color: #667eea;
+            box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
+        }
+
+        .label-list, .relationship-list {
+            list-style: none;
+        }
+
+        .label-item, .relationship-item {
+            padding: 0.75rem;
+            background: #f7fafc;
+            margin-bottom: 0.5rem;
+            border-radius: 8px;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            border-left: 4px solid transparent;
+        }
+
+        .label-item:hover, .relationship-item:hover {
+            background: #edf2f7;
+            border-left-color: #667eea;
+            transform: translateX(4px);
+        }
+
+        .label-item.active, .relationship-item.active {
+            background: #667eea;
+            color: white;
+            border-left-color: #4c51bf;
+        }
+
+        .node-count {
+            font-size: 0.85rem;
+            color: #718096;
+            float: right;
+            background: #e2e8f0;
+            padding: 0.2rem 0.5rem;
+            border-radius: 12px;
+        }
+
+        .active .node-count {
+            background: rgba(255, 255, 255, 0.3);
+            color: white;
+        }
+
+        .stats-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 1rem;
+            margin-bottom: 1rem;
+        }
+
+        .stat-card {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 1rem;
+            border-radius: 8px;
+            text-align: center;
+        }
+
+        .stat-value {
+            font-size: 2rem;
+            font-weight: bold;
+            display: block;
+        }
+
+        .stat-label {
+            font-size: 0.9rem;
+            opacity: 0.9;
+        }
+
+        #graph-container {
+            flex: 1;
+            background: #f7fafc;
+            border-radius: 8px;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .controls {
+            display: flex;
+            gap: 1rem;
+            margin-bottom: 1rem;
+            flex-wrap: wrap;
+        }
+
+        .btn {
+            padding: 0.75rem 1.5rem;
+            background: #667eea;
+            color: white;
+            border: none;
+            border-radius: 8px;
+            cursor: pointer;
+            font-size: 0.9rem;
+            transition: all 0.3s ease;
+        }
+
+        .btn:hover {
+            background: #5a67d8;
+            transform: translateY(-2px);
+            box-shadow: 0 4px 12px rgba(102, 126, 234, 0.3);
+        }
+
+        .btn.secondary {
+            background: #718096;
+        }
+
+        .btn.secondary:hover {
+            background: #4a5568;
+        }
+
+        .node-details, .relationship-details {
+            background: #f7fafc;
+            padding: 1rem;
+            border-radius: 8px;
+            margin-bottom: 1rem;
+        }
+
+        .property-list {
+            list-style: none;
+        }
+
+        .property-item {
+            display: flex;
+            justify-content: space-between;
+            padding: 0.5rem 0;
+            border-bottom: 1px solid #e2e8f0;
+        }
+
+        .property-key {
+            font-weight: 600;
+            color: #4a5568;
+        }
+
+        .property-value {
+            color: #718096;
+            word-break: break-word;
+        }
+
+        .loading {
+            text-align: center;
+            padding: 2rem;
+            color: #718096;
+        }
+
+        .empty-state {
+            text-align: center;
+            padding: 3rem;
+            color: #718096;
+        }
+
+        .empty-state svg {
+            width: 64px;
+            height: 64px;
+            margin-bottom: 1rem;
+            opacity: 0.5;
+        }
+
+        /* D3 Graph Styles */
+        .node {
+            cursor: pointer;
+            stroke-width: 2px;
+        }
+
+        .node:hover {
+            stroke-width: 3px;
+        }
+
+        .link {
+            fill: none;
+            stroke: #999;
+            stroke-opacity: 0.6;
+            stroke-width: 2px;
+        }
+
+        .node-label {
+            font-size: 10px;
+            font-weight: 600;
+            text-anchor: middle;
+            pointer-events: none;
+            fill: #333;
+        }
+
+        .link-label {
+            font-size: 8px;
+            text-anchor: middle;
+            pointer-events: none;
+            fill: #666;
+        }
+
+        /* Responsive Design */
+        @media (max-width: 1200px) {
+            .container {
+                grid-template-columns: 1fr;
+                grid-template-rows: auto auto 1fr;
+            }
+        }
+
+        @media (max-width: 768px) {
+            .container {
+                padding: 0.5rem;
+                gap: 0.5rem;
+            }
+            
+            .header {
+                padding: 1rem;
+            }
+            
+            .controls {
+                flex-direction: column;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <h1>🧠 Neo4j Database Explorer</h1>
+    </div>
+
+    <div class="container">
+        <!-- Sidebar -->
+        <div class="sidebar">
+            <div class="section">
+                <h3>🔍 Search</h3>
+                <input type="text" class="search-box" id="search-input" placeholder="Search nodes..." />
+                <div id="search-results"></div>
+            </div>
+
+            <div class="section">
+                <h3>🏷️ Node Labels</h3>
+                <ul class="label-list" id="label-list">
+                    <li class="loading">Loading labels...</li>
+                </ul>
+            </div>
+
+            <div class="section">
+                <h3>🔗 Relationships</h3>
+                <ul class="relationship-list" id="relationship-list">
+                    <li class="loading">Loading relationships...</li>
+                </ul>
+            </div>
+        </div>
+
+        <!-- Main Content -->
+        <div class="main-content">
+            <div class="controls">
+                <button class="btn" id="refresh-btn">🔄 Refresh</button>
+                <button class="btn secondary" id="reset-zoom-btn">🎯 Reset Zoom</button>
+                <button class="btn secondary" id="toggle-labels-btn">🏷️ Toggle Labels</button>
+                <select id="layout-select" class="btn">
+                    <option value="force">Force Layout</option>
+                    <option value="circle">Circle Layout</option>
+                    <option value="grid">Grid Layout</option>
+                </select>
+            </div>
+            <div id="graph-container">
+                <div class="loading" id="graph-loading">
+                    <div>Loading graph data...</div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Details Panel -->
+        <div class="details-panel">
+            <div class="section">
+                <h3>📊 Database Statistics</h3>
+                <div class="stats-grid" id="stats-grid">
+                    <div class="loading">Loading stats...</div>
+                </div>
+            </div>
+
+            <div class="section" id="node-details-section" style="display: none;">
+                <h3>📄 Node Details</h3>
+                <div id="selected-node-details"></div>
+            </div>
+
+            <div class="section" id="relationship-details-section" style="display: none;">
+                <h3>🔗 Relationship Details</h3>
+                <div id="selected-relationship-details"></div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        class Neo4jExplorer {
+            constructor() {
+                this.selectedLabel = null;
+                this.selectedNode = null;
+                this.showLabels = true;
+                this.simulation = null;
+                this.svg = null;
+                this.currentLayout = 'force';
+                
+                this.init();
+            }
+
+            async init() {
+                await this.loadDatabaseStats();
+                await this.loadLabels();
+                await this.loadRelationships();
+                this.initializeGraph();
+                this.setupEventListeners();
+                this.setupSearch();
+            }
+
+            async loadDatabaseStats() {
+                try {
+                    const response = await fetch('/api/stats');
+                    const stats = await response.json();
+                    this.renderStats(stats);
+                } catch (error) {
+                    console.error('Error loading stats:', error);
+                }
+            }
+
+            renderStats(stats) {
+                const statsGrid = document.getElementById('stats-grid');
+                statsGrid.innerHTML = `
+                    <div class="stat-card">
+                        <span class="stat-value">${stats.total_nodes.toLocaleString()}</span>
+                        <span class="stat-label">Total Nodes</span>
+                    </div>
+                    <div class="stat-card">
+                        <span class="stat-value">${stats.total_relationships.toLocaleString()}</span>
+                        <span class="stat-label">Total Relationships</span>
+                    </div>
+                `;
+            }
+
+            async loadLabels() {
+                try {
+                    const response = await fetch('/api/labels');
+                    const labels = await response.json();
+                    this.renderLabels(labels);
+                } catch (error) {
+                    console.error('Error loading labels:', error);
+                }
+            }
+
+            async renderLabels(labels) {
+                const labelList = document.getElementById('label-list');
+                
+                if (labels.length === 0) {
+                    labelList.innerHTML = '<li class="empty-state">No labels found</li>';
+                    return;
+                }
+
+                const labelItems = await Promise.all(labels.map(async (label) => {
+                    try {
+                        const countResponse = await fetch(`/api/nodes/${label}/count`);
+                        const countData = await countResponse.json();
+                        return `
+                            <li class="label-item" data-label="${label}">
+                                ${label}
+                                <span class="node-count">${countData.count}</span>
+                            </li>
+                        `;
+                    } catch {
+                        return `
+                            <li class="label-item" data-label="${label}">
+                                ${label}
+                                <span class="node-count">?</span>
+                            </li>
+                        `;
+                    }
+                }));
+
+                labelList.innerHTML = labelItems.join('');
+
+                // Add click listeners
+                labelList.querySelectorAll('.label-item').forEach(item => {
+                    item.addEventListener('click', () => {
+                        this.selectLabel(item.dataset.label);
+                    });
+                });
+            }
+
+            async loadRelationships() {
+                try {
+                    const response = await fetch('/api/relationships');
+                    const relationships = await response.json();
+                    this.renderRelationships(relationships);
+                } catch (error) {
+                    console.error('Error loading relationships:', error);
+                }
+            }
+
+            renderRelationships(relationships) {
+                const relationshipList = document.getElementById('relationship-list');
+                
+                if (relationships.length === 0) {
+                    relationshipList.innerHTML = '<li class="empty-state">No relationships found</li>';
+                    return;
+                }
+
+                relationshipList.innerHTML = relationships.map(rel => `
+                    <li class="relationship-item" data-relationship="${rel}">
+                        ${rel}
+                    </li>
+                `).join('');
+            }
+
+            async selectLabel(label) {
+                // Update UI
+                document.querySelectorAll('.label-item').forEach(item => {
+                    item.classList.remove('active');
+                });
+                document.querySelector(`[data-label="${label}"]`).classList.add('active');
+                
+                this.selectedLabel = label;
+                await this.loadGraphData();
+            }
+
+            async loadGraphData() {
+                document.getElementById('graph-loading').style.display = 'block';
+                
+                try {
+                    const url = this.selectedLabel 
+                        ? `/api/graph?label=${this.selectedLabel}&limit=100`
+                        : '/api/graph?limit=100';
+                    
+                    const response = await fetch(url);
+                    const data = await response.json();
+                    this.renderGraph(data);
+                } catch (error) {
+                    console.error('Error loading graph data:', error);
+                } finally {
+                    document.getElementById('graph-loading').style.display = 'none';
+                }
+            }
+
+            initializeGraph() {
+                const container = document.getElementById('graph-container');
+                const width = container.clientWidth;
+                const height = container.clientHeight;
+
+                // Clear existing SVG
+                d3.select('#graph-container svg').remove();
+
+                this.svg = d3.select('#graph-container')
+                    .append('svg')
+                    .attr('width', width)
+                    .attr('height', height);
+
+                // Add zoom behavior
+                const zoom = d3.zoom()
+                    .scaleExtent([0.1, 10])
+                    .on('zoom', (event) => {
+                        this.svg.select('g').attr('transform', event.transform);
+                    });
+
+                this.svg.call(zoom);
+
+                // Create main group
+                this.svg.append('g');
+            }
+
+            renderGraph(data) {
+                if (!data.nodes || data.nodes.length === 0) {
+                    return;
+                }
+
+                const width = this.svg.attr('width');
+                const height = this.svg.attr('height');
+                const g = this.svg.select('g');
+
+                // Clear existing elements
+                g.selectAll('*').remove();
+
+                // Color scale for different node labels
+                const colorScale = d3.scaleOrdinal(d3.schemeCategory10);
+
+                // Create simulation
+                this.simulation = d3.forceSimulation(data.nodes)
+                    .force('link', d3.forceLink(data.links).id(d => d.id).distance(100))
+                    .force('charge', d3.forceManyBody().strength(-300))
+                    .force('center', d3.forceCenter(width / 2, height / 2));
+
+                // Create links
+                const link = g.selectAll('.link')
+                    .data(data.links)
+                    .enter().append('line')
+                    .attr('class', 'link');
+
+                // Create nodes
+                const node = g.selectAll('.node')
+                    .data(data.nodes)
+                    .enter().append('circle')
+                    .attr('class', 'node')
+                    .attr('r', 8)
+                    .attr('fill', d => colorScale(d.labels[0] || 'Unknown'))
+                    .attr('stroke', '#fff')
+                    .call(d3.drag()
+                        .on('start', this.dragstarted.bind(this))
+                        .on('drag', this.dragged.bind(this))
+                        .on('end', this.dragended.bind(this)));
+
+                // Add labels
+                const labels = g.selectAll('.node-label')
+                    .data(data.nodes)
+                    .enter().append('text')
+                    .attr('class', 'node-label')
+                    .text(d => d.name)
+                    .style('display', this.showLabels ? 'block' : 'none');
+
+                // Node click handler
+                node.on('click', (event, d) => {
+                    this.selectNode(d);
+                });
+
+                // Update positions on simulation tick
+                this.simulation.on('tick', () => {
+                    link
+                        .attr('x1', d => d.source.x)
+                        .attr('y1', d => d.source.y)
+                        .attr('x2', d => d.target.x)
+                        .attr('y2', d => d.target.y);
+
+                    node
+                        .attr('cx', d => d.x)
+                        .attr('cy', d => d.y);
+
+                    labels
+                        .attr('x', d => d.x)
+                        .attr('y', d => d.y + 20);
+                });
+            }
+
+            selectNode(node) {
+                this.selectedNode = node;
+                this.showNodeDetails(node);
+                this.loadNodeRelationships(node.id);
+
+                // Highlight selected node
+                this.svg.selectAll('.node')
+                    .attr('stroke-width', d => d.id === node.id ? 4 : 2)
+                    .attr('stroke', d => d.id === node.id ? '#ff6b6b' : '#fff');
+            }
+
+            showNodeDetails(node) {
+                const section = document.getElementById('node-details-section');
+                const details = document.getElementById('selected-node-details');
+                
+                details.innerHTML = `
+                    <div class="node-details">
+                        <h4>ID: ${node.id}</h4>
+                        <p><strong>Labels:</strong> ${node.labels.join(', ')}</p>
+                        <h5>Properties:</h5>
+                        <ul class="property-list">
+                            ${Object.entries(node.properties).map(([key, value]) => `
+                                <li class="property-item">
+                                    <span class="property-key">${key}:</span>
+                                    <span class="property-value">${value}</span>
+                                </li>
+                            `).join('')}
+                        </ul>
+                    </div>
+                `;
+                
+                section.style.display = 'block';
+            }
+
+            async loadNodeRelationships(nodeId) {
+                try {
+                    const response = await fetch(`/api/node/${nodeId}/relationships`);
+                    const relationships = await response.json();
+                    this.showRelationshipDetails(relationships);
+                } catch (error) {
+                    console.error('Error loading node relationships:', error);
+                }
+            }
+
+            showRelationshipDetails(relationships) {
+                const section = document.getElementById('relationship-details-section');
+                const details = document.getElementById('selected-relationship-details');
+                
+                if (relationships.length === 0) {
+                    details.innerHTML = '<p>No relationships found</p>';
+                    section.style.display = 'block';
+                    return;
+                }
+
+                details.innerHTML = relationships.map(rel => `
+                    <div class="relationship-details">
+                        <h5>${rel.relationship.type}</h5>
+                        <p><strong>From:</strong> ${rel.source.properties.name || rel.source.id} (${rel.source.labels.join(', ')})</p>
+                        <p><strong>To:</strong> ${rel.target.properties.name || rel.target.id} (${rel.target.labels.join(', ')})</p>
+                        ${Object.keys(rel.relationship.properties).length > 0 ? `
+                            <h6>Properties:</h6>
+                            <ul class="property-list">
+                                ${Object.entries(rel.relationship.properties).map(([key, value]) => `
+                                    <li class="property-item">
+                                        <span class="property-key">${key}:</span>
+                                        <span class="property-value">${value}</span>
+                                    </li>
+                                `).join('')}
+                            </ul>
+                        ` : ''}
+                    </div>
+                `).join('');
+                
+                section.style.display = 'block';
+            }
+
+            setupEventListeners() {
+                // Refresh button
+                document.getElementById('refresh-btn').addEventListener('click', () => {
+                    this.loadGraphData();
+                });
+
+                // Reset zoom button
+                document.getElementById('reset-zoom-btn').addEventListener('click', () => {
+                    this.svg.transition().duration(750).call(
+                        d3.zoom().transform,
+                        d3.zoomIdentity
+                    );
+                });
+
+                // Toggle labels button
+                document.getElementById('toggle-labels-btn').addEventListener('click', () => {
+                    this.showLabels = !this.showLabels;
+                    this.svg.selectAll('.node-label')
+                        .style('display', this.showLabels ? 'block' : 'none');
+                });
+
+                // Layout selector
+                document.getElementById('layout-select').addEventListener('change', (e) => {
+                    this.currentLayout = e.target.value;
+                    this.applyLayout();
+                });
+            }
+
+            setupSearch() {
+                const searchInput = document.getElementById('search-input');
+                const searchResults = document.getElementById('search-results');
+                let searchTimeout;
+
+                searchInput.addEventListener('input', (e) => {
+                    clearTimeout(searchTimeout);
+                    const query = e.target.value.trim();
+
+                    if (query.length < 2) {
+                        searchResults.innerHTML = '';
+                        return;
+                    }
+
+                    searchTimeout = setTimeout(async () => {
+                        try {
+                            const response = await fetch(`/api/search?q=${encodeURIComponent(query)}`);
+                            const results = await response.json();
+                            this.renderSearchResults(results);
+                        } catch (error) {
+                            console.error('Error searching:', error);
+                        }
+                    }, 300);
+                });
+            }
+
+            renderSearchResults(results) {
+                const searchResults = document.getElementById('search-results');
+                
+                if (results.length === 0) {
+                    searchResults.innerHTML = '<p style="color: #999; padding: 0.5rem;">No results found</p>';
+                    return;
+                }
+
+                searchResults.innerHTML = results.map(node => `
+                    <div class="search-result" style="padding: 0.5rem; border: 1px solid #e2e8f0; margin-bottom: 0.5rem; border-radius: 4px; cursor: pointer;" data-node-id="${node.id}">
+                        <strong>${node.properties.name || `Node ${node.id}`}</strong><br>
+                        <small style="color: #666;">${node.labels.join(', ')}</small>
+                    </div>
+                `).join('');
+
+                // Add click listeners to search results
+                searchResults.querySelectorAll('.search-result').forEach(result => {
+                    result.addEventListener('click', () => {
+                        const nodeId = parseInt(result.dataset.nodeId);
+                        // Find and select the node if it's in the current graph
+                        const node = this.svg.selectAll('.node').data().find(n => n.id === nodeId);
+                        if (node) {
+                            this.selectNode(node);
+                        }
+                    });
+                });
+            }
+
+            applyLayout() {
+                if (!this.simulation) return;
+
+                const width = this.svg.attr('width');
+                const height = this.svg.attr('height');
+
+                this.simulation.stop();
+
+                switch (this.currentLayout) {
+                    case 'circle':
+                        this.simulation.force('center', null);
+                        break;
+                    case 'grid':
+                        this.simulation.force('center', null);
+                        break;
+                    default:
+                        this.simulation.force('center', d3.forceCenter(width / 2, height / 2));
+                }
+
+                this.simulation.alpha(1).restart();
+            }
+
+            dragstarted(event, d) {
+                if (!event.active) this.simulation.alphaTarget(0.3).restart();
+                d.fx = d.x;
+                d.fy = d.y;
+            }
+
+            dragged(event, d) {
+                d.fx = event.x;
+                d.fy = event.y;
+            }
+
+            dragended(event, d) {
+                if (!event.active) this.simulation.alphaTarget(0);
+                d.fx = null;
+                d.fy = null;
+            }
+        }
+
+        // Initialize the explorer when the page loads
+        document.addEventListener('DOMContentLoaded', () => {
+            new Neo4jExplorer();
+        });
+    </script>
+</body>
+</html>

@@ -6,7 +6,9 @@
   "scripts": {
     "start": "node server.js",
     "build": "npm install",
-    "dev": "nodemon server.js"
+    "dev": "nodemon server.js",
+    "start-all": "./start.sh",
+    "api": "python3 app.py"
   },
   "engines": {
     "node": ">=16.0.0",
@@ -16,7 +18,8 @@
     "express": "^4.17.1",
     "three": "^0.137.0",
     "d3": "^7.0.0",
-    "path": "^0.12.7"
+    "path": "^0.12.7",
+    "cors": "^2.8.5"
   },
   "devDependencies": {
     "nodemon": "^2.0.15"

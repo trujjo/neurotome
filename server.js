@@ -11,11 +11,17 @@ app.get('/health', (req, res) => {
 // Serve static files from the public directory
 app.use(express.static('public'));
 
-// Handle all routes by serving index.html
+// Route for database explorer
+app.get('/explorer', (req, res) => {
+    res.sendFile(path.join(__dirname, 'public', 'explorer.html'));
+});
+
+// Handle all other routes by serving index.html
 app.get('*', (req, res) => {
     res.sendFile(path.join(__dirname, 'public', 'index.html'));
 });
 
 app.listen(port, () => {
     console.log(`Server running on port ${port}`);
+    console.log(`Database explorer available at: http://localhost:${port}/explorer`);
 });
