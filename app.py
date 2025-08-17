@@ -386,7 +386,7 @@ def find_sensation_intersections():
                 # Add the intermediate node to our collection
                 node_id = node.element_id
                 if node_id not in nodes:
-                    color = "orange" if 'sensation' in node.labels and node.get("name") in sensation_names else "gray"
+                    color = "#f97316" if 'sensation' in node.labels and node.get("name") in sensation_names else "gray"
                     if 'sensation' in node.labels and node.get("name") in sensation_names:
                         selected_sensation_ids.add(node_id)
                     
@@ -404,7 +404,7 @@ def find_sensation_intersections():
             
             # Add source node
             if source_id not in nodes:
-                color = "orange" if 'sensation' in source_node.labels and source_node.get("name") in sensation_names else "gray"
+                color = "#f97316" if 'sensation' in source_node.labels and source_node.get("name") in sensation_names else "gray"
                 if 'sensation' in source_node.labels and source_node.get("name") in sensation_names:
                     selected_sensation_ids.add(source_id)
                 
@@ -418,7 +418,7 @@ def find_sensation_intersections():
             
             # Add target node  
             if target_id not in nodes:
-                color = "orange" if 'sensation' in target_node.labels and target_node.get("name") in sensation_names else "gray"
+                color = "#f97316" if 'sensation' in target_node.labels and target_node.get("name") in sensation_names else "gray"
                 if 'sensation' in target_node.labels and target_node.get("name") in sensation_names:
                     selected_sensation_ids.add(target_id)
                 

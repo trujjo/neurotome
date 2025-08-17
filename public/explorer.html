@@ -32,10 +32,10 @@
         }
 
         .header h1 {
-            color: #60a5fa;
+            color: #f97316;
             font-size: 2rem;
             font-weight: 700;
-            text-shadow: 0 0 20px rgba(96, 165, 250, 0.3);
+            text-shadow: 0 0 20px rgba(249, 115, 22, 0.3);
         }
 
         .container {
@@ -83,12 +83,12 @@
         }
 
         .section h3 {
-            color: #60a5fa;
+            color: #f97316;
             margin-bottom: 1rem;
             font-size: 1.2rem;
-            border-bottom: 2px solid rgba(96, 165, 250, 0.3);
+            border-bottom: 2px solid rgba(249, 115, 22, 0.3);
             padding-bottom: 0.5rem;
-            text-shadow: 0 0 10px rgba(96, 165, 250, 0.2);
+            text-shadow: 0 0 10px rgba(249, 115, 22, 0.2);
         }
 
         .search-box {
@@ -105,8 +105,8 @@
 
         .search-box:focus {
             outline: none;
-            border-color: #60a5fa;
-            box-shadow: 0 0 0 3px rgba(96, 165, 250, 0.2);
+            border-color: #f97316;
+            box-shadow: 0 0 0 3px rgba(249, 115, 22, 0.2);
             background: rgba(0, 0, 0, 0.5);
         }
 
@@ -130,19 +130,19 @@
         }
 
         .label-item:hover, .relationship-item:hover {
-            background: rgba(251, 146, 60, 0.2);
-            border-left-color: #fb923c;
-            border-color: rgba(251, 146, 60, 0.3);
+            background: rgba(107, 114, 128, 0.2);
+            border-left-color: #f97316;
+            border-color: rgba(249, 115, 22, 0.3);
             transform: translateX(4px);
-            box-shadow: 0 4px 12px rgba(251, 146, 60, 0.2);
+            box-shadow: 0 4px 12px rgba(249, 115, 22, 0.2);
         }
 
         .label-item.active, .relationship-item.active {
-            background: linear-gradient(135deg, #fb923c 0%, #f97316 100%);
+            background: linear-gradient(135deg, #6b7280 0%, #4b5563 100%);
             color: white;
-            border-left-color: #ea580c;
-            border-color: rgba(251, 146, 60, 0.5);
-            box-shadow: 0 8px 20px rgba(251, 146, 60, 0.3);
+            border-left-color: #f97316;
+            border-color: rgba(249, 115, 22, 0.5);
+            box-shadow: 0 8px 20px rgba(249, 115, 22, 0.3);
         }
 
         .node-count {
@@ -207,21 +207,21 @@
         }
 
         .sensation-toggle:hover {
-            background: rgba(251, 146, 60, 0.2);
-            border-color: rgba(251, 146, 60, 0.3);
+            background: rgba(107, 114, 128, 0.2);
+            border-color: rgba(249, 115, 22, 0.3);
             transform: translateY(-2px);
-            box-shadow: 0 4px 12px rgba(251, 146, 60, 0.2);
+            box-shadow: 0 4px 12px rgba(249, 115, 22, 0.2);
         }
 
         .sensation-toggle.active {
-            background: linear-gradient(135deg, #fb923c 0%, #f97316 100%);
-            border-color: #ea580c;
+            background: linear-gradient(135deg, #6b7280 0%, #4b5563 100%);
+            border-color: #f97316;
             color: white;
-            box-shadow: 0 8px 20px rgba(251, 146, 60, 0.3);
+            box-shadow: 0 8px 20px rgba(249, 115, 22, 0.3);
         }
 
         .sensation-toggle.active:hover {
-            background: linear-gradient(135deg, #f97316 0%, #ea580c 100%);
+            background: linear-gradient(135deg, #4b5563 0%, #374151 100%);
             transform: translateY(-2px);
         }
 
@@ -247,8 +247,8 @@
         }
 
         .sensation-group-header:hover {
-            background: rgba(96, 165, 250, 0.2);
-            color: #60a5fa;
+            background: rgba(249, 115, 22, 0.2);
+            color: #f97316;
         }
 
         .sensation-group-header:after {
@@ -257,7 +257,7 @@
             right: 16px;
             transition: transform 0.3s ease;
             font-size: 0.8em;
-            color: #60a5fa;
+            color: #f97316;
         }
 
         .sensation-group-header.collapsed:after {
@@ -294,8 +294,8 @@
         }
 
         .sensation-subgroup-header:hover {
-            background: rgba(96, 165, 250, 0.2);
-            color: #60a5fa;
+            background: rgba(249, 115, 22, 0.2);
+            color: #f97316;
         }
 
         .sensation-subgroup-header:after {
@@ -304,7 +304,7 @@
             right: 12px;
             transition: transform 0.3s ease;
             font-size: 0.7em;
-            color: #60a5fa;
+            color: #f97316;
         }
 
         .sensation-subgroup-header.collapsed:after {
@@ -325,6 +325,31 @@
             border-radius: 4px;
         }
 
+        .side-columns {
+            display: flex;
+            gap: 1rem;
+            padding: 0.5rem 0;
+        }
+
+        .side-column {
+            flex: 1;
+            min-width: 0; /* Allows content to shrink */
+        }
+
+        .column-header {
+            color: #f97316;
+            font-size: 0.8em;
+            font-weight: 600;
+            margin: 0 0 0.5rem 0;
+            padding-bottom: 0.25rem;
+            border-bottom: 1px solid rgba(249, 115, 22, 0.3);
+        }
+
+        .side-column .sensation-toggle {
+            margin-bottom: 0.25rem;
+            font-size: 0.75em;
+        }
+
         .intersection-summary {
             background: rgba(0, 0, 0, 0.4);
             padding: 12px;
@@ -340,12 +365,12 @@
         }
 
         .sensation-list li {
-            background: rgba(96, 165, 250, 0.2);
+            background: rgba(34, 197, 94, 0.2);
             padding: 4px 8px;
             margin: 2px 0;
             border-radius: 8px;
             font-size: 0.85em;
-            border: 1px solid rgba(96, 165, 250, 0.3);
+            border: 1px solid rgba(34, 197, 94, 0.3);
         }
 
         .intersection-results {
@@ -358,11 +383,11 @@
         }
 
         .node-type-group h5 {
-            color: #60a5fa;
+            color: #f97316;
             font-size: 0.9em;
             margin: 0 0 8px 0;
             padding-bottom: 4px;
-            border-bottom: 1px solid rgba(96, 165, 250, 0.3);
+            border-bottom: 1px solid rgba(249, 115, 22, 0.3);
         }
 
         .node-list {
@@ -382,10 +407,10 @@
         }
 
         .intersection-node:hover {
-            background: rgba(96, 165, 250, 0.2);
-            border-color: #60a5fa;
+            background: rgba(34, 197, 94, 0.2);
+            border-color: #22c55e;
             transform: translateX(4px);
-            box-shadow: 0 4px 12px rgba(96, 165, 250, 0.2);
+            box-shadow: 0 4px 12px rgba(34, 197, 94, 0.2);
         }
 
         .node-name {
@@ -403,16 +428,28 @@
             width: 100%;
             background: linear-gradient(135deg, #64748b 0%, #475569 100%);
             color: white;
-            border: 1px solid rgba(255, 255, 255, 0.1);
+            border: 1px solid rgba(34, 197, 94, 0.3);
+            box-shadow: 0 4px 12px rgba(34, 197, 94, 0.2);
         }
 
         .intersection-actions .btn:hover {
             background: linear-gradient(135deg, #475569 0%, #334155 100%);
-            box-shadow: 0 4px 12px rgba(100, 116, 139, 0.3);
+            box-shadow: 0 4px 12px rgba(34, 197, 94, 0.4);
+            border-color: rgba(34, 197, 94, 0.5);
         }
 
         #intersection-status {
             min-height: 1.2em;
+        }
+
+        #find-intersections-btn {
+            border: 1px solid rgba(34, 197, 94, 0.3) !important;
+            box-shadow: 0 4px 12px rgba(34, 197, 94, 0.2) !important;
+        }
+
+        #find-intersections-btn:hover:not(:disabled) {
+            box-shadow: 0 8px 20px rgba(34, 197, 94, 0.4) !important;
+            border-color: rgba(34, 197, 94, 0.5) !important;
         }
 
         #graph-container {
@@ -433,7 +470,7 @@
 
         .btn {
             padding: 0.75rem 1.5rem;
-            background: linear-gradient(135deg, #fb923c 0%, #f97316 100%);
+            background: linear-gradient(135deg, #6b7280 0%, #4b5563 100%);
             color: white;
             border: none;
             border-radius: 12px;
@@ -441,14 +478,15 @@
             font-size: 0.9rem;
             font-weight: 600;
             transition: all 0.3s ease;
-            border: 1px solid rgba(251, 146, 60, 0.3);
-            box-shadow: 0 4px 12px rgba(251, 146, 60, 0.2);
+            border: 1px solid rgba(249, 115, 22, 0.3);
+            box-shadow: 0 4px 12px rgba(249, 115, 22, 0.2);
         }
 
         .btn:hover {
-            background: linear-gradient(135deg, #f97316 0%, #ea580c 100%);
+            background: linear-gradient(135deg, #4b5563 0%, #374151 100%);
             transform: translateY(-2px);
-            box-shadow: 0 8px 20px rgba(251, 146, 60, 0.4);
+            box-shadow: 0 8px 20px rgba(249, 115, 22, 0.4);
+            border-color: rgba(249, 115, 22, 0.5);
         }
 
         .btn.secondary {
@@ -538,7 +576,7 @@
 
         .property-key {
             font-weight: 600;
-            color: #60a5fa;
+            color: #f97316;
         }
 
         .property-value {
@@ -569,20 +607,20 @@
         .node {
             cursor: pointer;
             stroke-width: 2px;
-            filter: drop-shadow(0 0 6px rgba(96, 165, 250, 0.3));
+            filter: drop-shadow(0 0 6px rgba(249, 115, 22, 0.3));
         }
 
         .node:hover {
             stroke-width: 3px;
-            filter: drop-shadow(0 0 12px rgba(96, 165, 250, 0.6));
+            filter: drop-shadow(0 0 12px rgba(249, 115, 22, 0.6));
         }
 
         .link {
             fill: none;
-            stroke: #60a5fa;
+            stroke: #f97316;
             stroke-opacity: 0.6;
             stroke-width: 2px;
-            filter: drop-shadow(0 0 3px rgba(96, 165, 250, 0.2));
+            filter: drop-shadow(0 0 3px rgba(249, 115, 22, 0.2));
         }
 
         .node-label {
@@ -927,24 +965,28 @@
             renderSides(sides) {
                 let html = '';
                 
-                // Sort sides: Left, Right, Bilateral, General
-                const sideOrder = ['Left', 'Right', 'Bilateral', 'General'];
-                const sortedSides = Object.keys(sides).sort((a, b) => {
-                    const aIndex = sideOrder.indexOf(a);
-                    const bIndex = sideOrder.indexOf(b);
-                    return (aIndex === -1 ? 999 : aIndex) - (bIndex === -1 ? 999 : bIndex);
-                });
+                // Check if we have both Left and Right sides
+                const hasLeft = sides['Left'] && sides['Left'].length > 0;
+                const hasRight = sides['Right'] && sides['Right'].length > 0;
                 
-                sortedSides.forEach(side => {
-                    const sensations = sides[side];
+                // If we have both Left and Right, display them as columns directly
+                if (hasLeft && hasRight) {
+                    const leftSensations = sides['Left'];
+                    const rightSensations = sides['Right'];
                     
                     html += `
-                        <div class="sensation-subgroup">
-                            <div class="sensation-subgroup-header" onclick="explorer.toggleDropdown(this)">
-                                ${side} (${sensations.length})
+                        <div class="side-columns">
+                            <div class="side-column">
+                                <h6 class="column-header">Left (${leftSensations.length})</h6>
+                                ${leftSensations.map(sensation => `
+                                    <div class="sensation-toggle" data-sensation="${sensation.name}">
+                                        ${sensation.name}
+                                    </div>
+                                `).join('')}
                             </div>
-                            <div class="sensation-subgroup-content" style="display: none;">
-                                ${sensations.map(sensation => `
+                            <div class="side-column">
+                                <h6 class="column-header">Right (${rightSensations.length})</h6>
+                                ${rightSensations.map(sensation => `
                                     <div class="sensation-toggle" data-sensation="${sensation.name}">
                                         ${sensation.name}
                                     </div>
@@ -952,7 +994,56 @@
                             </div>
                         </div>
                     `;
-                });
+                    
+                    // Handle remaining sides (Bilateral, General, etc.) as separate sections
+                    Object.keys(sides).forEach(side => {
+                        if (side !== 'Left' && side !== 'Right') {
+                            const sensations = sides[side];
+                            html += `
+                                <div class="sensation-subgroup">
+                                    <div class="sensation-subgroup-header" onclick="explorer.toggleDropdown(this)">
+                                        ${side} (${sensations.length})
+                                    </div>
+                                    <div class="sensation-subgroup-content" style="display: none;">
+                                        ${sensations.map(sensation => `
+                                            <div class="sensation-toggle" data-sensation="${sensation.name}">
+                                                ${sensation.name}
+                                            </div>
+                                        `).join('')}
+                                    </div>
+                                </div>
+                            `;
+                        }
+                    });
+                } else {
+                    // Fallback to original layout if we don't have both Left and Right
+                    // Sort sides: Left, Right, Bilateral, General
+                    const sideOrder = ['Left', 'Right', 'Bilateral', 'General'];
+                    const sortedSides = Object.keys(sides).sort((a, b) => {
+                        const aIndex = sideOrder.indexOf(a);
+                        const bIndex = sideOrder.indexOf(b);
+                        return (aIndex === -1 ? 999 : aIndex) - (bIndex === -1 ? 999 : bIndex);
+                    });
+                    
+                    sortedSides.forEach(side => {
+                        const sensations = sides[side];
+                        
+                        html += `
+                            <div class="sensation-subgroup">
+                                <div class="sensation-subgroup-header" onclick="explorer.toggleDropdown(this)">
+                                    ${side} (${sensations.length})
+                                </div>
+                                <div class="sensation-subgroup-content" style="display: none;">
+                                    ${sensations.map(sensation => `
+                                        <div class="sensation-toggle" data-sensation="${sensation.name}">
+                                            ${sensation.name}
+                                        </div>
+                                    `).join('')}
+                                </div>
+                            </div>
+                        `;
+                    });
+                }
                 
                 return html;
             }
@@ -1521,6 +1612,27 @@
                 // Clear existing elements
                 g.selectAll('*').remove();
 
+                // Add arrow marker definitions
+                const defs = this.svg.select('defs').empty() ? this.svg.append('defs') : this.svg.select('defs');
+                
+                // Clear existing markers
+                defs.selectAll('marker').remove();
+                
+                // Create arrow marker
+                defs.append('marker')
+                    .attr('id', 'arrow')
+                    .attr('viewBox', '0 -5 10 10')
+                    .attr('refX', 15)  // Position arrow at end of line
+                    .attr('refY', 0)
+                    .attr('markerWidth', 6)
+                    .attr('markerHeight', 6)
+                    .attr('orient', 'auto')
+                    .append('path')
+                    .attr('d', 'M0,-5L10,0L0,5')
+                    .attr('fill', '#f97316')
+                    .attr('stroke', '#f97316')
+                    .attr('stroke-width', 1);
+
                 // Color scale for different node labels
                 const colorScale = d3.scaleOrdinal(d3.schemeCategory10);
 
@@ -1552,7 +1664,8 @@
                 const link = g.selectAll('.link')
                     .data(data.links)
                     .enter().append('line')
-                    .attr('class', 'link');
+                    .attr('class', 'link')
+                    .attr('marker-end', 'url(#arrow)');  // Add arrow marker
 
                 // Add relationship labels
                 const linkLabels = g.selectAll('.link-label')
@@ -1605,11 +1718,36 @@
                 } else {
                     // Update positions on simulation tick for force layouts
                     this.simulation.on('tick', () => {
+                        // Update links with proper positioning to avoid overlap with nodes
                         link
-                            .attr('x1', d => d.source.x)
-                            .attr('y1', d => d.source.y)
-                            .attr('x2', d => d.target.x)
-                            .attr('y2', d => d.target.y);
+                            .attr('x1', d => {
+                                const dx = d.target.x - d.source.x;
+                                const dy = d.target.y - d.source.y;
+                                const length = Math.sqrt(dx * dx + dy * dy);
+                                const nodeRadius = 8;
+                                return length > 0 ? d.source.x + (dx * nodeRadius / length) : d.source.x;
+                            })
+                            .attr('y1', d => {
+                                const dx = d.target.x - d.source.x;
+                                const dy = d.target.y - d.source.y;
+                                const length = Math.sqrt(dx * dx + dy * dy);
+                                const nodeRadius = 8;
+                                return length > 0 ? d.source.y + (dy * nodeRadius / length) : d.source.y;
+                            })
+                            .attr('x2', d => {
+                                const dx = d.target.x - d.source.x;
+                                const dy = d.target.y - d.source.y;
+                                const length = Math.sqrt(dx * dx + dy * dy);
+                                const nodeRadius = 8;
+                                return length > 0 ? d.target.x - (dx * nodeRadius / length) : d.target.x;
+                            })
+                            .attr('y2', d => {
+                                const dx = d.target.x - d.source.x;
+                                const dy = d.target.y - d.source.y;
+                                const length = Math.sqrt(dx * dx + dy * dy);
+                                const nodeRadius = 8;
+                                return length > 0 ? d.target.y - (dy * nodeRadius / length) : d.target.y;
+                            });
 
                         // Position relationship labels in the middle of links
                         linkLabels
@@ -1741,19 +1879,47 @@
                 link
                     .attr('x1', d => {
                         const sourceNode = nodeData.find(n => n.id === d.source);
-                        return sourceNode ? sourceNode.x : 0;
+                        const targetNode = nodeData.find(n => n.id === d.target);
+                        if (!sourceNode || !targetNode) return 0;
+                        
+                        const dx = targetNode.x - sourceNode.x;
+                        const dy = targetNode.y - sourceNode.y;
+                        const length = Math.sqrt(dx * dx + dy * dy);
+                        const nodeRadius = 8;
+                        return length > 0 ? sourceNode.x + (dx * nodeRadius / length) : sourceNode.x;
                     })
                     .attr('y1', d => {
                         const sourceNode = nodeData.find(n => n.id === d.source);
-                        return sourceNode ? sourceNode.y : 0;
+                        const targetNode = nodeData.find(n => n.id === d.target);
+                        if (!sourceNode || !targetNode) return 0;
+                        
+                        const dx = targetNode.x - sourceNode.x;
+                        const dy = targetNode.y - sourceNode.y;
+                        const length = Math.sqrt(dx * dx + dy * dy);
+                        const nodeRadius = 8;
+                        return length > 0 ? sourceNode.y + (dy * nodeRadius / length) : sourceNode.y;
                     })
                     .attr('x2', d => {
+                        const sourceNode = nodeData.find(n => n.id === d.source);
                         const targetNode = nodeData.find(n => n.id === d.target);
-                        return targetNode ? targetNode.x : 0;
+                        if (!sourceNode || !targetNode) return 0;
+                        
+                        const dx = targetNode.x - sourceNode.x;
+                        const dy = targetNode.y - sourceNode.y;
+                        const length = Math.sqrt(dx * dx + dy * dy);
+                        const nodeRadius = 8;
+                        return length > 0 ? targetNode.x - (dx * nodeRadius / length) : targetNode.x;
                     })
                     .attr('y2', d => {
+                        const sourceNode = nodeData.find(n => n.id === d.source);
                         const targetNode = nodeData.find(n => n.id === d.target);
-                        return targetNode ? targetNode.y : 0;
+                        if (!sourceNode || !targetNode) return 0;
+                        
+                        const dx = targetNode.x - sourceNode.x;
+                        const dy = targetNode.y - sourceNode.y;
+                        const length = Math.sqrt(dx * dx + dy * dy);
+                        const nodeRadius = 8;
+                        return length > 0 ? targetNode.y - (dy * nodeRadius / length) : targetNode.y;
                     });
 
                 // Position relationship labels in the middle of links
