@@ -1,0 +1,135 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Simple Explorer Test</title>
+    <script src="https://d3js.org/d3.v7.min.js"></script>
+    <style>
+        body { font-family: Arial, sans-serif; margin: 20px; }
+        .section { margin: 20px 0; padding: 20px; border: 1px solid #ccc; }
+        ul { list-style: none; padding: 0; }
+        li { padding: 10px; margin: 5px 0; background: #f5f5f5; cursor: pointer; }
+        li:hover { background: #e0e0e0; }
+        .active { background: #007bff; color: white; }
+    </style>
+</head>
+<body>
+    <h1>Simple Explorer Test</h1>
+    
+    <div class="section">
+        <h3>Labels</h3>
+        <div id="labels-status">Loading...</div>
+        <ul id="labels-list"></ul>
+    </div>
+    
+    <div class="section">
+        <h3>Relationships</h3>
+        <div id="relationships-status">Loading...</div>
+        <ul id="relationships-list"></ul>
+    </div>
+    
+    <div class="section">
+        <h3>Sensations (first 10)</h3>
+        <div id="sensations-status">Loading...</div>
+        <ul id="sensations-list"></ul>
+    </div>
+
+    <script>
+        class SimpleExplorer {
+            constructor() {
+                this.init();
+            }
+            
+            async init() {
+                console.log('SimpleExplorer initializing...');
+                await this.loadLabels();
+                await this.loadRelationships();
+                await this.loadSensations();
+            }
+            
+            async loadLabels() {
+                const status = document.getElementById('labels-status');
+                const list = document.getElementById('labels-list');
+                
+                try {
+                    status.textContent = 'Loading labels...';
+                    const response = await fetch('/api/labels');
+                    const labels = await response.json();
+                    
+                    console.log('Labels loaded:', labels);
+                    status.textContent = `Loaded ${labels.length} labels`;
+                    
+                    list.innerHTML = labels.map(label => 
+                        `<li onclick="console.log('Clicked:', '${label}')">${label}</li>`
+                    ).join('');
+                    
+                } catch (error) {
+                    console.error('Error loading labels:', error);
+                    status.textContent = 'Error loading labels: ' + error.message;
+                    status.style.color = 'red';
+                }
+            }
+            
+            async loadRelationships() {
+                const status = document.getElementById('relationships-status');
+                const list = document.getElementById('relationships-list');
+                
+                try {
+                    status.textContent = 'Loading relationships...';
+                    const response = await fetch('/api/relationships');
+                    const relationships = await response.json();
+                    
+                    console.log('Relationships loaded:', relationships);
+                    status.textContent = `Loaded ${relationships.length} relationships`;
+                    
+                    list.innerHTML = relationships.map(rel => 
+                        `<li onclick="console.log('Clicked:', '${rel}')">${rel}</li>`
+                    ).join('');
+                    
+                } catch (error) {
+                    console.error('Error loading relationships:', error);
+                    status.textContent = 'Error loading relationships: ' + error.message;
+                    status.style.color = 'red';
+                }
+            }
+            
+            async loadSensations() {
+                const status = document.getElementById('sensations-status');
+                const list = document.getElementById('sensations-list');
+                
+                try {
+                    status.textContent = 'Loading sensations...';
+                    const response = await fetch('/api/sensations');
+                    const sensations = await response.json();
+                    
+                    console.log('Sensations loaded:', sensations.length, 'total');
+                    status.textContent = `Loaded ${sensations.length} sensations`;
+                    
+                    list.innerHTML = sensations.slice(0, 10).map(sensation => 
+                        `<li onclick="console.log('Clicked:', '${sensation.name}')">${sensation.name}</li>`
+                    ).join('');
+                    
+                } catch (error) {
+                    console.error('Error loading sensations:', error);
+                    status.textContent = 'Error loading sensations: ' + error.message;
+                    status.style.color = 'red';
+                }
+            }
+        }
+        
+        // Test D3 availability
+        if (typeof d3 !== 'undefined') {
+            console.log('D3.js loaded successfully, version:', d3.version);
+        } else {
+            console.error('D3.js not loaded!');
+        }
+        
+        // Initialize when DOM is ready
+        document.addEventListener('DOMContentLoaded', () => {
+            console.log('DOM loaded, initializing SimpleExplorer...');
+            window.explorer = new SimpleExplorer();
+        });
+    </script>
+</body>
+</html>

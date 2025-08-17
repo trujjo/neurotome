@@ -333,68 +333,80 @@ def find_sensation_intersections():
         return jsonify({"nodes": [], "links": []})
     
     with driver.session() as session:
-        # Step 1: Get sensation nodes and their immediate connections
-        sensation_query = """
-        MATCH (s:sensation)-[sr]-(connected)
-        WHERE s.name IN $sensation_names
-        RETURN DISTINCT s, sr, connected
-        LIMIT 200
-        """
-        
-        # Step 2: Get intersection nodes
-        intersection_query = """
-        MATCH (s:sensation)-[r1]-(n)
-        WHERE s.name IN $sensation_names
-        WITH n, count(DISTINCT s) as sensation_count
-        WHERE sensation_count = $required_count
-        RETURN DISTINCT n
-        LIMIT 100
-        """
-        
-        params = {
-            "sensation_names": sensation_names,
-            "required_count": len(sensation_names)
-        }
-        
-        # Execute both queries
-        sensation_result = session.run(sensation_query, params)
-        intersection_result = session.run(intersection_query, params)
+        # Find paths between selected sensations and their common pathways
+        if len(sensation_names) == 1:
+            # For single sensation, show its direct connections
+            pathway_query = """
+            MATCH (s:sensation)-[r]-(connected)
+            WHERE s.name = $sensation_name
+            RETURN s, r, connected
+            LIMIT 50
+            """
+            params = {"sensation_name": sensation_names[0]}
+            result = session.run(pathway_query, params)
+        else:
+            # For multiple sensations, find shared pathways between them
+            pathway_query = """
+            // Find paths between any two selected sensations
+            MATCH (s1:sensation), (s2:sensation)
+            WHERE s1.name IN $sensation_names AND s2.name IN $sensation_names 
+            AND s1.name < s2.name  // Avoid duplicate paths
+            
+            // Find shortest paths between them (up to length 4)
+            MATCH path = shortestPath((s1)-[*1..4]-(s2))
+            WHERE ALL(r IN relationships(path) WHERE r IS NOT NULL)
+            
+            // Return all nodes and relationships in these paths
+            UNWIND nodes(path) as n
+            UNWIND relationships(path) as r
+            RETURN DISTINCT n, r, startNode(r) as source, endNode(r) as target
+            LIMIT 200
+            """
+            params = {"sensation_names": sensation_names}
+            result = session.run(pathway_query, params)
         
         nodes = {}
         links = []
-        original_sensation_ids = set()  # Track original sensation nodes
-        intersection_node_ids = set()   # Track intersection nodes
+        selected_sensation_ids = set()
         
-        # First, collect intersection node IDs
-        for record in intersection_result:
-            node = record["n"]
-            intersection_node_ids.add(node.element_id)
-        
-        # Reset the result cursor for intersection nodes
-        intersection_result = session.run(intersection_query, params)
-        
-        # Process sensation relationships - this should definitely give us some links
-        for record in sensation_result:
-            source_node = record["s"]
-            relationship = record["sr"]
-            target_node = record["connected"]
+        # Process the pathway results
+        for record in result:
+            # Handle single sensation case
+            if 'connected' in record:
+                source_node = record["s"]
+                relationship = record["r"] 
+                target_node = record["connected"]
+            else:
+                # Handle pathway case
+                node = record["n"]
+                relationship = record["r"]
+                source_node = record["source"]
+                target_node = record["target"]
+                
+                # Add the intermediate node to our collection
+                node_id = node.element_id
+                if node_id not in nodes:
+                    color = "blue" if 'sensation' in node.labels and node.get("name") in sensation_names else "gray"
+                    if 'sensation' in node.labels and node.get("name") in sensation_names:
+                        selected_sensation_ids.add(node_id)
+                    
+                    nodes[node_id] = {
+                        "id": node_id,
+                        "labels": list(node.labels),
+                        "properties": dict(node),
+                        "name": dict(node).get("name", f"Node {node_id}"),
+                        "color": color
+                    }
             
+            # Process source and target nodes
             source_id = source_node.element_id
             target_id = target_node.element_id
             
-            # Track original sensation nodes
-            if 'sensation' in source_node.labels:
-                original_sensation_ids.add(source_id)
-            
-            # Add both nodes with color information
+            # Add source node
             if source_id not in nodes:
-                # Determine node color
-                if source_id in intersection_node_ids:
-                    color = "orange"
-                elif 'sensation' in source_node.labels:
-                    color = "blue"
-                else:
-                    color = "gray"
+                color = "blue" if 'sensation' in source_node.labels and source_node.get("name") in sensation_names else "gray"
+                if 'sensation' in source_node.labels and source_node.get("name") in sensation_names:
+                    selected_sensation_ids.add(source_id)
                 
                 nodes[source_id] = {
                     "id": source_id,
@@ -404,14 +416,11 @@ def find_sensation_intersections():
                     "color": color
                 }
             
+            # Add target node  
             if target_id not in nodes:
-                # Determine node color
-                if target_id in intersection_node_ids:
-                    color = "orange"
-                elif 'sensation' in target_node.labels:
-                    color = "blue"
-                else:
-                    color = "gray"
+                color = "blue" if 'sensation' in target_node.labels and target_node.get("name") in sensation_names else "gray"
+                if 'sensation' in target_node.labels and target_node.get("name") in sensation_names:
+                    selected_sensation_ids.add(target_id)
                 
                 nodes[target_id] = {
                     "id": target_id,
@@ -421,7 +430,7 @@ def find_sensation_intersections():
                     "color": color
                 }
             
-            # Add relationship
+            # Add relationship if it doesn't already exist
             link_exists = any(
                 (link["source"] == source_id and link["target"] == target_id) or
                 (link["source"] == target_id and link["target"] == source_id)
@@ -436,22 +445,27 @@ def find_sensation_intersections():
                     "properties": dict(relationship)
                 })
         
-        # Add intersection nodes (even if no additional relationships)
-        for record in intersection_result:
-            node = record["n"]
-            node_id = node.element_id
-            if node_id not in nodes:
-                # Intersection nodes are always orange
-                nodes[node_id] = {
-                    "id": node_id,
-                    "labels": list(node.labels),
-                    "properties": dict(node),
-                    "name": dict(node).get("name", f"Node {node_id}"),
-                    "color": "orange"
-                }
-            else:
-                # Update existing node to be orange if it's an intersection
-                nodes[node_id]["color"] = "orange"
+        # Now identify pathway intersection nodes (nodes that appear in multiple paths)
+        # These are the key nodes that connect multiple sensations
+        pathway_nodes = set()
+        for node_id, node_data in nodes.items():
+            if node_id not in selected_sensation_ids:  # Not an original sensation
+                # Count how many selected sensations this node connects to
+                connected_sensations = 0
+                for link in links:
+                    other_node_id = None
+                    if link["source"] == node_id:
+                        other_node_id = link["target"]
+                    elif link["target"] == node_id:
+                        other_node_id = link["source"]
+                    
+                    if other_node_id and other_node_id in selected_sensation_ids:
+                        connected_sensations += 1
+                
+                # If this node connects to multiple sensations, it's a pathway intersection
+                if connected_sensations >= 2 or (len(sensation_names) == 1 and connected_sensations >= 1):
+                    nodes[node_id]["color"] = "orange"
+                    pathway_nodes.add(node_id)
         
         return jsonify({
             "nodes": list(nodes.values()),

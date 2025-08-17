@@ -1,0 +1,50 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Debug Explorer</title>
+</head>
+<body>
+    <h1>Debug Explorer</h1>
+    <div id="status">Loading...</div>
+    <div id="labels"></div>
+    <div id="relationships"></div>
+    <div id="sensations"></div>
+
+    <script>
+        async function testAPIs() {
+            const status = document.getElementById('status');
+            
+            try {
+                // Test labels API
+                status.textContent = 'Testing labels API...';
+                const labelsResponse = await fetch('/api/labels');
+                const labels = await labelsResponse.json();
+                document.getElementById('labels').innerHTML = '<h3>Labels:</h3>' + JSON.stringify(labels, null, 2);
+                
+                // Test relationships API
+                status.textContent = 'Testing relationships API...';
+                const relationshipsResponse = await fetch('/api/relationships');
+                const relationships = await relationshipsResponse.json();
+                document.getElementById('relationships').innerHTML = '<h3>Relationships:</h3>' + JSON.stringify(relationships, null, 2);
+                
+                // Test sensations API
+                status.textContent = 'Testing sensations API...';
+                const sensationsResponse = await fetch('/api/sensations');
+                const sensations = await sensationsResponse.json();
+                document.getElementById('sensations').innerHTML = '<h3>Sensations (first 5):</h3>' + JSON.stringify(sensations.slice(0, 5), null, 2);
+                
+                status.textContent = 'All APIs working!';
+                status.style.color = 'green';
+            } catch (error) {
+                status.textContent = 'Error: ' + error.message;
+                status.style.color = 'red';
+                console.error('API Test Error:', error);
+            }
+        }
+
+        document.addEventListener('DOMContentLoaded', testAPIs);
+    </script>
+</body>
+</html>

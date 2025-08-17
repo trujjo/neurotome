@@ -1,0 +1,177 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Debug Neo4j Explorer</title>
+    <script src="https://d3js.org/d3.v7.min.js"></script>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: Arial, sans-serif; padding: 20px; background: #f5f5f5; }
+        .debug-section { margin: 20px 0; padding: 20px; background: white; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
+        .status { padding: 10px; margin: 10px 0; border-radius: 4px; }
+        .loading { background: #fff3cd; color: #856404; }
+        .success { background: #d4edda; color: #155724; }
+        .error { background: #f8d7da; color: #721c24; }
+        ul { list-style: none; padding: 0; }
+        li { padding: 8px; margin: 4px 0; background: #f8f9fa; border-radius: 4px; }
+        .step { margin: 10px 0; padding: 10px; background: #e9ecef; border-radius: 4px; }
+    </style>
+</head>
+<body>
+    <h1>Debug Neo4j Explorer</h1>
+    
+    <div class="debug-section">
+        <h3>Initialization Steps</h3>
+        <div id="init-steps"></div>
+    </div>
+    
+    <div class="debug-section">
+        <h3>API Test Results</h3>
+        <div id="api-results"></div>
+    </div>
+    
+    <div class="debug-section">
+        <h3>D3.js Check</h3>
+        <div id="d3-check"></div>
+    </div>
+
+    <script>
+        function addStep(message, status = 'loading') {
+            const stepsDiv = document.getElementById('init-steps');
+            const step = document.createElement('div');
+            step.className = `step status ${status}`;
+            step.textContent = `${new Date().toLocaleTimeString()}: ${message}`;
+            stepsDiv.appendChild(step);
+            console.log(message);
+        }
+
+        function addApiResult(name, result, error = null) {
+            const resultsDiv = document.getElementById('api-results');
+            const resultDiv = document.createElement('div');
+            resultDiv.className = `status ${error ? 'error' : 'success'}`;
+            resultDiv.innerHTML = `
+                <strong>${name}:</strong> ${error ? error.message : `Success (${result.length || 'N/A'} items)`}
+                ${!error && result && result.length ? `<br><small>Sample: ${JSON.stringify(result.slice(0, 2), null, 2)}</small>` : ''}
+            `;
+            resultsDiv.appendChild(resultDiv);
+        }
+
+        class DebugExplorer {
+            constructor() {
+                addStep('DebugExplorer constructor called');
+                this.selectedLabel = null;
+                this.selectedNode = null;
+                this.selectedRelationships = new Set();
+                this.selectedSensations = new Set();
+                this.showLabels = true;
+                this.simulation = null;
+                this.svg = null;
+                this.currentLayout = 'force';
+                
+                addStep('Starting initialization...');
+                this.init().catch(error => {
+                    addStep(`Initialization failed: ${error.message}`, 'error');
+                });
+            }
+
+            async init() {
+                try {
+                    addStep('Loading labels...');
+                    await this.loadLabels();
+                    addStep('Labels loaded successfully', 'success');
+                    
+                    addStep('Loading relationships...');
+                    await this.loadRelationships();
+                    addStep('Relationships loaded successfully', 'success');
+                    
+                    addStep('Loading sensations...');
+                    await this.loadSensations();
+                    addStep('Sensations loaded successfully', 'success');
+                    
+                    addStep('All initialization complete!', 'success');
+                } catch (error) {
+                    addStep(`Initialization error: ${error.message}`, 'error');
+                    throw error;
+                }
+            }
+
+            async loadLabels() {
+                try {
+                    const response = await fetch('/api/labels');
+                    if (!response.ok) {
+                        throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+                    }
+                    const labels = await response.json();
+                    addApiResult('Labels API', labels);
+                    return labels;
+                } catch (error) {
+                    addApiResult('Labels API', null, error);
+                    throw error;
+                }
+            }
+
+            async loadRelationships() {
+                try {
+                    const response = await fetch('/api/relationships');
+                    if (!response.ok) {
+                        throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+                    }
+                    const relationships = await response.json();
+                    addApiResult('Relationships API', relationships);
+                    return relationships;
+                } catch (error) {
+                    addApiResult('Relationships API', null, error);
+                    throw error;
+                }
+            }
+
+            async loadSensations() {
+                try {
+                    const response = await fetch('/api/sensations');
+                    if (!response.ok) {
+                        throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+                    }
+                    const sensations = await response.json();
+                    addApiResult('Sensations API', sensations);
+                    return sensations;
+                } catch (error) {
+                    addApiResult('Sensations API', null, error);
+                    throw error;
+                }
+            }
+        }
+
+        // Check D3.js
+        const d3Check = document.getElementById('d3-check');
+        if (typeof d3 !== 'undefined') {
+            d3Check.className = 'status success';
+            d3Check.textContent = `D3.js loaded successfully, version: ${d3.version}`;
+        } else {
+            d3Check.className = 'status error';
+            d3Check.textContent = 'D3.js not loaded!';
+        }
+
+        // Global error handler
+        window.addEventListener('error', (event) => {
+            addStep(`Global error: ${event.error.message}`, 'error');
+            console.error('Global error:', event.error);
+        });
+
+        window.addEventListener('unhandledrejection', (event) => {
+            addStep(`Unhandled promise rejection: ${event.reason}`, 'error');
+            console.error('Unhandled promise rejection:', event.reason);
+        });
+
+        // Initialize when DOM is ready
+        document.addEventListener('DOMContentLoaded', () => {
+            addStep('DOM loaded, creating DebugExplorer...');
+            try {
+                window.debugExplorer = new DebugExplorer();
+            } catch (error) {
+                addStep(`Failed to create DebugExplorer: ${error.message}`, 'error');
+            }
+        });
+    </script>
+</body>
+</html>

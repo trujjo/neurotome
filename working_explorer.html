@@ -1,0 +1,475 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Working Explorer - Neurotome</title>
+    <script src="https://d3js.org/d3.v7.min.js"></script>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: #333;
+        }
+
+        .header {
+            background: rgba(255, 255, 255, 0.95);
+            backdrop-filter: blur(10px);
+            padding: 1rem 2rem;
+            box-shadow: 0 2px 20px rgba(0,0,0,0.1);
+        }
+
+        .header h1 {
+            color: #4a5568;
+            font-size: 2rem;
+            font-weight: 700;
+        }
+
+        .container {
+            display: grid;
+            grid-template-columns: 300px 1fr 350px;
+            height: calc(100vh - 80px);
+            gap: 1rem;
+            padding: 1rem;
+        }
+
+        .sidebar, .main-content, .details-panel {
+            background: rgba(255, 255, 255, 0.95);
+            backdrop-filter: blur(10px);
+            border-radius: 12px;
+            padding: 1.5rem;
+            box-shadow: 0 8px 32px rgba(0,0,0,0.1);
+            overflow-y: auto;
+        }
+
+        .section {
+            margin-bottom: 2rem;
+        }
+
+        .section h3 {
+            color: #4a5568;
+            margin-bottom: 1rem;
+            font-size: 1.2rem;
+            border-bottom: 2px solid #e2e8f0;
+            padding-bottom: 0.5rem;
+        }
+
+        ul {
+            list-style: none;
+        }
+
+        li {
+            padding: 0.75rem;
+            background: #f7fafc;
+            margin-bottom: 0.5rem;
+            border-radius: 8px;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            border-left: 4px solid transparent;
+        }
+
+        li:hover {
+            background: #edf2f7;
+            border-left-color: #667eea;
+            transform: translateX(4px);
+        }
+
+        li.active {
+            background: #667eea;
+            color: white;
+            border-left-color: #4c51bf;
+        }
+
+        .btn {
+            padding: 0.75rem 1.5rem;
+            background: #667eea;
+            color: white;
+            border: none;
+            border-radius: 8px;
+            cursor: pointer;
+            font-size: 0.9rem;
+            transition: all 0.3s ease;
+            width: 100%;
+            margin: 0.5rem 0;
+        }
+
+        .btn:hover {
+            background: #5a67d8;
+            transform: translateY(-2px);
+            box-shadow: 0 4px 12px rgba(102, 126, 234, 0.3);
+        }
+
+        .btn:disabled {
+            background: #a0aec0;
+            cursor: not-allowed;
+            transform: none;
+            box-shadow: none;
+        }
+
+        .status {
+            padding: 0.5rem;
+            margin: 0.5rem 0;
+            border-radius: 4px;
+            font-size: 0.9rem;
+        }
+
+        .loading { background: #fff3cd; color: #856404; }
+        .success { background: #d4edda; color: #155724; }
+        .error { background: #f8d7da; color: #721c24; }
+
+        #graph-container {
+            background: #f7fafc;
+            border-radius: 8px;
+            min-height: 400px;
+            position: relative;
+        }
+
+        .search-box {
+            width: 100%;
+            padding: 0.75rem;
+            border: 2px solid #e2e8f0;
+            border-radius: 8px;
+            font-size: 1rem;
+            margin-bottom: 1rem;
+        }
+
+        .search-box:focus {
+            outline: none;
+            border-color: #667eea;
+            box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
+        }
+    </style>
+</head>
+<body>
+    <header class="header">
+        <h1>Working Neo4j Database Explorer</h1>
+    </header>
+
+    <div class="container">
+        <!-- Sidebar -->
+        <div class="sidebar">
+            <div class="section">
+                <h3>🔍 Search</h3>
+                <input type="text" class="search-box" id="search-input" placeholder="Search nodes..." />
+                <div id="search-results"></div>
+            </div>
+
+            <div class="section">
+                <h3>🏷️ Node Labels</h3>
+                <ul id="label-list">
+                    <li class="loading">Loading labels...</li>
+                </ul>
+            </div>
+
+            <div class="section">
+                <h3>🔗 Relationships</h3>
+                <ul id="relationship-list">
+                    <li class="loading">Loading relationships...</li>
+                </ul>
+            </div>
+        </div>
+
+        <!-- Main Content -->
+        <div class="main-content">
+            <div id="status" class="status loading">Initializing...</div>
+            <div id="graph-container"></div>
+        </div>
+
+        <!-- Details Panel -->
+        <div class="details-panel">
+            <div class="section">
+                <h3>🧠 Sensation Analysis</h3>
+                <p style="font-size: 0.9em; color: #666; margin-bottom: 1rem;">
+                    Select sensations to find their intersections
+                </p>
+                <div id="sensation-toggles">
+                    <div class="loading">Loading sensations...</div>
+                </div>
+                <button class="btn" id="find-intersections-btn" disabled>
+                    🔍 Find Intersections
+                </button>
+                <div id="intersection-status" class="status">Select sensations to find intersections</div>
+            </div>
+
+            <div class="section" id="node-details-section" style="display: none;">
+                <h3>📄 Node Details</h3>
+                <div id="selected-node-details"></div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        class WorkingExplorer {
+            constructor() {
+                console.log('WorkingExplorer: Constructor called');
+                this.selectedLabel = null;
+                this.selectedRelationships = new Set();
+                this.selectedSensations = new Set();
+                this.updateStatus('Initializing explorer...', 'loading');
+                
+                this.init().catch(error => {
+                    console.error('Initialization failed:', error);
+                    this.updateStatus(`Initialization failed: ${error.message}`, 'error');
+                });
+            }
+
+            updateStatus(message, type = 'loading') {
+                const status = document.getElementById('status');
+                status.textContent = message;
+                status.className = `status ${type}`;
+                console.log(`Status [${type}]: ${message}`);
+            }
+
+            async init() {
+                try {
+                    this.updateStatus('Loading labels...', 'loading');
+                    await this.loadLabels();
+                    
+                    this.updateStatus('Loading relationships...', 'loading');
+                    await this.loadRelationships();
+                    
+                    this.updateStatus('Loading sensations...', 'loading');
+                    await this.loadSensations();
+                    
+                    this.setupEventListeners();
+                    this.updateStatus('Explorer ready!', 'success');
+                    
+                } catch (error) {
+                    console.error('Init error:', error);
+                    this.updateStatus(`Error: ${error.message}`, 'error');
+                }
+            }
+
+            async loadLabels() {
+                try {
+                    const response = await fetch('/api/labels');
+                    if (!response.ok) throw new Error(`HTTP ${response.status}`);
+                    
+                    const labels = await response.json();
+                    console.log('Labels loaded:', labels);
+                    
+                    const labelList = document.getElementById('label-list');
+                    labelList.innerHTML = labels.map(label => 
+                        `<li data-label="${label}" onclick="window.explorer.selectLabel('${label}')">${label}</li>`
+                    ).join('');
+                    
+                } catch (error) {
+                    console.error('Error loading labels:', error);
+                    const labelList = document.getElementById('label-list');
+                    labelList.innerHTML = '<li class="error">Error loading labels</li>';
+                    throw error;
+                }
+            }
+
+            async loadRelationships() {
+                try {
+                    const response = await fetch('/api/relationships');
+                    if (!response.ok) throw new Error(`HTTP ${response.status}`);
+                    
+                    const relationships = await response.json();
+                    console.log('Relationships loaded:', relationships);
+                    
+                    const relationshipList = document.getElementById('relationship-list');
+                    relationshipList.innerHTML = relationships.map(rel => 
+                        `<li data-relationship="${rel}" onclick="window.explorer.toggleRelationship('${rel}')">${rel}</li>`
+                    ).join('');
+                    
+                } catch (error) {
+                    console.error('Error loading relationships:', error);
+                    const relationshipList = document.getElementById('relationship-list');
+                    relationshipList.innerHTML = '<li class="error">Error loading relationships</li>';
+                    throw error;
+                }
+            }
+
+            async loadSensations() {
+                try {
+                    const response = await fetch('/api/sensations');
+                    if (!response.ok) throw new Error(`HTTP ${response.status}`);
+                    
+                    const sensations = await response.json();
+                    console.log('Sensations loaded:', sensations.length, 'total');
+                    
+                    // Group sensations by modality
+                    const grouped = {};
+                    sensations.forEach(sensation => {
+                        const modality = sensation.properties.modality || 'other';
+                        if (!grouped[modality]) grouped[modality] = [];
+                        grouped[modality].push(sensation);
+                    });
+
+                    // Render grouped sensations
+                    const sensationToggles = document.getElementById('sensation-toggles');
+                    let html = '';
+                    
+                    Object.entries(grouped).slice(0, 5).forEach(([modality, items]) => {
+                        html += `<h4>${modality} (${items.length})</h4>`;
+                        html += items.slice(0, 10).map(sensation => 
+                            `<div class="sensation-item" data-sensation="${sensation.name}" onclick="window.explorer.toggleSensation('${sensation.name}')" style="padding: 4px; margin: 2px 0; background: #f8f9fa; border-radius: 4px; cursor: pointer; font-size: 0.9em;">${sensation.name}</div>`
+                        ).join('');
+                    });
+                    
+                    sensationToggles.innerHTML = html;
+                    
+                } catch (error) {
+                    console.error('Error loading sensations:', error);
+                    const sensationToggles = document.getElementById('sensation-toggles');
+                    sensationToggles.innerHTML = '<div class="error">Error loading sensations</div>';
+                    throw error;
+                }
+            }
+
+            selectLabel(label) {
+                console.log('Selected label:', label);
+                this.selectedLabel = label;
+                
+                // Update UI
+                document.querySelectorAll('[data-label]').forEach(item => {
+                    item.classList.toggle('active', item.dataset.label === label);
+                });
+                
+                this.updateStatus(`Selected label: ${label}`, 'success');
+            }
+
+            toggleRelationship(relationship) {
+                console.log('Toggled relationship:', relationship);
+                
+                if (this.selectedRelationships.has(relationship)) {
+                    this.selectedRelationships.delete(relationship);
+                } else {
+                    this.selectedRelationships.add(relationship);
+                }
+                
+                // Update UI
+                document.querySelectorAll('[data-relationship]').forEach(item => {
+                    item.classList.toggle('active', this.selectedRelationships.has(item.dataset.relationship));
+                });
+                
+                this.updateStatus(`Selected relationships: ${Array.from(this.selectedRelationships).join(', ') || 'none'}`, 'success');
+            }
+
+            toggleSensation(sensation) {
+                console.log('Toggled sensation:', sensation);
+                
+                if (this.selectedSensations.has(sensation)) {
+                    this.selectedSensations.delete(sensation);
+                } else {
+                    this.selectedSensations.add(sensation);
+                }
+                
+                // Update UI
+                document.querySelectorAll('[data-sensation]').forEach(item => {
+                    item.classList.toggle('active', this.selectedSensations.has(item.dataset.sensation));
+                });
+                
+                // Update intersection button
+                const btn = document.getElementById('find-intersections-btn');
+                btn.disabled = this.selectedSensations.size === 0;
+                
+                const status = document.getElementById('intersection-status');
+                status.textContent = this.selectedSensations.size > 0 
+                    ? `${this.selectedSensations.size} sensations selected`
+                    : 'Select sensations to find intersections';
+            }
+
+            async findIntersections() {
+                if (this.selectedSensations.size === 0) return;
+                
+                const sensationArray = Array.from(this.selectedSensations);
+                console.log('Finding intersections for:', sensationArray);
+                
+                const status = document.getElementById('intersection-status');
+                status.textContent = '🔍 Finding intersections...';
+                status.className = 'status loading';
+                
+                try {
+                    const response = await fetch('/api/sensations/intersections', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ sensations: sensationArray })
+                    });
+                    
+                    if (!response.ok) throw new Error(`HTTP ${response.status}`);
+                    
+                    const data = await response.json();
+                    console.log('Intersection results:', data);
+                    
+                    if (data.nodes && data.nodes.length > 0) {
+                        status.textContent = `✅ Found ${data.nodes.length} intersecting nodes, ${data.links.length} relationships`;
+                        status.className = 'status success';
+                        
+                        // Show details
+                        const nodeDetailsSection = document.getElementById('node-details-section');
+                        const nodeDetails = document.getElementById('selected-node-details');
+                        nodeDetailsSection.style.display = 'block';
+                        
+                        const nodesByType = {};
+                        data.nodes.forEach(node => {
+                            const type = node.labels[0] || 'Unknown';
+                            if (!nodesByType[type]) nodesByType[type] = [];
+                            nodesByType[type].push(node);
+                        });
+                        
+                        let detailsHtml = `<p><strong>Selected Sensations:</strong> ${sensationArray.join(', ')}</p>`;
+                        detailsHtml += '<div style="margin-top: 1rem;">';
+                        
+                        Object.entries(nodesByType).forEach(([type, nodes]) => {
+                            detailsHtml += `<h5>${type}s (${nodes.length})</h5>`;
+                            detailsHtml += '<ul>';
+                            nodes.forEach(node => {
+                                detailsHtml += `<li style="font-size: 0.9em; padding: 4px;">${node.name}</li>`;
+                            });
+                            detailsHtml += '</ul>';
+                        });
+                        
+                        detailsHtml += '</div>';
+                        nodeDetails.innerHTML = detailsHtml;
+                        
+                    } else {
+                        status.textContent = '❌ No intersections found';
+                        status.className = 'status error';
+                    }
+                    
+                } catch (error) {
+                    console.error('Error finding intersections:', error);
+                    status.textContent = `❌ Error: ${error.message}`;
+                    status.className = 'status error';
+                }
+            }
+
+            setupEventListeners() {
+                console.log('Setting up event listeners...');
+                
+                const intersectionBtn = document.getElementById('find-intersections-btn');
+                intersectionBtn.addEventListener('click', () => this.findIntersections());
+                
+                console.log('Event listeners set up');
+            }
+        }
+
+        // Check D3.js
+        if (typeof d3 !== 'undefined') {
+            console.log('D3.js loaded successfully, version:', d3.version);
+        } else {
+            console.error('D3.js not loaded!');
+        }
+
+        // Initialize when DOM is ready
+        document.addEventListener('DOMContentLoaded', () => {
+            console.log('DOM loaded, creating WorkingExplorer...');
+            try {
+                window.explorer = new WorkingExplorer();
+                console.log('WorkingExplorer created successfully');
+            } catch (error) {
+                console.error('Failed to create WorkingExplorer:', error);
+            }
+        });
+    </script>
+</body>
+</html>
