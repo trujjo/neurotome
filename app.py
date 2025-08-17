@@ -92,7 +92,7 @@ def get_nodes_by_label(label):
         for record in result:
             node = record["n"]
             node_data = {
-                "id": node.id,
+                "id": node.element_id,
                 "labels": list(node.labels),
                 "properties": dict(node)
             }
@@ -123,12 +123,12 @@ def get_node_relationships(node_id):
         for record in result:
             rel_data = {
                 "source": {
-                    "id": record["n"].id,
+                    "id": record["n"].element_id,
                     "labels": list(record["n"].labels),
                     "properties": dict(record["n"])
                 },
                 "target": {
-                    "id": record["m"].id,
+                    "id": record["m"].element_id,
                     "labels": list(record["m"].labels),
                     "properties": dict(record["m"])
                 },
@@ -162,7 +162,7 @@ def search_nodes():
         for record in result:
             node = record["n"]
             node_data = {
-                "id": node.id,
+                "id": node.element_id,
                 "labels": record["labels"],
                 "properties": dict(node)
             }
@@ -268,23 +268,25 @@ def get_graph_data():
             relationship = record["r"]
             
             # Add source node
-            source_id = source_node.id
+            source_id = source_node.element_id
             if source_id not in nodes:
                 nodes[source_id] = {
                     "id": source_id,
                     "labels": list(source_node.labels),
                     "properties": dict(source_node),
-                    "name": dict(source_node).get("name", f"Node {source_id}")
+                    "name": dict(source_node).get("name", f"Node {source_id}"),
+                    "color": "gray"  # Default color for regular graph
                 }
             
             # Add target node
-            target_id = target_node.id
+            target_id = target_node.element_id
             if target_id not in nodes:
                 nodes[target_id] = {
                     "id": target_id,
                     "labels": list(target_node.labels),
                     "properties": dict(target_node),
-                    "name": dict(target_node).get("name", f"Node {target_id}")
+                    "name": dict(target_node).get("name", f"Node {target_id}"),
+                    "color": "gray"  # Default color for regular graph
                 }
             
             # Add relationship
@@ -294,6 +296,162 @@ def get_graph_data():
                 "type": type(relationship).__name__,
                 "properties": dict(relationship)
             })
+        
+        return jsonify({
+            "nodes": list(nodes.values()),
+            "links": links
+        })
+
+# API endpoint to get all sensation nodes
+@app.route("/api/sensations")
+def get_sensations():
+    with driver.session() as session:
+        query = """
+        MATCH (s:sensation)
+        RETURN s
+        ORDER BY s.name
+        """
+        result = session.run(query)
+        sensations = []
+        for record in result:
+            sensation = record["s"]
+            sensation_data = {
+                "id": sensation.element_id,
+                "name": sensation.get("name", f"Sensation {sensation.element_id}"),
+                "properties": dict(sensation)
+            }
+            sensations.append(sensation_data)
+        return jsonify(sensations)
+
+# API endpoint to find intersections between selected sensations
+@app.route("/api/sensations/intersections", methods=["POST"])
+def find_sensation_intersections():
+    data = request.get_json()
+    sensation_names = data.get('sensations', [])
+    
+    if not sensation_names:
+        return jsonify({"nodes": [], "links": []})
+    
+    with driver.session() as session:
+        # Step 1: Get sensation nodes and their immediate connections
+        sensation_query = """
+        MATCH (s:sensation)-[sr]-(connected)
+        WHERE s.name IN $sensation_names
+        RETURN DISTINCT s, sr, connected
+        LIMIT 200
+        """
+        
+        # Step 2: Get intersection nodes
+        intersection_query = """
+        MATCH (s:sensation)-[r1]-(n)
+        WHERE s.name IN $sensation_names
+        WITH n, count(DISTINCT s) as sensation_count
+        WHERE sensation_count = $required_count
+        RETURN DISTINCT n
+        LIMIT 100
+        """
+        
+        params = {
+            "sensation_names": sensation_names,
+            "required_count": len(sensation_names)
+        }
+        
+        # Execute both queries
+        sensation_result = session.run(sensation_query, params)
+        intersection_result = session.run(intersection_query, params)
+        
+        nodes = {}
+        links = []
+        original_sensation_ids = set()  # Track original sensation nodes
+        intersection_node_ids = set()   # Track intersection nodes
+        
+        # First, collect intersection node IDs
+        for record in intersection_result:
+            node = record["n"]
+            intersection_node_ids.add(node.element_id)
+        
+        # Reset the result cursor for intersection nodes
+        intersection_result = session.run(intersection_query, params)
+        
+        # Process sensation relationships - this should definitely give us some links
+        for record in sensation_result:
+            source_node = record["s"]
+            relationship = record["sr"]
+            target_node = record["connected"]
+            
+            source_id = source_node.element_id
+            target_id = target_node.element_id
+            
+            # Track original sensation nodes
+            if 'sensation' in source_node.labels:
+                original_sensation_ids.add(source_id)
+            
+            # Add both nodes with color information
+            if source_id not in nodes:
+                # Determine node color
+                if source_id in intersection_node_ids:
+                    color = "orange"
+                elif 'sensation' in source_node.labels:
+                    color = "blue"
+                else:
+                    color = "gray"
+                
+                nodes[source_id] = {
+                    "id": source_id,
+                    "labels": list(source_node.labels),
+                    "properties": dict(source_node),
+                    "name": dict(source_node).get("name", f"Node {source_id}"),
+                    "color": color
+                }
+            
+            if target_id not in nodes:
+                # Determine node color
+                if target_id in intersection_node_ids:
+                    color = "orange"
+                elif 'sensation' in target_node.labels:
+                    color = "blue"
+                else:
+                    color = "gray"
+                
+                nodes[target_id] = {
+                    "id": target_id,
+                    "labels": list(target_node.labels),
+                    "properties": dict(target_node),
+                    "name": dict(target_node).get("name", f"Node {target_id}"),
+                    "color": color
+                }
+            
+            # Add relationship
+            link_exists = any(
+                (link["source"] == source_id and link["target"] == target_id) or
+                (link["source"] == target_id and link["target"] == source_id)
+                for link in links
+            )
+            
+            if not link_exists:
+                links.append({
+                    "source": source_id,
+                    "target": target_id,
+                    "type": type(relationship).__name__,
+                    "properties": dict(relationship)
+                })
+        
+        # Add intersection nodes (even if no additional relationships)
+        for record in intersection_result:
+            node = record["n"]
+            node_id = node.element_id
+            if node_id not in nodes:
+                # Intersection nodes are always orange
+                nodes[node_id] = {
+                    "id": node_id,
+                    "labels": list(node.labels),
+                    "properties": dict(node),
+                    "name": dict(node).get("name", f"Node {node_id}"),
+                    "color": "orange"
+                }
+            else:
+                # Update existing node to be orange if it's an intersection
+                nodes[node_id]["color"] = "orange"
         
         return jsonify({
             "nodes": list(nodes.values()),
@@ -316,6 +474,10 @@ def get_dermatomes_myotomes_api():
 # Route for database explorer
 @app.route("/explorer")
 def explorer():
+    return send_from_directory('public', 'explorer.html')
+
+@app.route("/explorer.html")
+def explorer_html():
     return send_from_directory('public', 'explorer.html')
 
 # Serve static files

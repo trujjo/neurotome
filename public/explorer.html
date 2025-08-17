@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Neo4j Database Explorer - Neurotome</title>
+    <title>Neurotome</title>
     <script src="https://d3js.org/d3.v7.min.js"></script>
     <style>
         * {
@@ -166,6 +166,221 @@
             opacity: 0.9;
         }
 
+        .sensation-toggles {
+            display: flex;
+            flex-direction: column;
+            gap: 0.5rem;
+            margin-bottom: 1rem;
+        }
+
+        .sensation-toggle {
+            padding: 0.6rem;
+            background: #f7fafc;
+            border: 2px solid #e2e8f0;
+            border-radius: 6px;
+            cursor: pointer;
+            text-align: center;
+            font-size: 0.85rem;
+            transition: all 0.3s ease;
+            user-select: none;
+        }
+
+        .sensation-toggle:hover {
+            background: #edf2f7;
+            border-color: #cbd5e0;
+        }
+
+        .sensation-toggle.active {
+            background: #667eea;
+            border-color: #5a67d8;
+            color: white;
+        }
+
+        .sensation-toggle.active:hover {
+            background: #5a67d8;
+        }
+
+        .sensation-group {
+            margin-bottom: 12px;
+            border: 1px solid #e2e8f0;
+            border-radius: 8px;
+            overflow: hidden;
+            background: white;
+        }
+
+        .sensation-group-header {
+            background: #f7fafc;
+            padding: 12px 16px;
+            font-weight: 600;
+            cursor: pointer;
+            user-select: none;
+            border-bottom: 1px solid #e2e8f0;
+            transition: background-color 0.2s;
+            position: relative;
+            color: #2d3748;
+        }
+
+        .sensation-group-header:hover {
+            background: #edf2f7;
+        }
+
+        .sensation-group-header:after {
+            content: '▼';
+            position: absolute;
+            right: 16px;
+            transition: transform 0.2s;
+            font-size: 0.8em;
+            color: #667eea;
+        }
+
+        .sensation-group-header.collapsed:after {
+            transform: rotate(-90deg);
+        }
+
+        .sensation-group-content {
+            padding: 12px;
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+            gap: 8px;
+            max-height: 400px;
+            overflow-y: auto;
+        }
+
+        .sensation-subgroup {
+            margin-bottom: 8px;
+            border: 1px solid #e9ecef;
+            border-radius: 6px;
+            overflow: hidden;
+            background: #fafafa;
+        }
+
+        .sensation-subgroup-header {
+            background: #f1f3f4;
+            padding: 8px 12px;
+            font-weight: 500;
+            cursor: pointer;
+            user-select: none;
+            transition: background-color 0.2s;
+            position: relative;
+            color: #495057;
+            font-size: 0.9em;
+        }
+
+        .sensation-subgroup-header:hover {
+            background: #e9ecef;
+        }
+
+        .sensation-subgroup-header:after {
+            content: '▼';
+            position: absolute;
+            right: 12px;
+            transition: transform 0.2s;
+            font-size: 0.7em;
+            color: #6c757d;
+        }
+
+        .sensation-subgroup-header.collapsed:after {
+            transform: rotate(-90deg);
+        }
+
+        .sensation-subgroup-content {
+            padding: 6px;
+            display: flex;
+            flex-direction: column;
+            gap: 4px;
+        }
+
+        .sensation-subgroup .sensation-toggle {
+            padding: 4px 8px;
+            margin: 0;
+            font-size: 0.8em;
+            border-radius: 4px;
+        }
+
+        .intersection-summary {
+            background: #f8f9fa;
+            padding: 12px;
+            border-radius: 6px;
+            margin-bottom: 16px;
+        }
+
+        .sensation-list {
+            list-style: none;
+            padding: 0;
+            margin: 8px 0;
+        }
+
+        .sensation-list li {
+            background: #e9ecef;
+            padding: 4px 8px;
+            margin: 2px 0;
+            border-radius: 4px;
+            font-size: 0.85em;
+        }
+
+        .intersection-results {
+            max-height: 300px;
+            overflow-y: auto;
+        }
+
+        .node-type-group {
+            margin-bottom: 16px;
+        }
+
+        .node-type-group h5 {
+            color: #495057;
+            font-size: 0.9em;
+            margin: 0 0 8px 0;
+            padding-bottom: 4px;
+            border-bottom: 1px solid #dee2e6;
+        }
+
+        .node-list {
+            list-style: none;
+            padding: 0;
+            margin: 0;
+        }
+
+        .intersection-node {
+            background: #ffffff;
+            border: 1px solid #dee2e6;
+            border-radius: 4px;
+            padding: 6px 10px;
+            margin: 2px 0;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+
+        .intersection-node:hover {
+            background: #f8f9fa;
+            border-color: #667eea;
+        }
+
+        .node-name {
+            font-size: 0.85em;
+            color: #495057;
+        }
+
+        .intersection-actions {
+            margin-top: 16px;
+            padding-top: 12px;
+            border-top: 1px solid #dee2e6;
+        }
+
+        .intersection-actions .btn {
+            width: 100%;
+            background: #6c757d;
+            color: white;
+        }
+
+        .intersection-actions .btn:hover {
+            background: #5a6268;
+        }
+
+        #intersection-status {
+            min-height: 1.2em;
+        }
+
         #graph-container {
             flex: 1;
             background: #f7fafc;
@@ -311,7 +526,7 @@
 </head>
 <body>
     <div class="header">
-        <h1>🧠 Neo4j Database Explorer</h1>
+        <h1>Neurotome</h1>
     </div>
 
     <div class="container">
@@ -366,10 +581,17 @@
         <!-- Details Panel -->
         <div class="details-panel">
             <div class="section">
-                <h3>📊 Database Statistics</h3>
-                <div class="stats-grid" id="stats-grid">
-                    <div class="loading">Loading stats...</div>
+                <h3>� Sensation Analysis</h3>
+                <p style="font-size: 0.9em; color: #666; margin-bottom: 1rem;">
+                    Select sensations to find their intersections
+                </p>
+                <div class="sensation-toggles" id="sensation-toggles">
+                    <div class="loading">Loading sensations...</div>
                 </div>
+                <button class="btn" id="find-intersections-btn" style="width: 100%; margin-top: 1rem;" disabled>
+                    🔍 Find Intersections
+                </button>
+                <div id="intersection-status" style="font-size: 0.8em; color: #666; margin-top: 0.5rem;"></div>
             </div>
 
             <div class="section" id="node-details-section" style="display: none;">
@@ -390,6 +612,7 @@
                 this.selectedLabel = null;
                 this.selectedNode = null;
                 this.selectedRelationships = new Set(); // Track selected relationships
+                this.selectedSensations = new Set(); // Track selected sensations
                 this.showLabels = true;
                 this.simulation = null;
                 this.svg = null;
@@ -399,45 +622,503 @@
             }
 
             async init() {
-                await this.loadDatabaseStats();
-                await this.loadLabels();
-                await this.loadRelationships();
-                this.initializeGraph();
-                this.setupEventListeners();
-                this.setupSearch();
-            }
-
-            async loadDatabaseStats() {
                 try {
-                    const response = await fetch('/api/stats');
-                    const stats = await response.json();
-                    this.renderStats(stats);
+                    console.log('Neo4jExplorer: Starting initialization...');
+                    
+                    console.log('Loading labels...');
+                    await this.loadLabels();
+                    
+                    console.log('Loading relationships...');
+                    await this.loadRelationships();
+                    
+                    console.log('Loading sensations...');
+                    await this.loadSensations();
+                    
+                    console.log('Initializing graph...');
+                    this.initializeGraph();
+                    
+                    console.log('Setting up event listeners...');
+                    this.setupEventListeners();
+                    
+                    console.log('Setting up search...');
+                    this.setupSearch();
+                    
+                    console.log('Neo4jExplorer initialization complete!');
                 } catch (error) {
-                    console.error('Error loading stats:', error);
+                    console.error('Neo4jExplorer initialization failed:', error);
+                    // Show error to user
+                    const container = document.querySelector('.container');
+                    if (container) {
+                        container.innerHTML = `
+                            <div style="background: #f8d7da; color: #721c24; padding: 2rem; border-radius: 8px; margin: 2rem;">
+                                <h3>Explorer Initialization Failed</h3>
+                                <p>Error: ${error.message}</p>
+                                <p>Please check the console for more details and refresh the page to try again.</p>
+                            </div>
+                        `;
+                    }
                 }
             }
 
-            renderStats(stats) {
-                const statsGrid = document.getElementById('stats-grid');
-                statsGrid.innerHTML = `
-                    <div class="stat-card">
-                        <span class="stat-value">${stats.total_nodes.toLocaleString()}</span>
-                        <span class="stat-label">Total Nodes</span>
+            async loadSensations() {
+                try {
+                    console.log('Fetching sensations from /api/sensations...');
+                    const response = await fetch('/api/sensations');
+                    if (!response.ok) {
+                        throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+                    }
+                    const allSensations = await response.json();
+                    console.log(`Loaded ${allSensations.length} sensations`);
+                    this.renderSensations(allSensations);
+                } catch (error) {
+                    console.error('Error loading sensations:', error);
+                    const sensationToggles = document.getElementById('sensation-toggles');
+                    if (sensationToggles) {
+                        sensationToggles.innerHTML = '<div class="loading" style="color: red;">Error loading sensations</div>';
+                    }
+                    throw error;
+                }
+            }
+
+            renderSensations(sensations) {
+                const sensationToggles = document.getElementById('sensation-toggles');
+                
+                if (sensations.length === 0) {
+                    sensationToggles.innerHTML = '<div class="empty-state">No sensations found</div>';
+                    return;
+                }
+
+                // Group sensations hierarchically: Type -> Spinal Level -> Side -> Individual sensations
+                const groupedSensations = this.groupSensationsHierarchically(sensations);
+                
+                let html = '';
+
+                // Create hierarchical dropdowns
+                Object.entries(groupedSensations).forEach(([type, levels]) => {
+                    const totalCount = this.countSensationsInGroup(levels);
+                    
+                    html += `
+                        <div class="sensation-group">
+                            <div class="sensation-group-header" onclick="explorer.toggleDropdown(this)">
+                                ${type} (${totalCount})
+                            </div>
+                            <div class="sensation-group-content" style="display: none;">
+                                ${this.renderSpinalLevels(levels)}
+                            </div>
+                        </div>
+                    `;
+                });
+
+                sensationToggles.innerHTML = html;
+
+                // Use event delegation for sensation toggles since they're nested
+                sensationToggles.removeEventListener('click', this.sensationClickHandler);
+                this.sensationClickHandler = (event) => {
+                    if (event.target.classList.contains('sensation-toggle')) {
+                        this.toggleSensation(event.target.dataset.sensation);
+                    }
+                };
+                sensationToggles.addEventListener('click', this.sensationClickHandler);
+            }
+
+            groupSensationsHierarchically(sensations) {
+                const grouped = {};
+                
+                sensations.forEach(sensation => {
+                    const props = sensation.properties;
+                    
+                    // Determine type (Motor vs Sensation)
+                    let type = 'Sensation';
+                    if (props.modality === 'motor' || props.type === 'weakness') {
+                        type = 'Motor';
+                    }
+                    
+                    // Extract spinal level from name (look for patterns like C5, T1, L2, S1)
+                    const spinalLevel = this.extractSpinalLevel(sensation.name);
+                    
+                    // Extract side (left/right/bilateral)
+                    const side = this.extractSide(sensation.name, props);
+                    
+                    // Initialize nested structure
+                    if (!grouped[type]) grouped[type] = {};
+                    if (!grouped[type][spinalLevel]) grouped[type][spinalLevel] = {};
+                    if (!grouped[type][spinalLevel][side]) grouped[type][spinalLevel][side] = [];
+                    
+                    grouped[type][spinalLevel][side].push(sensation);
+                });
+                
+                return grouped;
+            }
+
+            extractSpinalLevel(name) {
+                // Look for spinal level patterns: C1-C8, T1-T12, L1-L5, S1-S5
+                const spinalMatch = name.match(/\b([CTLS])(\d{1,2})\b/i);
+                if (spinalMatch) {
+                    return spinalMatch[1].toUpperCase() + spinalMatch[2];
+                }
+                
+                // Look for word patterns like "cervical", "thoracic", "lumbar", "sacral"
+                const regionMatch = name.match(/\b(cervical|thoracic|lumbar|sacral)\b/i);
+                if (regionMatch) {
+                    return regionMatch[1].toLowerCase();
+                }
+                
+                return 'General';
+            }
+
+            extractSide(name, props) {
+                // Check properties first
+                if (props.side) {
+                    return props.side === 'left' ? 'Left' : props.side === 'right' ? 'Right' : 'Bilateral';
+                }
+                
+                // Check location property
+                if (props.location) {
+                    if (props.location.includes('left')) return 'Left';
+                    if (props.location.includes('right')) return 'Right';
+                }
+                
+                // Check name for side indicators
+                const nameLower = name.toLowerCase();
+                if (nameLower.includes('left')) return 'Left';
+                if (nameLower.includes('right')) return 'Right';
+                if (nameLower.includes('bilateral')) return 'Bilateral';
+                
+                return 'General';
+            }
+
+            countSensationsInGroup(levels) {
+                let count = 0;
+                Object.values(levels).forEach(sides => {
+                    Object.values(sides).forEach(sensations => {
+                        count += sensations.length;
+                    });
+                });
+                return count;
+            }
+
+            renderSpinalLevels(levels) {
+                let html = '';
+                
+                // Sort spinal levels for better organization
+                const sortedLevels = Object.keys(levels).sort(this.sortSpinalLevels.bind(this));
+                
+                sortedLevels.forEach(level => {
+                    const sides = levels[level];
+                    const levelCount = this.countSensationsInGroup({[level]: sides});
+                    
+                    html += `
+                        <div class="sensation-subgroup">
+                            <div class="sensation-subgroup-header" onclick="explorer.toggleDropdown(this)">
+                                ${level} (${levelCount})
+                            </div>
+                            <div class="sensation-subgroup-content" style="display: none;">
+                                ${this.renderSides(sides)}
+                            </div>
+                        </div>
+                    `;
+                });
+                
+                return html;
+            }
+
+            renderSides(sides) {
+                let html = '';
+                
+                // Sort sides: Left, Right, Bilateral, General
+                const sideOrder = ['Left', 'Right', 'Bilateral', 'General'];
+                const sortedSides = Object.keys(sides).sort((a, b) => {
+                    const aIndex = sideOrder.indexOf(a);
+                    const bIndex = sideOrder.indexOf(b);
+                    return (aIndex === -1 ? 999 : aIndex) - (bIndex === -1 ? 999 : bIndex);
+                });
+                
+                sortedSides.forEach(side => {
+                    const sensations = sides[side];
+                    
+                    html += `
+                        <div class="sensation-subgroup">
+                            <div class="sensation-subgroup-header" onclick="explorer.toggleDropdown(this)">
+                                ${side} (${sensations.length})
+                            </div>
+                            <div class="sensation-subgroup-content" style="display: none;">
+                                ${sensations.map(sensation => `
+                                    <div class="sensation-toggle" data-sensation="${sensation.name}">
+                                        ${sensation.name}
+                                    </div>
+                                `).join('')}
+                            </div>
+                        </div>
+                    `;
+                });
+                
+                return html;
+            }
+
+            sortSpinalLevels(a, b) {
+                // Custom sort for spinal levels: C1-C8, T1-T12, L1-L5, S1-S5, then others
+                const order = { 'C': 1, 'T': 2, 'L': 3, 'S': 4 };
+                
+                const parseLevel = (level) => {
+                    const match = level.match(/^([CTLS])(\d+)$/);
+                    if (match) {
+                        return { region: match[1], number: parseInt(match[2]), priority: order[match[1]] || 999 };
+                    }
+                    return { region: level, number: 0, priority: 999 };
+                };
+                
+                const levelA = parseLevel(a);
+                const levelB = parseLevel(b);
+                
+                if (levelA.priority !== levelB.priority) {
+                    return levelA.priority - levelB.priority;
+                }
+                
+                if (levelA.region === levelB.region) {
+                    return levelA.number - levelB.number;
+                }
+                
+                return a.localeCompare(b);
+            }
+
+            toggleDropdown(headerElement) {
+                const content = headerElement.nextElementSibling;
+                const isHidden = content.style.display === 'none';
+                
+                content.style.display = isHidden ? 'block' : 'none';
+                headerElement.classList.toggle('collapsed', !isHidden);
+            }
+
+            toggleSensation(sensationName) {
+                const toggleElement = document.querySelector(`[data-sensation="${sensationName}"]`);
+                
+                if (this.selectedSensations.has(sensationName)) {
+                    // Remove from selection
+                    this.selectedSensations.delete(sensationName);
+                    toggleElement.classList.remove('active');
+                } else {
+                    // Add to selection
+                    this.selectedSensations.add(sensationName);
+                    toggleElement.classList.add('active');
+                }
+                
+                // Update intersection button state
+                this.updateIntersectionButton();
+            }
+
+            updateIntersectionButton() {
+                const button = document.getElementById('find-intersections-btn');
+                const status = document.getElementById('intersection-status');
+                
+                if (this.selectedSensations.size > 0) {
+                    button.disabled = false;
+                    button.style.opacity = '1';
+                    status.innerHTML = `${this.selectedSensations.size} sensation(s) selected`;
+                    status.style.color = '#2d3748';
+                } else {
+                    button.disabled = true;
+                    button.style.opacity = '0.5';
+                    status.innerHTML = 'Select sensations to find intersections';
+                    status.style.color = '#666';
+                }
+            }
+
+            async findIntersections() {
+                if (this.selectedSensations.size === 0) return;
+                
+                const sensationArray = Array.from(this.selectedSensations);
+                const status = document.getElementById('intersection-status');
+                
+                try {
+                    status.innerHTML = '🔍 Finding intersections...';
+                    status.style.color = '#2d3748';
+                    
+                    const response = await fetch('/api/sensations/intersections', {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json',
+                        },
+                        body: JSON.stringify({
+                            sensations: sensationArray
+                        })
+                    });
+                    
+                    const data = await response.json();
+                    
+                    if (data.nodes && data.nodes.length > 0) {
+                        // Clear any existing filters to show pure intersection results
+                        this.selectedLabel = null;
+                        this.selectedRelationships.clear();
+                        
+                        // Update filter UI to reflect cleared state
+                        document.querySelectorAll('.label-item').forEach(item => {
+                            item.classList.remove('active');
+                        });
+                        document.querySelectorAll('.relationship-item').forEach(item => {
+                            item.classList.remove('active');
+                        });
+                        
+                        // Render the intersection graph
+                        this.renderGraph(data);
+                        
+                        // Update status with detailed information
+                        const nodeTypes = {};
+                        data.nodes.forEach(node => {
+                            const label = node.labels[0] || 'Unknown';
+                            nodeTypes[label] = (nodeTypes[label] || 0) + 1;
+                        });
+                        
+                        const typeBreakdown = Object.entries(nodeTypes)
+                            .map(([type, count]) => `${count} ${type}${count > 1 ? 's' : ''}`)
+                            .join(', ');
+                        
+                        status.innerHTML = `✅ Found ${data.nodes.length} intersecting nodes: ${typeBreakdown}`;
+                        status.style.color = '#28a745';
+                        
+                        // Update filter status to show we're displaying intersection results
+                        this.updateFilterStatus();
+                        
+                        // Show intersection details in the sidebar
+                        this.showIntersectionDetails(sensationArray, data);
+                        
+                    } else {
+                        status.innerHTML = '❌ No intersections found';
+                        status.style.color = '#dc3545';
+                    }
+                } catch (error) {
+                    console.error('Error finding intersections:', error);
+                    status.innerHTML = '❌ Error finding intersections';
+                    status.style.color = '#dc3545';
+                }
+            }
+
+            showIntersectionDetails(selectedSensations, intersectionData) {
+                // Show the node details section
+                const nodeDetailsSection = document.getElementById('node-details-section');
+                const nodeDetails = document.getElementById('selected-node-details');
+                
+                nodeDetailsSection.style.display = 'block';
+                
+                const nodeCount = intersectionData.nodes.length;
+                const linkCount = intersectionData.links.length;
+                
+                // Group nodes by type for better presentation
+                const nodesByType = {};
+                intersectionData.nodes.forEach(node => {
+                    const type = node.labels[0] || 'Unknown';
+                    if (!nodesByType[type]) {
+                        nodesByType[type] = [];
+                    }
+                    nodesByType[type].push(node);
+                });
+                
+                let detailsHtml = `
+                    <div class="intersection-summary">
+                        <h4>🔗 Intersection Analysis</h4>
+                        <p><strong>Selected Sensations:</strong></p>
+                        <ul class="sensation-list">
+                            ${selectedSensations.map(sensation => `<li>${sensation}</li>`).join('')}
+                        </ul>
+                        <p><strong>Results:</strong> ${nodeCount} nodes, ${linkCount} relationships</p>
                     </div>
-                    <div class="stat-card">
-                        <span class="stat-value">${stats.total_relationships.toLocaleString()}</span>
-                        <span class="stat-label">Total Relationships</span>
+                    <div class="intersection-results">
+                `;
+                
+                // Display nodes grouped by type
+                Object.entries(nodesByType).forEach(([type, nodes]) => {
+                    detailsHtml += `
+                        <div class="node-type-group">
+                            <h5>${type}s (${nodes.length})</h5>
+                            <ul class="node-list">
+                    `;
+                    
+                    nodes.forEach(node => {
+                        const name = node.name || node.properties.name || `${type} ${node.id}`;
+                        detailsHtml += `
+                            <li class="intersection-node" data-node-id="${node.id}">
+                                <span class="node-name">${name}</span>
+                            </li>
+                        `;
+                    });
+                    
+                    detailsHtml += `
+                            </ul>
+                        </div>
+                    `;
+                });
+                
+                detailsHtml += `
+                    </div>
+                    <div class="intersection-actions">
+                        <button class="btn" onclick="explorer.clearIntersectionResults()">
+                            🧹 Clear Results
+                        </button>
                     </div>
                 `;
+                
+                nodeDetails.innerHTML = detailsHtml;
+                
+                // Add click listeners to intersection nodes for details
+                nodeDetails.querySelectorAll('.intersection-node').forEach(nodeElement => {
+                    nodeElement.addEventListener('click', () => {
+                        const nodeId = nodeElement.dataset.nodeId;
+                        const node = intersectionData.nodes.find(n => n.id === nodeId);
+                        if (node) {
+                            this.selectNode(node);
+                        }
+                    });
+                });
+            }
+
+            clearIntersectionResults() {
+                // Clear the intersection results and go back to normal view
+                this.selectedSensations.clear();
+                document.querySelectorAll('.sensation-toggle').forEach(toggle => {
+                    toggle.classList.remove('active');
+                });
+                
+                // Hide node details section
+                document.getElementById('node-details-section').style.display = 'none';
+                
+                // Update status
+                const status = document.getElementById('intersection-status');
+                status.innerHTML = 'Select sensations to find intersections';
+                status.style.color = '#666';
+                
+                // Update button state
+                this.updateIntersectionButton();
+                
+                // Reload default graph view
+                this.loadDefaultGraph();
+            }
+
+            async loadDefaultGraph() {
+                try {
+                    const response = await fetch('/api/graph?limit=50');
+                    const data = await response.json();
+                    this.renderGraph(data);
+                } catch (error) {
+                    console.error('Error loading default graph:', error);
+                }
             }
 
             async loadLabels() {
                 try {
+                    console.log('Fetching labels from /api/labels...');
                     const response = await fetch('/api/labels');
+                    if (!response.ok) {
+                        throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+                    }
                     const labels = await response.json();
+                    console.log(`Loaded ${labels.length} labels:`, labels);
                     this.renderLabels(labels);
                 } catch (error) {
                     console.error('Error loading labels:', error);
+                    const labelList = document.getElementById('label-list');
+                    if (labelList) {
+                        labelList.innerHTML = '<li class="loading" style="color: red;">Error loading labels</li>';
+                    }
+                    throw error;
                 }
             }
 
@@ -481,11 +1162,21 @@
 
             async loadRelationships() {
                 try {
+                    console.log('Fetching relationships from /api/relationships...');
                     const response = await fetch('/api/relationships');
+                    if (!response.ok) {
+                        throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+                    }
                     const relationships = await response.json();
+                    console.log(`Loaded ${relationships.length} relationships:`, relationships);
                     this.renderRelationships(relationships);
                 } catch (error) {
                     console.error('Error loading relationships:', error);
+                    const relationshipList = document.getElementById('relationship-list');
+                    if (relationshipList) {
+                        relationshipList.innerHTML = '<li class="loading" style="color: red;">Error loading relationships</li>';
+                    }
+                    throw error;
                 }
             }
 
@@ -555,8 +1246,26 @@
                     item.classList.remove('active');
                 });
 
-                // Update status indicator
+                // Clear selected sensations
+                this.selectedSensations.clear();
+                document.querySelectorAll('.sensation-toggle').forEach(toggle => {
+                    toggle.classList.remove('active');
+                });
+
+                // Hide intersection details if showing
+                const nodeDetailsSection = document.getElementById('node-details-section');
+                if (nodeDetailsSection.style.display === 'block') {
+                    nodeDetailsSection.style.display = 'none';
+                }
+
+                // Update status indicators
                 this.updateFilterStatus();
+                this.updateIntersectionButton();
+
+                // Clear intersection status
+                const intersectionStatus = document.getElementById('intersection-status');
+                intersectionStatus.innerHTML = 'Select sensations to find intersections';
+                intersectionStatus.style.color = '#666';
 
                 // Reload graph data without filters
                 await this.loadGraphData();
@@ -671,20 +1380,39 @@
                     .enter().append('line')
                     .attr('class', 'link');
 
+                // Add relationship labels
+                const linkLabels = g.selectAll('.link-label')
+                    .data(data.links)
+                    .enter().append('text')
+                    .attr('class', 'link-label')
+                    .text(d => d.type || 'unknown')
+                    .style('font-size', '10px')
+                    .style('fill', '#666')
+                    .style('text-anchor', 'middle')
+                    .style('pointer-events', 'none')
+                    .style('display', this.showLabels ? 'block' : 'none');
+
                 // Create nodes
                 const node = g.selectAll('.node')
                     .data(data.nodes)
                     .enter().append('circle')
                     .attr('class', 'node')
                     .attr('r', 8)
-                    .attr('fill', d => colorScale(d.labels[0] || 'Unknown'))
+                    .attr('fill', d => {
+                        // Use color from data if available, otherwise default to gray
+                        if (d.color) {
+                            return d.color;
+                        }
+                        // Fallback to gray for nodes without color data
+                        return '#999999';
+                    })
                     .attr('stroke', '#fff')
                     .call(d3.drag()
                         .on('start', this.dragstarted.bind(this))
                         .on('drag', this.dragged.bind(this))
                         .on('end', this.dragended.bind(this)));
 
-                // Add labels
+                // Add node labels
                 const labels = g.selectAll('.node-label')
                     .data(data.nodes)
                     .enter().append('text')
@@ -699,7 +1427,7 @@
 
                 if (useCoordinates) {
                     // Position nodes and links immediately using coordinates
-                    this.updateCoordinatePositions(link, node, labels);
+                    this.updateCoordinatePositions(link, node, labels, linkLabels);
                 } else {
                     // Update positions on simulation tick for force layouts
                     this.simulation.on('tick', () => {
@@ -708,6 +1436,11 @@
                             .attr('y1', d => d.source.y)
                             .attr('x2', d => d.target.x)
                             .attr('y2', d => d.target.y);
+
+                        // Position relationship labels in the middle of links
+                        linkLabels
+                            .attr('x', d => (d.source.x + d.target.x) / 2)
+                            .attr('y', d => (d.source.y + d.target.y) / 2);
 
                         node
                             .attr('cx', d => d.x)
@@ -817,7 +1550,7 @@
                 });
             }
 
-            updateCoordinatePositions(link, node, labels) {
+            updateCoordinatePositions(link, node, labels, linkLabels) {
                 // Position nodes using their calculated coordinates
                 node
                     .attr('cx', d => d.x || 0)
@@ -848,6 +1581,25 @@
                         const targetNode = nodeData.find(n => n.id === d.target);
                         return targetNode ? targetNode.y : 0;
                     });
+
+                // Position relationship labels in the middle of links
+                if (linkLabels) {
+                    linkLabels
+                        .attr('x', d => {
+                            const sourceNode = nodeData.find(n => n.id === d.source);
+                            const targetNode = nodeData.find(n => n.id === d.target);
+                            const sourceX = sourceNode ? sourceNode.x : 0;
+                            const targetX = targetNode ? targetNode.x : 0;
+                            return (sourceX + targetX) / 2;
+                        })
+                        .attr('y', d => {
+                            const sourceNode = nodeData.find(n => n.id === d.source);
+                            const targetNode = nodeData.find(n => n.id === d.target);
+                            const sourceY = sourceNode ? sourceNode.y : 0;
+                            const targetY = targetNode ? targetNode.y : 0;
+                            return (sourceY + targetY) / 2;
+                        });
+                }
             }
 
             updateLayoutStatus(useCoordinates, nodeCount) {
@@ -960,6 +1712,8 @@
                     this.showLabels = !this.showLabels;
                     this.svg.selectAll('.node-label')
                         .style('display', this.showLabels ? 'block' : 'none');
+                    this.svg.selectAll('.link-label')
+                        .style('display', this.showLabels ? 'block' : 'none');
                 });
 
                 // Clear filters button
@@ -971,6 +1725,11 @@
                 document.getElementById('layout-select').addEventListener('change', (e) => {
                     this.currentLayout = e.target.value;
                     this.applyLayout();
+                });
+
+                // Find intersections button
+                document.getElementById('find-intersections-btn').addEventListener('click', () => {
+                    this.findIntersections();
                 });
             }
 
@@ -1086,7 +1845,26 @@
 
         // Initialize the explorer when the page loads
         document.addEventListener('DOMContentLoaded', () => {
-            new Neo4jExplorer();
+            console.log('DOM loaded, initializing Neo4jExplorer...');
+            try {
+                // Make explorer globally accessible
+                window.explorer = new Neo4jExplorer();
+                console.log('Neo4jExplorer created successfully');
+            } catch (error) {
+                console.error('Failed to create Neo4jExplorer:', error);
+                
+                // Show error to user
+                const container = document.querySelector('.container');
+                if (container) {
+                    container.innerHTML = `
+                        <div style="background: #f8d7da; color: #721c24; padding: 2rem; border-radius: 8px; margin: 2rem;">
+                            <h3>Explorer Failed to Start</h3>
+                            <p>Error: ${error.message}</p>
+                            <p>Please check the console for more details and refresh the page to try again.</p>
+                        </div>
+                    `;
+                }
+            }
         });
     </script>
 </body>

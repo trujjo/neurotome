@@ -203,3 +203,23 @@ nav ul li a.active {
     border-radius: 8px;
     box-shadow: 0 2px 4px rgba(0,0,0,0.1);
 }
+
+/* Graph labels styling */
+.node-label {
+    font-family: Arial, sans-serif;
+    font-size: 12px;
+    fill: #333;
+    pointer-events: none;
+    text-anchor: middle;
+}
+
+.link-label {
+    font-family: Arial, sans-serif;
+    font-size: 10px;
+    fill: #666;
+    pointer-events: none;
+    text-anchor: middle;
+    background: rgba(255, 255, 255, 0.8);
+    padding: 2px 4px;
+    border-radius: 3px;
+}
