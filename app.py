@@ -386,7 +386,7 @@ def find_sensation_intersections():
                 # Add the intermediate node to our collection
                 node_id = node.element_id
                 if node_id not in nodes:
-                    color = "blue" if 'sensation' in node.labels and node.get("name") in sensation_names else "gray"
+                    color = "orange" if 'sensation' in node.labels and node.get("name") in sensation_names else "gray"
                     if 'sensation' in node.labels and node.get("name") in sensation_names:
                         selected_sensation_ids.add(node_id)
                     
@@ -404,7 +404,7 @@ def find_sensation_intersections():
             
             # Add source node
             if source_id not in nodes:
-                color = "blue" if 'sensation' in source_node.labels and source_node.get("name") in sensation_names else "gray"
+                color = "orange" if 'sensation' in source_node.labels and source_node.get("name") in sensation_names else "gray"
                 if 'sensation' in source_node.labels and source_node.get("name") in sensation_names:
                     selected_sensation_ids.add(source_id)
                 
@@ -418,7 +418,7 @@ def find_sensation_intersections():
             
             # Add target node  
             if target_id not in nodes:
-                color = "blue" if 'sensation' in target_node.labels and target_node.get("name") in sensation_names else "gray"
+                color = "orange" if 'sensation' in target_node.labels and target_node.get("name") in sensation_names else "gray"
                 if 'sensation' in target_node.labels and target_node.get("name") in sensation_names:
                     selected_sensation_ids.add(target_id)
                 
@@ -474,7 +474,8 @@ def find_sensation_intersections():
 
 @app.route("/")
 def index():
-    return send_from_directory('public', 'index.html')
+    """Main page - serves the database explorer"""
+    return send_from_directory('public', 'explorer.html')
 
 # API endpoint to get dermatomes and myotomes data
 @app.route("/api/dermatomes-myotomes")
@@ -485,7 +486,7 @@ def get_dermatomes_myotomes_api():
         "myotomes": myotomes
     })
 
-# Route for database explorer
+# Legacy routes for backward compatibility
 @app.route("/explorer")
 def explorer():
     return send_from_directory('public', 'explorer.html')
@@ -493,6 +494,11 @@ def explorer():
 @app.route("/explorer.html")
 def explorer_html():
     return send_from_directory('public', 'explorer.html')
+
+# Route to access the old index page if needed
+@app.route("/old-index")
+def old_index():
+    return send_from_directory('public', 'index.html')
 
 # Serve static files
 @app.route('/static/<path:filename>')
