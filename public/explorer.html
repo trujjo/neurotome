@@ -194,6 +194,13 @@
             margin-bottom: 1rem;
         }
 
+        .muscle-toggles {
+            display: flex;
+            flex-direction: column;
+            gap: 0.5rem;
+            margin-bottom: 1rem;
+        }
+
         .sensation-toggle {
             padding: 0.6rem;
             background: rgba(0, 0, 0, 0.3);
@@ -222,6 +229,37 @@
 
         .sensation-toggle.active:hover {
             background: linear-gradient(135deg, #4b5563 0%, #374151 100%);
+            transform: translateY(-2px);
+        }
+
+        .muscle-toggle {
+            padding: 0.6rem;
+            background: rgba(0, 0, 0, 0.3);
+            border: 2px solid rgba(255, 255, 255, 0.1);
+            border-radius: 12px;
+            cursor: pointer;
+            text-align: center;
+            font-size: 0.85rem;
+            transition: all 0.3s ease;
+            user-select: none;
+        }
+
+        .muscle-toggle:hover {
+            background: rgba(34, 197, 94, 0.2);
+            border-color: rgba(34, 197, 94, 0.3);
+            transform: translateY(-2px);
+            box-shadow: 0 4px 12px rgba(34, 197, 94, 0.2);
+        }
+
+        .muscle-toggle.active {
+            background: linear-gradient(135deg, #059669 0%, #047857 100%);
+            border-color: #22c55e;
+            color: white;
+            box-shadow: 0 8px 20px rgba(34, 197, 94, 0.3);
+        }
+
+        .muscle-toggle.active:hover {
+            background: linear-gradient(135deg, #047857 0%, #065f46 100%);
             transform: translateY(-2px);
         }
 
@@ -450,6 +488,123 @@
         #find-intersections-btn:hover:not(:disabled) {
             box-shadow: 0 8px 20px rgba(34, 197, 94, 0.4) !important;
             border-color: rgba(34, 197, 94, 0.5) !important;
+        }
+
+        /* Muscle group styles - similar to sensation groups but with green theme */
+        .muscle-group {
+            margin-bottom: 12px;
+            border: 1px solid rgba(34, 197, 94, 0.2);
+            border-radius: 12px;
+            overflow: hidden;
+            background: rgba(0, 0, 0, 0.2);
+            backdrop-filter: blur(10px);
+        }
+
+        .muscle-group-header {
+            background: rgba(0, 0, 0, 0.4);
+            padding: 12px 16px;
+            font-weight: 600;
+            cursor: pointer;
+            user-select: none;
+            border-bottom: 1px solid rgba(34, 197, 94, 0.2);
+            transition: all 0.3s ease;
+            position: relative;
+            color: #e2e8f0;
+        }
+
+        .muscle-group-header:hover {
+            background: rgba(34, 197, 94, 0.2);
+            color: #22c55e;
+        }
+
+        .muscle-group-header:after {
+            content: '▼';
+            position: absolute;
+            right: 16px;
+            transition: transform 0.3s ease;
+            font-size: 0.8em;
+            color: #22c55e;
+        }
+
+        .muscle-group-header.collapsed:after {
+            transform: rotate(-90deg);
+        }
+
+        .muscle-group-content {
+            padding: 12px;
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+            gap: 8px;
+            max-height: 400px;
+            overflow-y: auto;
+        }
+
+        .muscle-region {
+            margin-bottom: 8px;
+        }
+
+        .muscle-region-header {
+            background: rgba(34, 197, 94, 0.15);
+            padding: 8px 12px;
+            font-weight: 500;
+            cursor: pointer;
+            user-select: none;
+            border-radius: 4px;
+            transition: all 0.3s ease;
+            position: relative;
+            color: #22c55e;
+            margin-left: 16px;
+            font-size: 0.9em;
+            border: 1px solid rgba(34, 197, 94, 0.3);
+        }
+
+        .muscle-region-header:hover {
+            background: rgba(34, 197, 94, 0.25);
+            color: #16a34a;
+        }
+
+        .muscle-region-header:after {
+            content: '▼';
+            position: absolute;
+            right: 12px;
+            transition: transform 0.3s ease;
+            font-size: 0.7em;
+            color: #22c55e;
+        }
+
+        .muscle-region-header.collapsed:after {
+            transform: rotate(-90deg);
+        }
+
+        .muscle-region-content {
+            padding: 8px 0 8px 20px;
+            border-left: 2px solid rgba(34, 197, 94, 0.2);
+            margin-left: 28px;
+        }
+
+        .muscle-side-columns {
+            display: flex;
+            gap: 1rem;
+            padding: 0.5rem 0;
+        }
+
+        .muscle-side-column {
+            flex: 1;
+            min-width: 0;
+        }
+
+        .muscle-column-header {
+            color: #22c55e;
+            font-size: 0.8em;
+            font-weight: 600;
+            margin: 0 0 0.5rem 0;
+            padding-bottom: 0.25rem;
+            border-bottom: 1px solid rgba(34, 197, 94, 0.3);
+        }
+
+        .muscle-side-column .muscle-toggle {
+            margin-bottom: 0.25rem;
+            font-size: 0.75em;
         }
 
         #graph-container {
@@ -734,6 +889,20 @@
                 <div id="intersection-status" style="font-size: 0.8em; color: #666; margin-top: 0.5rem;"></div>
             </div>
 
+            <div class="section">
+                <h3>💪 Muscle Analysis</h3>
+                <p style="font-size: 0.9em; color: #666; margin-bottom: 1rem;">
+                    Select muscles organized by body side
+                </p>
+                <div class="muscle-toggles" id="muscle-toggles">
+                    <div class="loading">Loading muscles...</div>
+                </div>
+                <button class="btn" id="analyze-muscles-btn" style="width: 100%; margin-top: 1rem;" disabled>
+                    🔍 Analyze Muscles
+                </button>
+                <div id="muscle-status" style="font-size: 0.8em; color: #666; margin-top: 0.5rem;"></div>
+            </div>
+
             <div class="section" id="node-details-section" style="display: none;">
                 <h3>📄 Node Details</h3>
                 <div id="selected-node-details"></div>
@@ -753,12 +922,28 @@
                 this.selectedNode = null;
                 this.selectedRelationships = new Set(); // Track selected relationships
                 this.selectedSensations = new Set(); // Track selected sensations
+                this.selectedMuscles = new Set(); // Track selected muscles
                 this.showLabels = true;
                 this.simulation = null;
                 this.svg = null;
                 this.currentLayout = 'force';
                 
                 this.init();
+            }
+
+            // Text formatting helper functions
+            formatText(text) {
+                if (!text) return '';
+                return text.toString()
+                    .replace(/_/g, ' ')  // Replace underscores with spaces
+                    .replace(/\b\w/g, l => l.toUpperCase());  // Capitalize first letter of each word
+            }
+
+            formatRelationshipName(relationshipType) {
+                if (!relationshipType) return '';
+                return relationshipType
+                    .replace(/_/g, ' ')  // Replace underscores with spaces
+                    .replace(/\b\w/g, l => l.toUpperCase());  // Capitalize first letter of each word
             }
 
             async init() {
@@ -773,6 +958,9 @@
                     
                     console.log('Loading sensations...');
                     await this.loadSensations();
+                    
+                    console.log('Loading muscles...');
+                    await this.loadMuscles();
                     
                     console.log('Initializing graph...');
                     this.initializeGraph();
@@ -980,7 +1168,7 @@
                                 <h6 class="column-header">Left (${leftSensations.length})</h6>
                                 ${leftSensations.map(sensation => `
                                     <div class="sensation-toggle" data-sensation="${sensation.name}">
-                                        ${sensation.name}
+                                        ${this.formatText(sensation.name)}
                                     </div>
                                 `).join('')}
                             </div>
@@ -988,7 +1176,7 @@
                                 <h6 class="column-header">Right (${rightSensations.length})</h6>
                                 ${rightSensations.map(sensation => `
                                     <div class="sensation-toggle" data-sensation="${sensation.name}">
-                                        ${sensation.name}
+                                        ${this.formatText(sensation.name)}
                                     </div>
                                 `).join('')}
                             </div>
@@ -1007,7 +1195,7 @@
                                     <div class="sensation-subgroup-content" style="display: none;">
                                         ${sensations.map(sensation => `
                                             <div class="sensation-toggle" data-sensation="${sensation.name}">
-                                                ${sensation.name}
+                                                ${this.formatText(sensation.name)}
                                             </div>
                                         `).join('')}
                                     </div>
@@ -1036,7 +1224,7 @@
                                 <div class="sensation-subgroup-content" style="display: none;">
                                     ${sensations.map(sensation => `
                                         <div class="sensation-toggle" data-sensation="${sensation.name}">
-                                            ${sensation.name}
+                                            ${this.formatText(sensation.name)}
                                         </div>
                                     `).join('')}
                                 </div>
@@ -1285,6 +1473,281 @@
                 this.loadDefaultGraph();
             }
 
+            // Muscle-related methods
+            async loadMuscles() {
+                try {
+                    console.log('Fetching muscles from /api/nodes/muscle...');
+                    const response = await fetch('/api/nodes/muscle?limit=200');
+                    if (!response.ok) {
+                        throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+                    }
+                    const muscles = await response.json();
+                    console.log(`Loaded ${muscles.length} muscles`);
+                    this.renderMuscles(muscles);
+                } catch (error) {
+                    console.error('Error loading muscles:', error);
+                    const muscleToggles = document.getElementById('muscle-toggles');
+                    if (muscleToggles) {
+                        muscleToggles.innerHTML = '<div class="loading" style="color: red;">Error loading muscles</div>';
+                    }
+                    throw error;
+                }
+            }
+
+            renderMuscles(muscles) {
+                const muscleToggles = document.getElementById('muscle-toggles');
+                
+                if (muscles.length === 0) {
+                    muscleToggles.innerHTML = '<div class="empty-state">No muscles found</div>';
+                    return;
+                }
+
+                // Group muscles by location (side -> region)
+                const groupedMuscles = this.groupMusclesBySide(muscles);
+                
+                // Define side display names
+                const sideNames = {
+                    'left': 'Left Side',
+                    'right': 'Right Side',
+                    'bilateral': 'Bilateral',
+                    'general': 'General'
+                };
+                
+                let html = '';
+
+                // Create hierarchical dropdowns: Side -> Region -> Muscles
+                Object.entries(groupedMuscles).forEach(([side, regions]) => {
+                    const totalMuscles = Object.values(regions).flat().length;
+                    
+                    html += `
+                        <div class="muscle-group">
+                            <div class="muscle-group-header" onclick="explorer.toggleDropdown(this)">
+                                ${sideNames[side] || this.formatText(side)} (${totalMuscles})
+                            </div>
+                            <div class="muscle-group-content" style="display: none;">
+                    `;
+                    
+                    // Sort regions alphabetically, but keep 'general' last
+                    const sortedRegions = Object.keys(regions).sort((a, b) => {
+                        if (a === 'general') return 1;
+                        if (b === 'general') return -1;
+                        return a.localeCompare(b);
+                    });
+                    
+                    sortedRegions.forEach(region => {
+                        const regionMuscles = regions[region];
+                        html += `
+                            <div class="muscle-region">
+                                <div class="muscle-region-header" onclick="explorer.toggleDropdown(this)">
+                                    ${this.formatText(region)} (${regionMuscles.length})
+                                </div>
+                                <div class="muscle-region-content" style="display: none;">
+                                    ${this.renderMuscleList(regionMuscles)}
+                                </div>
+                            </div>
+                        `;
+                    });
+                    
+                    html += `
+                            </div>
+                        </div>
+                    `;
+                });
+
+                muscleToggles.innerHTML = html;
+
+                // Use event delegation for muscle toggles
+                muscleToggles.removeEventListener('click', this.muscleClickHandler);
+                this.muscleClickHandler = (event) => {
+                    if (event.target.classList.contains('muscle-toggle')) {
+                        this.toggleMuscle(event.target.dataset.muscle);
+                    }
+                };
+                muscleToggles.addEventListener('click', this.muscleClickHandler);
+            }
+
+            groupMusclesBySide(muscles) {
+                const grouped = {};
+                
+                muscles.forEach(muscle => {
+                    const props = muscle.properties;
+                    const name = muscle.properties.name || muscle.id;
+                    
+                    // Extract detailed location information
+                    const locationInfo = this.extractMuscleLocation(props, name);
+                    
+                    // Create hierarchical structure: Side -> Region -> Individual muscles
+                    if (!grouped[locationInfo.side]) {
+                        grouped[locationInfo.side] = {};
+                    }
+                    if (!grouped[locationInfo.side][locationInfo.region]) {
+                        grouped[locationInfo.side][locationInfo.region] = [];
+                    }
+                    
+                    grouped[locationInfo.side][locationInfo.region].push(muscle);
+                });
+                
+                // Remove empty groups
+                Object.keys(grouped).forEach(side => {
+                    Object.keys(grouped[side]).forEach(region => {
+                        if (grouped[side][region].length === 0) {
+                            delete grouped[side][region];
+                        }
+                    });
+                    if (Object.keys(grouped[side]).length === 0) {
+                        delete grouped[side];
+                    }
+                });
+                
+                return grouped;
+            }
+
+            extractMuscleLocation(props, name) {
+                const location = props.location ? props.location.trim() : '';
+                const nameLower = name.toLowerCase();
+                
+                // Determine side from location or name
+                let side = 'general';
+                const locationLower = location.toLowerCase();
+                
+                if (locationLower.includes('left') || nameLower.includes('left')) {
+                    side = 'left';
+                } else if (locationLower.includes('right') || nameLower.includes('right')) {
+                    side = 'right';
+                } else if (locationLower.includes('bilateral') || locationLower.includes('both') || 
+                          nameLower.includes('bilateral') || nameLower.includes('both')) {
+                    side = 'bilateral';
+                }
+                
+                // Use the actual location property as the region, with some cleanup
+                let region = location || 'general';
+                
+                // Clean up the region name by removing side indicators
+                region = region.replace(/\b(left|right|bilateral|both)\b/gi, '').trim();
+                
+                // If region is empty after cleanup, use general
+                if (!region || region === '') {
+                    region = 'general';
+                }
+                
+                return { side, region };
+            }
+
+            renderMuscleList(muscles) {
+                return muscles.map(muscle => {
+                    const name = muscle.properties.name || muscle.id;
+                    return `
+                        <div class="muscle-toggle" data-muscle="${name}">
+                            ${this.formatText(name)}
+                        </div>
+                    `;
+                }).join('');
+            }
+
+            toggleMuscle(muscleName) {
+                const toggleElement = document.querySelector(`[data-muscle="${muscleName}"]`);
+                
+                if (this.selectedMuscles.has(muscleName)) {
+                    // Remove from selection
+                    this.selectedMuscles.delete(muscleName);
+                    toggleElement.classList.remove('active');
+                } else {
+                    // Add to selection
+                    this.selectedMuscles.add(muscleName);
+                    toggleElement.classList.add('active');
+                }
+                
+                // Update muscle analysis button state
+                this.updateMuscleButton();
+            }
+
+            updateMuscleButton() {
+                const button = document.getElementById('analyze-muscles-btn');
+                const status = document.getElementById('muscle-status');
+                
+                if (this.selectedMuscles.size > 0) {
+                    button.disabled = false;
+                    button.style.opacity = '1';
+                    status.innerHTML = `${this.selectedMuscles.size} muscle(s) selected`;
+                    status.style.color = '#2d3748';
+                } else {
+                    button.disabled = true;
+                    button.style.opacity = '0.5';
+                    status.innerHTML = 'Select muscles to analyze';
+                    status.style.color = '#666';
+                }
+            }
+
+            async analyzeMuscles() {
+                if (this.selectedMuscles.size === 0) return;
+                
+                const muscleArray = Array.from(this.selectedMuscles);
+                const status = document.getElementById('muscle-status');
+                
+                try {
+                    status.innerHTML = '🔍 Analyzing muscles...';
+                    status.style.color = '#2d3748';
+                    
+                    // Use the graph API with muscle filter
+                    const response = await fetch('/api/graph?label=muscle&limit=200');
+                    const data = await response.json();
+                    
+                    // Filter to only show selected muscles and their connections
+                    const filteredNodes = data.nodes.filter(node => 
+                        node.labels.includes('muscle') && 
+                        muscleArray.includes(node.properties.name || node.id) ||
+                        !node.labels.includes('muscle') // Include non-muscle nodes that connect to muscles
+                    );
+                    
+                    const selectedMuscleIds = new Set(
+                        filteredNodes
+                            .filter(node => node.labels.includes('muscle') && 
+                                   muscleArray.includes(node.properties.name || node.id))
+                            .map(node => node.id)
+                    );
+                    
+                    const filteredLinks = data.links.filter(link =>
+                        selectedMuscleIds.has(link.source) || selectedMuscleIds.has(link.target)
+                    );
+                    
+                    const filteredData = {
+                        nodes: filteredNodes,
+                        links: filteredLinks
+                    };
+                    
+                    if (filteredData.nodes.length > 0) {
+                        // Clear any existing filters to show pure muscle results
+                        this.selectedLabel = null;
+                        this.selectedRelationships.clear();
+                        
+                        // Update filter UI to reflect cleared state
+                        document.querySelectorAll('.label-item').forEach(item => {
+                            item.classList.remove('active');
+                        });
+                        document.querySelectorAll('.relationship-item').forEach(item => {
+                            item.classList.remove('active');
+                        });
+                        
+                        // Render the muscle analysis graph
+                        this.renderGraph(filteredData);
+                        
+                        status.innerHTML = `✅ Found ${filteredData.nodes.length} connected nodes for selected muscles`;
+                        status.style.color = '#059669';
+                        
+                        // Update filter status
+                        this.updateFilterStatus();
+                        
+                    } else {
+                        status.innerHTML = '❌ No connections found for selected muscles';
+                        status.style.color = '#dc3545';
+                    }
+                } catch (error) {
+                    console.error('Error analyzing muscles:', error);
+                    status.innerHTML = '❌ Error analyzing muscles';
+                    status.style.color = '#dc3545';
+                }
+            }
+
             async loadDefaultGraph() {
                 try {
                     const response = await fetch('/api/graph?limit=50');
@@ -1329,14 +1792,14 @@
                         const countData = await countResponse.json();
                         return `
                             <li class="label-item" data-label="${label}">
-                                ${label}
+                                ${this.formatText(label)}
                                 <span class="node-count">${countData.count}</span>
                             </li>
                         `;
                     } catch {
                         return `
                             <li class="label-item" data-label="${label}">
-                                ${label}
+                                ${this.formatText(label)}
                                 <span class="node-count">?</span>
                             </li>
                         `;
@@ -1383,7 +1846,7 @@
 
                 relationshipList.innerHTML = relationships.map(rel => `
                     <li class="relationship-item" data-relationship="${rel}">
-                        ${rel}
+                        ${this.formatRelationshipName(rel)}
                     </li>
                 `).join('');
 
@@ -1445,6 +1908,12 @@
                     toggle.classList.remove('active');
                 });
 
+                // Clear selected muscles
+                this.selectedMuscles.clear();
+                document.querySelectorAll('.muscle-toggle').forEach(toggle => {
+                    toggle.classList.remove('active');
+                });
+
                 // Hide intersection details if showing
                 const nodeDetailsSection = document.getElementById('node-details-section');
                 if (nodeDetailsSection.style.display === 'block') {
@@ -1454,11 +1923,17 @@
                 // Update status indicators
                 this.updateFilterStatus();
                 this.updateIntersectionButton();
+                this.updateMuscleButton();
 
                 // Clear intersection status
                 const intersectionStatus = document.getElementById('intersection-status');
                 intersectionStatus.innerHTML = 'Select sensations to find intersections';
                 intersectionStatus.style.color = '#666';
+
+                // Clear muscle status
+                const muscleStatus = document.getElementById('muscle-status');
+                muscleStatus.innerHTML = 'Select muscles to analyze';
+                muscleStatus.style.color = '#666';
 
                 // Reload graph data without filters
                 await this.loadGraphData();
@@ -1481,6 +1956,7 @@
                 this.selectedNode = null;
                 this.selectedRelationships.clear();
                 this.selectedSensations.clear();
+                this.selectedMuscles.clear();
 
                 // Clear all UI selections
                 document.querySelectorAll('.label-item').forEach(item => {
@@ -1492,6 +1968,9 @@
                 document.querySelectorAll('.sensation-toggle').forEach(toggle => {
                     toggle.classList.remove('active');
                 });
+                document.querySelectorAll('.muscle-toggle').forEach(toggle => {
+                    toggle.classList.remove('active');
+                });
 
                 // Hide all detail sections
                 document.getElementById('node-details-section').style.display = 'none';
@@ -1500,11 +1979,17 @@
                 // Reset status indicators
                 this.updateFilterStatus();
                 this.updateIntersectionButton();
+                this.updateMuscleButton();
 
                 // Clear intersection status
                 const intersectionStatus = document.getElementById('intersection-status');
                 intersectionStatus.innerHTML = 'Select sensations to find intersections';
                 intersectionStatus.style.color = '#666';
+
+                // Clear muscle status
+                const muscleStatus = document.getElementById('muscle-status');
+                muscleStatus.innerHTML = 'Select muscles to analyze';
+                muscleStatus.style.color = '#666';
 
                 // Reset layout to force layout
                 this.currentLayout = 'force';
@@ -1664,16 +2149,15 @@
                 const link = g.selectAll('.link')
                     .data(data.links)
                     .enter().append('line')
-                    .attr('class', 'link')
-                    .attr('marker-end', 'url(#arrow)');  // Add arrow marker
+                    .attr('class', 'link');
 
                 // Add relationship labels
                 const linkLabels = g.selectAll('.link-label')
                     .data(data.links)
                     .enter().append('text')
                     .attr('class', 'link-label')
-                    .text(d => d.type || 'unknown')
-                    .style('font-size', '10px')
+                    .text(d => this.formatRelationshipName(d.type || 'unknown'))
+                    .style('font-size', '8px')
                     .style('fill', '#666')
                     .style('text-anchor', 'middle')
                     .style('pointer-events', 'none')
@@ -1704,7 +2188,11 @@
                     .data(data.nodes)
                     .enter().append('text')
                     .attr('class', 'node-label')
-                    .text(d => d.name)
+                    .text(d => this.formatText(d.name))
+                    .style('font-size', '8px')
+                    .style('fill', '#333')
+                    .style('text-anchor', 'middle')
+                    .style('pointer-events', 'none')
                     .style('display', this.showLabels ? 'block' : 'none');
 
                 // Node click handler
@@ -1974,14 +2462,14 @@
                 
                 details.innerHTML = `
                     <div class="node-details">
-                        <h4>ID: ${node.id}</h4>
-                        <p><strong>Labels:</strong> ${node.labels.join(', ')}</p>
+                        <h4>${this.formatText(node.name || node.id)}</h4>
+                        <p><strong>Type:</strong> ${node.labels.map(label => this.formatText(label)).join(', ')}</p>
                         <h5>Properties:</h5>
                         <ul class="property-list">
                             ${Object.entries(node.properties).map(([key, value]) => `
                                 <li class="property-item">
-                                    <span class="property-key">${key}:</span>
-                                    <span class="property-value">${value}</span>
+                                    <span class="property-key">${this.formatText(key)}:</span>
+                                    <span class="property-value">${this.formatText(String(value))}</span>
                                 </li>
                             `).join('')}
                         </ul>
@@ -2013,16 +2501,16 @@
 
                 details.innerHTML = relationships.map(rel => `
                     <div class="relationship-details">
-                        <h5>${rel.relationship.type}</h5>
-                        <p><strong>From:</strong> ${rel.source.properties.name || rel.source.id} (${rel.source.labels.join(', ')})</p>
-                        <p><strong>To:</strong> ${rel.target.properties.name || rel.target.id} (${rel.target.labels.join(', ')})</p>
+                        <h5>${this.formatRelationshipName(rel.relationship.type)}</h5>
+                        <p><strong>From:</strong> ${this.formatText(rel.source.properties.name || rel.source.id)} (${rel.source.labels.map(label => this.formatText(label)).join(', ')})</p>
+                        <p><strong>To:</strong> ${this.formatText(rel.target.properties.name || rel.target.id)} (${rel.target.labels.map(label => this.formatText(label)).join(', ')})</p>
                         ${Object.keys(rel.relationship.properties).length > 0 ? `
                             <h6>Properties:</h6>
                             <ul class="property-list">
                                 ${Object.entries(rel.relationship.properties).map(([key, value]) => `
                                     <li class="property-item">
-                                        <span class="property-key">${key}:</span>
-                                        <span class="property-value">${value}</span>
+                                        <span class="property-key">${this.formatText(key)}:</span>
+                                        <span class="property-value">${this.formatText(String(value))}</span>
                                     </li>
                                 `).join('')}
                             </ul>
@@ -2071,6 +2559,11 @@
                 document.getElementById('find-intersections-btn').addEventListener('click', () => {
                     this.findIntersections();
                 });
+
+                // Analyze muscles button
+                document.getElementById('analyze-muscles-btn').addEventListener('click', () => {
+                    this.analyzeMuscles();
+                });
             }
 
             setupSearch() {
@@ -2109,8 +2602,8 @@
 
                 searchResults.innerHTML = results.map(node => `
                     <div class="search-result" style="padding: 0.5rem; border: 1px solid #e2e8f0; margin-bottom: 0.5rem; border-radius: 4px; cursor: pointer;" data-node-id="${node.id}">
-                        <strong>${node.properties.name || `Node ${node.id}`}</strong><br>
-                        <small style="color: #666;">${node.labels.join(', ')}</small>
+                        <strong>${this.formatText(node.properties.name || `Node ${node.id}`)}</strong><br>
+                        <small style="color: #666;">${node.labels.map(label => this.formatText(label)).join(', ')}</small>
                     </div>
                 `).join('');
 
