@@ -91,6 +91,42 @@
             text-shadow: 0 0 10px rgba(249, 115, 22, 0.2);
         }
 
+        .analysis-subsection {
+            background: rgba(0, 0, 0, 0.3);
+            border-radius: 6px;
+            padding: 0.8rem;
+            margin-bottom: 1rem;
+            border: 1px solid rgba(255, 255, 255, 0.1);
+        }
+
+        .analysis-subsection h4 {
+            margin: 0 0 0.8rem 0;
+            font-size: 1em;
+            font-weight: 600;
+            text-shadow: 0 0 8px rgba(255, 255, 255, 0.1);
+            position: relative;
+            padding-right: 20px;
+            transition: all 0.3s ease;
+        }
+
+        .analysis-subsection h4:after {
+            content: '▼';
+            position: absolute;
+            right: 0;
+            font-size: 0.8em;
+            transition: transform 0.3s ease;
+            color: rgba(255, 255, 255, 0.7);
+        }
+
+        .analysis-subsection h4.collapsed:after {
+            transform: rotate(-90deg);
+        }
+
+        .analysis-subsection h4:hover {
+            opacity: 0.8;
+            transform: translateY(-1px);
+        }
+
         .search-box {
             width: 100%;
             padding: 0.75rem;
@@ -480,14 +516,16 @@
             min-height: 1.2em;
         }
 
-        #find-intersections-btn {
-            border: 1px solid rgba(34, 197, 94, 0.3) !important;
-            box-shadow: 0 4px 12px rgba(34, 197, 94, 0.2) !important;
+        #localize-lesion-btn {
+            border: 1px solid rgba(249, 115, 22, 0.5) !important;
+            box-shadow: 0 4px 12px rgba(249, 115, 22, 0.3) !important;
+            background: linear-gradient(135deg, #FF9800, #4CAF50) !important;
         }
 
-        #find-intersections-btn:hover:not(:disabled) {
-            box-shadow: 0 8px 20px rgba(34, 197, 94, 0.4) !important;
-            border-color: rgba(34, 197, 94, 0.5) !important;
+        #localize-lesion-btn:hover:not(:disabled) {
+            box-shadow: 0 8px 20px rgba(249, 115, 22, 0.5) !important;
+            border-color: rgba(249, 115, 22, 0.7) !important;
+            transform: translateY(-1px);
         }
 
         /* Muscle group styles - similar to sensation groups but with green theme */
@@ -876,35 +914,36 @@
         <!-- Details Panel -->
         <div class="details-panel">
             <div class="section">
-                <h3>� Sensation Analysis</h3>
+                <h3>🎯 Localize the Lesion</h3>
                 <p style="font-size: 0.9em; color: #666; margin-bottom: 1rem;">
-                    Select sensations to find their intersections
+                    Select sensations and muscles to localize potential lesions
                 </p>
-                <div class="sensation-toggles" id="sensation-toggles">
-                    <div class="loading">Loading sensations...</div>
+                
+                <!-- Sensation Analysis Subsection -->
+                <div class="analysis-subsection">
+                    <h4 style="color: #FF9800; margin: 1rem 0 0.5rem 0; cursor: pointer;" onclick="explorer.toggleDropdown(this)">🔸 Sensations</h4>
+                    <div class="sensation-toggles" id="sensation-toggles" style="display: block;">
+                        <div class="loading">Loading sensations...</div>
+                    </div>
                 </div>
-                <button class="btn" id="find-intersections-btn" style="width: 100%; margin-top: 1rem;" disabled>
-                    🔍 Find Intersections
-                </button>
-                <div id="intersection-status" style="font-size: 0.8em; color: #666; margin-top: 0.5rem;"></div>
-            </div>
 
-            <div class="section">
-                <h3>💪 Muscle Analysis</h3>
-                <p style="font-size: 0.9em; color: #666; margin-bottom: 1rem;">
-                    Select muscles organized by body side
-                </p>
-                <div class="muscle-toggles" id="muscle-toggles">
-                    <div class="loading">Loading muscles...</div>
+                <!-- Muscle Analysis Subsection -->
+                <div class="analysis-subsection">
+                    <h4 style="color: #4CAF50; margin: 1rem 0 0.5rem 0; cursor: pointer;" onclick="explorer.toggleDropdown(this)">🔸 Muscles</h4>
+                    <div class="muscle-toggles" id="muscle-toggles" style="display: block;">
+                        <div class="loading">Loading muscles...</div>
+                    </div>
                 </div>
-                <button class="btn" id="analyze-muscles-btn" style="width: 100%; margin-top: 1rem;" disabled>
-                    🔍 Analyze Muscles
+
+                <!-- Combined Analysis Button -->
+                <button class="btn" id="localize-lesion-btn" style="width: 100%; margin-top: 1.5rem; background: linear-gradient(135deg, #FF9800, #4CAF50); color: white; font-weight: bold;" disabled>
+                    🎯 Localize the Lesion
                 </button>
-                <div id="muscle-status" style="font-size: 0.8em; color: #666; margin-top: 0.5rem;"></div>
+                <div id="localization-status" style="font-size: 0.8em; color: #666; margin-top: 0.5rem;">Select sensations and/or muscles to analyze</div>
             </div>
 
             <div class="section" id="node-details-section" style="display: none;">
-                <h3>📄 Node Details</h3>
+                <h3>📄 Analysis Results</h3>
                 <div id="selected-node-details"></div>
             </div>
 
@@ -1016,26 +1055,16 @@
                     return;
                 }
 
-                // Group sensations hierarchically: Type -> Spinal Level -> Side -> Individual sensations
-                const groupedSensations = this.groupSensationsHierarchically(sensations);
-                
-                let html = '';
-
-                // Create hierarchical dropdowns
-                Object.entries(groupedSensations).forEach(([type, levels]) => {
-                    const totalCount = this.countSensationsInGroup(levels);
-                    
-                    html += `
-                        <div class="sensation-group">
-                            <div class="sensation-group-header" onclick="explorer.toggleDropdown(this)">
-                                ${type} (${totalCount})
-                            </div>
-                            <div class="sensation-group-content" style="display: none;">
-                                ${this.renderSpinalLevels(levels)}
-                            </div>
-                        </div>
-                    `;
+                // Filter to get only actual sensations (not motor items)
+                const actualSensations = sensations.filter(sensation => {
+                    const props = sensation.properties;
+                    return !(props.modality === 'motor' || props.type === 'weakness');
                 });
+
+                // Group sensations by spinal level and side directly
+                const groupedSensations = this.groupSensationsByLevel(actualSensations);
+                
+                let html = this.renderSpinalLevels(groupedSensations);
 
                 sensationToggles.innerHTML = html;
 
@@ -1047,6 +1076,28 @@
                     }
                 };
                 sensationToggles.addEventListener('click', this.sensationClickHandler);
+            }
+
+            groupSensationsByLevel(sensations) {
+                const grouped = {};
+                
+                sensations.forEach(sensation => {
+                    const props = sensation.properties;
+                    
+                    // Extract spinal level from name (look for patterns like C5, T1, L2, S1)
+                    const spinalLevel = this.extractSpinalLevel(sensation.name);
+                    
+                    // Extract side (left/right/bilateral)
+                    const side = this.extractSide(sensation.name, props);
+                    
+                    // Initialize nested structure: Spinal Level -> Side -> Individual sensations
+                    if (!grouped[spinalLevel]) grouped[spinalLevel] = {};
+                    if (!grouped[spinalLevel][side]) grouped[spinalLevel][side] = [];
+                    
+                    grouped[spinalLevel][side].push(sensation);
+                });
+                
+                return grouped;
             }
 
             groupSensationsHierarchically(sensations) {
@@ -1283,23 +1334,35 @@
                     toggleElement.classList.add('active');
                 }
                 
-                // Update intersection button state
-                this.updateIntersectionButton();
+                // Update localization button state
+                this.updateLocalizationButton();
             }
 
-            updateIntersectionButton() {
-                const button = document.getElementById('find-intersections-btn');
-                const status = document.getElementById('intersection-status');
+            updateLocalizationButton() {
+                const button = document.getElementById('localize-lesion-btn');
+                const status = document.getElementById('localization-status');
                 
-                if (this.selectedSensations.size > 0) {
+                const totalSelections = this.selectedSensations.size + this.selectedMuscles.size;
+                
+                if (totalSelections > 0) {
                     button.disabled = false;
                     button.style.opacity = '1';
-                    status.innerHTML = `${this.selectedSensations.size} sensation(s) selected`;
+                    
+                    let statusText = '';
+                    if (this.selectedSensations.size > 0 && this.selectedMuscles.size > 0) {
+                        statusText = `${this.selectedSensations.size} sensation(s) + ${this.selectedMuscles.size} muscle(s) selected`;
+                    } else if (this.selectedSensations.size > 0) {
+                        statusText = `${this.selectedSensations.size} sensation(s) selected`;
+                    } else {
+                        statusText = `${this.selectedMuscles.size} muscle(s) selected`;
+                    }
+                    
+                    status.innerHTML = statusText;
                     status.style.color = '#2d3748';
                 } else {
                     button.disabled = true;
                     button.style.opacity = '0.5';
-                    status.innerHTML = 'Select sensations to find intersections';
+                    status.innerHTML = 'Select sensations and/or muscles to analyze';
                     status.style.color = '#666';
                 }
             }
@@ -1373,19 +1436,19 @@
                 }
             }
 
-            showIntersectionDetails(selectedSensations, intersectionData) {
+            showLocalizationDetails(localizationData, hasSensations, hasMuscles) {
                 // Show the node details section
                 const nodeDetailsSection = document.getElementById('node-details-section');
                 const nodeDetails = document.getElementById('selected-node-details');
                 
                 nodeDetailsSection.style.display = 'block';
                 
-                const nodeCount = intersectionData.nodes.length;
-                const linkCount = intersectionData.links.length;
+                const nodeCount = localizationData.nodes.length;
+                const linkCount = localizationData.links.length;
                 
                 // Group nodes by type for better presentation
                 const nodesByType = {};
-                intersectionData.nodes.forEach(node => {
+                localizationData.nodes.forEach(node => {
                     const type = node.labels[0] || 'Unknown';
                     if (!nodesByType[type]) {
                         nodesByType[type] = [];
@@ -1393,16 +1456,34 @@
                     nodesByType[type].push(node);
                 });
                 
+                let analysisType = '';
+                if (hasSensations && hasMuscles) {
+                    analysisType = 'Combined Sensation & Muscle Analysis';
+                } else if (hasSensations) {
+                    analysisType = 'Sensation Analysis';
+                } else {
+                    analysisType = 'Muscle Analysis';
+                }
+                
                 let detailsHtml = `
-                    <div class="intersection-summary">
-                        <h4>🔗 Intersection Analysis</h4>
-                        <p><strong>Selected Sensations:</strong></p>
-                        <ul class="sensation-list">
-                            ${selectedSensations.map(sensation => `<li>${sensation}</li>`).join('')}
+                    <div class="localization-summary">
+                        <h4>🎯 ${analysisType}</h4>
+                        <p><strong>Selected Items:</strong></p>
+                        <ul class="selection-list">
+                `;
+                
+                if (hasSensations) {
+                    detailsHtml += `<li><strong>Sensations:</strong> ${Array.from(this.selectedSensations).join(', ')}</li>`;
+                }
+                if (hasMuscles) {
+                    detailsHtml += `<li><strong>Muscles:</strong> ${Array.from(this.selectedMuscles).join(', ')}</li>`;
+                }
+                
+                detailsHtml += `
                         </ul>
-                        <p><strong>Results:</strong> ${nodeCount} nodes, ${linkCount} relationships</p>
+                        <p><strong>Results:</strong> ${nodeCount} anatomical structures, ${linkCount} connections</p>
                     </div>
-                    <div class="intersection-results">
+                    <div class="localization-results">
                 `;
                 
                 // Display nodes grouped by type
@@ -1416,7 +1497,7 @@
                     nodes.forEach(node => {
                         const name = node.name || node.properties.name || `${type} ${node.id}`;
                         detailsHtml += `
-                            <li class="intersection-node" data-node-id="${node.id}">
+                            <li class="localization-node" data-node-id="${node.id}">
                                 <span class="node-name">${name}</span>
                             </li>
                         `;
@@ -1430,8 +1511,8 @@
                 
                 detailsHtml += `
                     </div>
-                    <div class="intersection-actions">
-                        <button class="btn" onclick="explorer.clearIntersectionResults()">
+                    <div class="localization-actions">
+                        <button class="btn" onclick="explorer.clearLocalizationResults()">
                             🧹 Clear Results
                         </button>
                     </div>
@@ -1439,11 +1520,11 @@
                 
                 nodeDetails.innerHTML = detailsHtml;
                 
-                // Add click listeners to intersection nodes for details
-                nodeDetails.querySelectorAll('.intersection-node').forEach(nodeElement => {
+                // Add click listeners to localization nodes for details
+                nodeDetails.querySelectorAll('.localization-node').forEach(nodeElement => {
                     nodeElement.addEventListener('click', () => {
                         const nodeId = nodeElement.dataset.nodeId;
-                        const node = intersectionData.nodes.find(n => n.id === nodeId);
+                        const node = localizationData.nodes.find(n => n.id === nodeId);
                         if (node) {
                             this.selectNode(node);
                         }
@@ -1451,10 +1532,15 @@
                 });
             }
 
-            clearIntersectionResults() {
-                // Clear the intersection results and go back to normal view
+            clearLocalizationResults() {
+                // Clear the localization results and go back to normal view
                 this.selectedSensations.clear();
+                this.selectedMuscles.clear();
+                
                 document.querySelectorAll('.sensation-toggle').forEach(toggle => {
+                    toggle.classList.remove('active');
+                });
+                document.querySelectorAll('.muscle-toggle').forEach(toggle => {
                     toggle.classList.remove('active');
                 });
                 
@@ -1462,12 +1548,12 @@
                 document.getElementById('node-details-section').style.display = 'none';
                 
                 // Update status
-                const status = document.getElementById('intersection-status');
-                status.innerHTML = 'Select sensations to find intersections';
+                const status = document.getElementById('localization-status');
+                status.innerHTML = 'Select sensations and/or muscles to analyze';
                 status.style.color = '#666';
                 
                 // Update button state
-                this.updateIntersectionButton();
+                this.updateLocalizationButton();
                 
                 // Reload default graph view
                 this.loadDefaultGraph();
@@ -1502,7 +1588,7 @@
                     return;
                 }
 
-                // Group muscles by location (side -> region)
+                // Group muscles by location (location -> side)
                 const groupedMuscles = this.groupMusclesBySide(muscles);
                 
                 // Define side display names
@@ -1515,34 +1601,35 @@
                 
                 let html = '';
 
-                // Create hierarchical dropdowns: Side -> Region -> Muscles
-                Object.entries(groupedMuscles).forEach(([side, regions]) => {
-                    const totalMuscles = Object.values(regions).flat().length;
+                // Create hierarchical dropdowns: Location -> Side -> Muscles
+                Object.entries(groupedMuscles).forEach(([location, sides]) => {
+                    const totalMuscles = Object.values(sides).flat().length;
                     
                     html += `
                         <div class="muscle-group">
                             <div class="muscle-group-header" onclick="explorer.toggleDropdown(this)">
-                                ${sideNames[side] || this.formatText(side)} (${totalMuscles})
+                                ${this.formatText(location)} (${totalMuscles})
                             </div>
                             <div class="muscle-group-content" style="display: none;">
                     `;
                     
-                    // Sort regions alphabetically, but keep 'general' last
-                    const sortedRegions = Object.keys(regions).sort((a, b) => {
-                        if (a === 'general') return 1;
-                        if (b === 'general') return -1;
-                        return a.localeCompare(b);
+                    // Sort sides: left, right, bilateral, general
+                    const sortedSides = Object.keys(sides).sort((a, b) => {
+                        const sideOrder = ['left', 'right', 'bilateral', 'general'];
+                        const aIndex = sideOrder.indexOf(a);
+                        const bIndex = sideOrder.indexOf(b);
+                        return (aIndex === -1 ? 999 : aIndex) - (bIndex === -1 ? 999 : bIndex);
                     });
                     
-                    sortedRegions.forEach(region => {
-                        const regionMuscles = regions[region];
+                    sortedSides.forEach(side => {
+                        const sideMuscles = sides[side];
                         html += `
                             <div class="muscle-region">
                                 <div class="muscle-region-header" onclick="explorer.toggleDropdown(this)">
-                                    ${this.formatText(region)} (${regionMuscles.length})
+                                    ${sideNames[side] || this.formatText(side)} (${sideMuscles.length})
                                 </div>
                                 <div class="muscle-region-content" style="display: none;">
-                                    ${this.renderMuscleList(regionMuscles)}
+                                    ${this.renderMuscleList(sideMuscles)}
                                 </div>
                             </div>
                         `;
@@ -1576,26 +1663,26 @@
                     // Extract detailed location information
                     const locationInfo = this.extractMuscleLocation(props, name);
                     
-                    // Create hierarchical structure: Side -> Region -> Individual muscles
-                    if (!grouped[locationInfo.side]) {
-                        grouped[locationInfo.side] = {};
+                    // Create hierarchical structure: Location -> Side -> Individual muscles
+                    if (!grouped[locationInfo.region]) {
+                        grouped[locationInfo.region] = {};
                     }
-                    if (!grouped[locationInfo.side][locationInfo.region]) {
-                        grouped[locationInfo.side][locationInfo.region] = [];
+                    if (!grouped[locationInfo.region][locationInfo.side]) {
+                        grouped[locationInfo.region][locationInfo.side] = [];
                     }
                     
-                    grouped[locationInfo.side][locationInfo.region].push(muscle);
+                    grouped[locationInfo.region][locationInfo.side].push(muscle);
                 });
                 
                 // Remove empty groups
-                Object.keys(grouped).forEach(side => {
-                    Object.keys(grouped[side]).forEach(region => {
-                        if (grouped[side][region].length === 0) {
-                            delete grouped[side][region];
+                Object.keys(grouped).forEach(region => {
+                    Object.keys(grouped[region]).forEach(side => {
+                        if (grouped[region][side].length === 0) {
+                            delete grouped[region][side];
                         }
                     });
-                    if (Object.keys(grouped[side]).length === 0) {
-                        delete grouped[side];
+                    if (Object.keys(grouped[region]).length === 0) {
+                        delete grouped[region];
                     }
                 });
                 
@@ -1657,25 +1744,8 @@
                     toggleElement.classList.add('active');
                 }
                 
-                // Update muscle analysis button state
-                this.updateMuscleButton();
-            }
-
-            updateMuscleButton() {
-                const button = document.getElementById('analyze-muscles-btn');
-                const status = document.getElementById('muscle-status');
-                
-                if (this.selectedMuscles.size > 0) {
-                    button.disabled = false;
-                    button.style.opacity = '1';
-                    status.innerHTML = `${this.selectedMuscles.size} muscle(s) selected`;
-                    status.style.color = '#2d3748';
-                } else {
-                    button.disabled = true;
-                    button.style.opacity = '0.5';
-                    status.innerHTML = 'Select muscles to analyze';
-                    status.style.color = '#666';
-                }
+                // Update localization button state
+                this.updateLocalizationButton();
             }
 
             async analyzeMuscles() {
@@ -1744,6 +1814,122 @@
                 } catch (error) {
                     console.error('Error analyzing muscles:', error);
                     status.innerHTML = '❌ Error analyzing muscles';
+                    status.style.color = '#dc3545';
+                }
+            }
+
+            async localizeLesion() {
+                const hasSensations = this.selectedSensations.size > 0;
+                const hasMuscles = this.selectedMuscles.size > 0;
+                
+                if (!hasSensations && !hasMuscles) return;
+                
+                const status = document.getElementById('localization-status');
+                
+                try {
+                    status.innerHTML = '🎯 Localizing lesion...';
+                    status.style.color = '#2d3748';
+                    
+                    let combinedData = { nodes: [], links: [] };
+                    
+                    // Process sensations if selected
+                    if (hasSensations) {
+                        const sensationArray = Array.from(this.selectedSensations);
+                        const sensationResponse = await fetch('/api/sensations/intersections', {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({ sensations: sensationArray })
+                        });
+                        const sensationData = await sensationResponse.json();
+                        
+                        if (sensationData.nodes) {
+                            combinedData.nodes = [...combinedData.nodes, ...sensationData.nodes];
+                            combinedData.links = [...combinedData.links, ...sensationData.links];
+                        }
+                    }
+                    
+                    // Process muscles if selected
+                    if (hasMuscles) {
+                        const muscleArray = Array.from(this.selectedMuscles);
+                        const muscleResponse = await fetch('/api/graph?label=muscle&limit=200');
+                        const muscleData = await muscleResponse.json();
+                        
+                        // Filter to only show selected muscles and their connections
+                        const muscleNodes = muscleData.nodes.filter(node => 
+                            node.labels.includes('muscle') && 
+                            muscleArray.includes(node.properties.name || node.id) ||
+                            !node.labels.includes('muscle')
+                        );
+                        
+                        const selectedMuscleIds = new Set(
+                            muscleNodes
+                                .filter(node => node.labels.includes('muscle') && 
+                                       muscleArray.includes(node.properties.name || node.id))
+                                .map(node => node.id)
+                        );
+                        
+                        const muscleLinks = muscleData.links.filter(link =>
+                            selectedMuscleIds.has(link.source) || selectedMuscleIds.has(link.target)
+                        );
+                        
+                        combinedData.nodes = [...combinedData.nodes, ...muscleNodes];
+                        combinedData.links = [...combinedData.links, ...muscleLinks];
+                    }
+                    
+                    // Remove duplicate nodes and links
+                    const uniqueNodes = combinedData.nodes.filter((node, index, self) => 
+                        index === self.findIndex(n => n.id === node.id)
+                    );
+                    
+                    const uniqueLinks = combinedData.links.filter((link, index, self) => 
+                        index === self.findIndex(l => l.source === link.source && l.target === link.target)
+                    );
+                    
+                    const finalData = { nodes: uniqueNodes, links: uniqueLinks };
+                    
+                    if (finalData.nodes.length > 0) {
+                        // Clear any existing filters to show pure localization results
+                        this.selectedLabel = null;
+                        this.selectedRelationships.clear();
+                        
+                        // Update filter UI to reflect cleared state
+                        document.querySelectorAll('.label-item').forEach(item => {
+                            item.classList.remove('active');
+                        });
+                        document.querySelectorAll('.relationship-item').forEach(item => {
+                            item.classList.remove('active');
+                        });
+                        
+                        // Render the combined localization graph
+                        this.renderGraph(finalData);
+                        
+                        // Create detailed status message
+                        const nodeTypes = {};
+                        finalData.nodes.forEach(node => {
+                            const label = node.labels[0] || 'Unknown';
+                            nodeTypes[label] = (nodeTypes[label] || 0) + 1;
+                        });
+                        
+                        const typeBreakdown = Object.entries(nodeTypes)
+                            .map(([type, count]) => `${count} ${type}${count > 1 ? 's' : ''}`)
+                            .join(', ');
+                        
+                        status.innerHTML = `✅ Lesion localized: ${finalData.nodes.length} anatomical structures identified (${typeBreakdown})`;
+                        status.style.color = '#059669';
+                        
+                        // Update filter status
+                        this.updateFilterStatus();
+                        
+                        // Show detailed results
+                        this.showLocalizationDetails(finalData, hasSensations, hasMuscles);
+                        
+                    } else {
+                        status.innerHTML = '❌ No anatomical connections found for selected items';
+                        status.style.color = '#dc3545';
+                    }
+                } catch (error) {
+                    console.error('Error localizing lesion:', error);
+                    status.innerHTML = '❌ Error during lesion localization';
                     status.style.color = '#dc3545';
                 }
             }
@@ -1922,18 +2108,12 @@
 
                 // Update status indicators
                 this.updateFilterStatus();
-                this.updateIntersectionButton();
-                this.updateMuscleButton();
+                this.updateLocalizationButton();
 
-                // Clear intersection status
-                const intersectionStatus = document.getElementById('intersection-status');
-                intersectionStatus.innerHTML = 'Select sensations to find intersections';
-                intersectionStatus.style.color = '#666';
-
-                // Clear muscle status
-                const muscleStatus = document.getElementById('muscle-status');
-                muscleStatus.innerHTML = 'Select muscles to analyze';
-                muscleStatus.style.color = '#666';
+                // Clear localization status
+                const localizationStatus = document.getElementById('localization-status');
+                localizationStatus.innerHTML = 'Select sensations and/or muscles to analyze';
+                localizationStatus.style.color = '#666';
 
                 // Reload graph data without filters
                 await this.loadGraphData();
@@ -1978,18 +2158,12 @@
 
                 // Reset status indicators
                 this.updateFilterStatus();
-                this.updateIntersectionButton();
-                this.updateMuscleButton();
+                this.updateLocalizationButton();
 
-                // Clear intersection status
-                const intersectionStatus = document.getElementById('intersection-status');
-                intersectionStatus.innerHTML = 'Select sensations to find intersections';
-                intersectionStatus.style.color = '#666';
-
-                // Clear muscle status
-                const muscleStatus = document.getElementById('muscle-status');
-                muscleStatus.innerHTML = 'Select muscles to analyze';
-                muscleStatus.style.color = '#666';
+                // Clear localization status
+                const localizationStatus = document.getElementById('localization-status');
+                localizationStatus.innerHTML = 'Select sensations and/or muscles to analyze';
+                localizationStatus.style.color = '#666';
 
                 // Reset layout to force layout
                 this.currentLayout = 'force';
@@ -2555,14 +2729,9 @@
                     this.applyLayout();
                 });
 
-                // Find intersections button
-                document.getElementById('find-intersections-btn').addEventListener('click', () => {
-                    this.findIntersections();
-                });
-
-                // Analyze muscles button
-                document.getElementById('analyze-muscles-btn').addEventListener('click', () => {
-                    this.analyzeMuscles();
+                // Localize lesion button (combines sensation and muscle analysis)
+                document.getElementById('localize-lesion-btn').addEventListener('click', () => {
+                    this.localizeLesion();
                 });
             }
 
