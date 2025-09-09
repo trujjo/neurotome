@@ -232,8 +232,9 @@ def get_graph_data():
             rel_type_conditions = ' OR '.join([f'type(r) = "{rel_type}"' for rel_type in rel_types])
             
             if label_filter:
+                # Modified query: Only show connections between nodes of the same label
                 query = f"""
-                MATCH (n:`{label_filter}`)-[r]-(m)
+                MATCH (n:`{label_filter}`)-[r]-(m:`{label_filter}`)
                 WHERE {rel_type_conditions}
                 RETURN n, r, m
                 LIMIT {limit}
@@ -246,8 +247,9 @@ def get_graph_data():
                 LIMIT {limit}
                 """
         elif label_filter:
+            # Modified query: Only show connections between nodes of the same label
             query = f"""
-            MATCH (n:`{label_filter}`)-[r]-(m)
+            MATCH (n:`{label_filter}`)-[r]-(m:`{label_filter}`)
             RETURN n, r, m
             LIMIT {limit}
             """
@@ -471,6 +473,238 @@ def find_sensation_intersections():
             "nodes": list(nodes.values()),
             "links": links
         })
+
+# API endpoint for advanced lesion localization with pathfinding
+@app.route("/api/localize-lesion", methods=["POST"])
+def localize_lesion():
+    data = request.get_json()
+    sensations = data.get('sensations', [])
+    muscles = data.get('muscles', [])
+    
+    # Combine sensations and muscles
+    selected_items = sensations + muscles
+    
+    if len(selected_items) < 2:
+        return jsonify({
+            "error": "At least 2 items (sensations/muscles) required for localization",
+            "paths": [],
+            "hub": None
+        }), 400
+    
+    with driver.session() as session:
+        try:
+            # Build the dynamic query based on selected items
+            # Create the WITH clause for selected nodes
+            selected_nodes_conditions = []
+            params = {}
+            
+            for i, item in enumerate(selected_items):
+                param_name = f"item_{i}"
+                selected_nodes_conditions.append(f"n.name = ${param_name}")
+                params[param_name] = item
+            
+            where_clause = " OR ".join(selected_nodes_conditions)
+            
+            # Build the dynamic query
+            query = f"""
+            // 1) Get the selected nodes (sensations and muscles)
+            MATCH (n)
+            WHERE ({where_clause}) AND NOT n:artery
+            WITH collect(n) AS picks
+            WHERE size(picks) >= {len(selected_items)}
+            """
+            
+            # Add dynamic path finding based on number of selected items
+            if len(selected_items) == 2:
+                query += """
+                WITH picks[0] AS a, picks[1] AS b
+                WHERE a <> b
+                
+                // 2) Try to find the best meeting hub (exclude artery hubs)
+                CALL {
+                WITH a, b
+                MATCH (m)
+                WHERE m <> a AND m <> b AND NOT m:artery
+                MATCH p1 = shortestPath((a)-[*..300]-(m))
+                MATCH p2 = shortestPath((b)-[*..300]-(m))
+                WITH p1, p2, m, length(p1) + length(p2) AS totalLen
+                ORDER BY totalLen ASC
+                RETURN p1, p2, m AS hub, totalLen
+                LIMIT 1
+                }
+                
+                // 3) Return results
+                RETURN
+                CASE WHEN p1 IS NULL OR p2 IS NULL
+                THEN null ELSE p1 END AS p1,
+                CASE WHEN p1 IS NULL OR p2 IS NULL
+                THEN null ELSE p2 END AS p2,
+                null AS p3,
+                CASE WHEN p1 IS NULL OR p2 IS NULL
+                THEN null ELSE hub END AS hub,
+                CASE WHEN p1 IS NULL OR p2 IS NULL
+                THEN a ELSE null END AS a_only,
+                CASE WHEN p1 IS NULL OR p2 IS NULL
+                THEN b ELSE null END AS b_only,
+                null AS c_only,
+                CASE WHEN p1 IS NULL OR p2 IS NULL
+                THEN 0 ELSE totalLen END AS totalLen
+                """
+            elif len(selected_items) == 3:
+                query += """
+                WITH picks[0] AS a, picks[1] AS b, picks[2] AS c
+                WHERE a <> b AND a <> c AND b <> c
+                
+                // 2) Try to find the best meeting hub (exclude artery hubs)
+                CALL {
+                WITH a, b, c
+                MATCH (m)
+                WHERE m <> a AND m <> b AND m <> c AND NOT m:artery
+                MATCH p1 = shortestPath((a)-[*..300]-(m))
+                MATCH p2 = shortestPath((b)-[*..300]-(m))
+                MATCH p3 = shortestPath((c)-[*..300]-(m))
+                WITH p1, p2, p3, m, length(p1) + length(p2) + length(p3) AS totalLen
+                ORDER BY totalLen ASC
+                RETURN p1, p2, p3, m AS hub, totalLen
+                LIMIT 1
+                }
+                
+                // 3) Return results
+                RETURN
+                CASE WHEN p1 IS NULL OR p2 IS NULL OR p3 IS NULL
+                THEN null ELSE p1 END AS p1,
+                CASE WHEN p1 IS NULL OR p2 IS NULL OR p3 IS NULL
+                THEN null ELSE p2 END AS p2,
+                CASE WHEN p1 IS NULL OR p2 IS NULL OR p3 IS NULL
+                THEN null ELSE p3 END AS p3,
+                CASE WHEN p1 IS NULL OR p2 IS NULL OR p3 IS NULL
+                THEN null ELSE hub END AS hub,
+                CASE WHEN p1 IS NULL OR p2 IS NULL OR p3 IS NULL
+                THEN a ELSE null END AS a_only,
+                CASE WHEN p1 IS NULL OR p2 IS NULL OR p3 IS NULL
+                THEN b ELSE null END AS b_only,
+                CASE WHEN p1 IS NULL OR p2 IS NULL OR p3 IS NULL
+                THEN c ELSE null END AS c_only,
+                CASE WHEN p1 IS NULL OR p2 IS NULL OR p3 IS NULL
+                THEN 0 ELSE totalLen END AS totalLen
+                """
+            else:  # 4 or more items
+                query += f"""
+                WITH picks[0..{min(4, len(selected_items))-1}] AS selectedPicks
+                WITH selectedPicks[0] AS a, selectedPicks[1] AS b, selectedPicks[2] AS c, 
+                     CASE WHEN size(selectedPicks) > 3 THEN selectedPicks[3] ELSE null END AS d
+                WHERE a <> b AND a <> c AND b <> c AND (d IS NULL OR (a <> d AND b <> d AND c <> d))
+                
+                // 2) Try to find the best meeting hub (exclude artery hubs)
+                CALL {{
+                WITH a, b, c, d
+                MATCH (m)
+                WHERE m <> a AND m <> b AND m <> c AND (d IS NULL OR m <> d) AND NOT m:artery
+                MATCH p1 = shortestPath((a)-[*..300]-(m))
+                MATCH p2 = shortestPath((b)-[*..300]-(m))
+                MATCH p3 = shortestPath((c)-[*..300]-(m))
+                OPTIONAL MATCH p4 = CASE WHEN d IS NOT NULL THEN shortestPath((d)-[*..300]-(m)) ELSE null END
+                WITH p1, p2, p3, p4, m, 
+                     length(p1) + length(p2) + length(p3) + CASE WHEN p4 IS NOT NULL THEN length(p4) ELSE 0 END AS totalLen
+                ORDER BY totalLen ASC
+                RETURN p1, p2, p3, p4, m AS hub, totalLen
+                LIMIT 1
+                }}
+                
+                // 3) Return results
+                RETURN
+                CASE WHEN p1 IS NULL OR p2 IS NULL OR p3 IS NULL
+                THEN null ELSE p1 END AS p1,
+                CASE WHEN p1 IS NULL OR p2 IS NULL OR p3 IS NULL
+                THEN null ELSE p2 END AS p2,
+                CASE WHEN p1 IS NULL OR p2 IS NULL OR p3 IS NULL
+                THEN null ELSE p3 END AS p3,
+                CASE WHEN p1 IS NULL OR p2 IS NULL OR p3 IS NULL
+                THEN null ELSE hub END AS hub,
+                CASE WHEN p1 IS NULL OR p2 IS NULL OR p3 IS NULL
+                THEN a ELSE null END AS a_only,
+                CASE WHEN p1 IS NULL OR p2 IS NULL OR p3 IS NULL
+                THEN b ELSE null END AS b_only,
+                CASE WHEN p1 IS NULL OR p2 IS NULL OR p3 IS NULL
+                THEN c ELSE null END AS c_only,
+                CASE WHEN p1 IS NULL OR p2 IS NULL OR p3 IS NULL
+                THEN 0 ELSE totalLen END AS totalLen,
+                p4
+                """
+            
+            result = session.run(query, params)
+            record = result.single()
+            
+            if record:
+                # Extract paths and nodes
+                paths = []
+                all_nodes = {}
+                all_links = []
+                
+                # Process each path
+                for path_key in ['p1', 'p2', 'p3', 'p4']:
+                    path = record.get(path_key)
+                    if path:
+                        path_nodes = []
+                        for i, node in enumerate(path.nodes):
+                            node_id = node.element_id
+                            node_data = {
+                                "id": node_id,
+                                "labels": list(node.labels),
+                                "properties": dict(node),
+                                "name": dict(node).get("name", f"Node {node_id}"),
+                                "color": "orange" if i == 0 or i == len(path.nodes)-1 else "lightblue"
+                            }
+                            all_nodes[node_id] = node_data
+                            path_nodes.append(node_id)
+                        
+                        # Add relationships
+                        for rel in path.relationships:
+                            all_links.append({
+                                "source": rel.start_node.element_id,
+                                "target": rel.end_node.element_id,
+                                "type": type(rel).__name__,
+                                "properties": dict(rel)
+                            })
+                        
+                        paths.append(path_nodes)
+                
+                # Highlight hub if found
+                hub = record.get('hub')
+                if hub:
+                    hub_id = hub.element_id
+                    if hub_id in all_nodes:
+                        all_nodes[hub_id]["color"] = "red"
+                        all_nodes[hub_id]["isHub"] = True
+                
+                return jsonify({
+                    "paths": paths,
+                    "hub": hub.element_id if hub else None,
+                    "nodes": list(all_nodes.values()),
+                    "links": all_links,
+                    "totalLength": record.get('totalLen', 0),
+                    "found": len(paths) > 0
+                })
+            else:
+                return jsonify({
+                    "paths": [],
+                    "hub": None,
+                    "nodes": [],
+                    "links": [],
+                    "totalLength": 0,
+                    "found": False,
+                    "message": "No pathways found between selected items"
+                })
+                
+        except Exception as e:
+            return jsonify({
+                "error": f"Error in lesion localization: {str(e)}",
+                "paths": [],
+                "hub": None,
+                "nodes": [],
+                "links": [],
+                "found": False
+            }), 500
 
 @app.route("/")
 def index():

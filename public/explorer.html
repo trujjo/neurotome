@@ -906,7 +906,7 @@
             </div>
             <div id="graph-container">
                 <div class="loading" id="graph-loading">
-                    <div>Loading graph data...</div>
+                    <div>Select labels or run localization to see data</div>
                 </div>
             </div>
         </div>
@@ -922,7 +922,7 @@
                 <!-- Sensation Analysis Subsection -->
                 <div class="analysis-subsection">
                     <h4 style="color: #FF9800; margin: 1rem 0 0.5rem 0; cursor: pointer;" onclick="explorer.toggleDropdown(this)">🔸 Sensations</h4>
-                    <div class="sensation-toggles" id="sensation-toggles" style="display: block;">
+                    <div class="sensation-toggles" id="sensation-toggles" style="display: none;">
                         <div class="loading">Loading sensations...</div>
                     </div>
                 </div>
@@ -930,7 +930,7 @@
                 <!-- Muscle Analysis Subsection -->
                 <div class="analysis-subsection">
                     <h4 style="color: #4CAF50; margin: 1rem 0 0.5rem 0; cursor: pointer;" onclick="explorer.toggleDropdown(this)">🔸 Muscles</h4>
-                    <div class="muscle-toggles" id="muscle-toggles" style="display: block;">
+                    <div class="muscle-toggles" id="muscle-toggles" style="display: none;">
                         <div class="loading">Loading muscles...</div>
                     </div>
                 </div>
@@ -1824,70 +1824,40 @@
                 
                 if (!hasSensations && !hasMuscles) return;
                 
+                const totalSelected = this.selectedSensations.size + this.selectedMuscles.size;
+                if (totalSelected < 2) {
+                    const status = document.getElementById('localization-status');
+                    status.innerHTML = '⚠️ Please select at least 2 items (sensations/muscles) for lesion localization';
+                    status.style.color = '#f59e0b';
+                    return;
+                }
+                
                 const status = document.getElementById('localization-status');
                 
                 try {
-                    status.innerHTML = '🎯 Localizing lesion...';
+                    status.innerHTML = '🎯 Localizing lesion using advanced pathfinding...';
                     status.style.color = '#2d3748';
                     
-                    let combinedData = { nodes: [], links: [] };
+                    // Prepare the data for the new API endpoint
+                    const sensationArray = Array.from(this.selectedSensations);
+                    const muscleArray = Array.from(this.selectedMuscles);
                     
-                    // Process sensations if selected
-                    if (hasSensations) {
-                        const sensationArray = Array.from(this.selectedSensations);
-                        const sensationResponse = await fetch('/api/sensations/intersections', {
-                            method: 'POST',
-                            headers: { 'Content-Type': 'application/json' },
-                            body: JSON.stringify({ sensations: sensationArray })
-                        });
-                        const sensationData = await sensationResponse.json();
-                        
-                        if (sensationData.nodes) {
-                            combinedData.nodes = [...combinedData.nodes, ...sensationData.nodes];
-                            combinedData.links = [...combinedData.links, ...sensationData.links];
-                        }
+                    const response = await fetch('/api/localize-lesion', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ 
+                            sensations: sensationArray,
+                            muscles: muscleArray 
+                        })
+                    });
+                    
+                    if (!response.ok) {
+                        throw new Error(`HTTP ${response.status}: ${response.statusText}`);
                     }
                     
-                    // Process muscles if selected
-                    if (hasMuscles) {
-                        const muscleArray = Array.from(this.selectedMuscles);
-                        const muscleResponse = await fetch('/api/graph?label=muscle&limit=200');
-                        const muscleData = await muscleResponse.json();
-                        
-                        // Filter to only show selected muscles and their connections
-                        const muscleNodes = muscleData.nodes.filter(node => 
-                            node.labels.includes('muscle') && 
-                            muscleArray.includes(node.properties.name || node.id) ||
-                            !node.labels.includes('muscle')
-                        );
-                        
-                        const selectedMuscleIds = new Set(
-                            muscleNodes
-                                .filter(node => node.labels.includes('muscle') && 
-                                       muscleArray.includes(node.properties.name || node.id))
-                                .map(node => node.id)
-                        );
-                        
-                        const muscleLinks = muscleData.links.filter(link =>
-                            selectedMuscleIds.has(link.source) || selectedMuscleIds.has(link.target)
-                        );
-                        
-                        combinedData.nodes = [...combinedData.nodes, ...muscleNodes];
-                        combinedData.links = [...combinedData.links, ...muscleLinks];
-                    }
+                    const data = await response.json();
                     
-                    // Remove duplicate nodes and links
-                    const uniqueNodes = combinedData.nodes.filter((node, index, self) => 
-                        index === self.findIndex(n => n.id === node.id)
-                    );
-                    
-                    const uniqueLinks = combinedData.links.filter((link, index, self) => 
-                        index === self.findIndex(l => l.source === link.source && l.target === link.target)
-                    );
-                    
-                    const finalData = { nodes: uniqueNodes, links: uniqueLinks };
-                    
-                    if (finalData.nodes.length > 0) {
+                    if (data.found && data.nodes.length > 0) {
                         // Clear any existing filters to show pure localization results
                         this.selectedLabel = null;
                         this.selectedRelationships.clear();
@@ -1900,12 +1870,12 @@
                             item.classList.remove('active');
                         });
                         
-                        // Render the combined localization graph
-                        this.renderGraph(finalData);
+                        // Render the fresh pathfinding results
+                        this.renderGraph(data);
                         
                         // Create detailed status message
                         const nodeTypes = {};
-                        finalData.nodes.forEach(node => {
+                        data.nodes.forEach(node => {
                             const label = node.labels[0] || 'Unknown';
                             nodeTypes[label] = (nodeTypes[label] || 0) + 1;
                         });
@@ -1914,23 +1884,82 @@
                             .map(([type, count]) => `${count} ${type}${count > 1 ? 's' : ''}`)
                             .join(', ');
                         
-                        status.innerHTML = `✅ Lesion localized: ${finalData.nodes.length} anatomical structures identified (${typeBreakdown})`;
+                        let statusMessage = `✅ Lesion localized: ${data.paths.length} pathway(s) found`;
+                        if (data.hub) {
+                            statusMessage += ` with common hub`;
+                        }
+                        statusMessage += ` (${data.nodes.length} anatomical structures: ${typeBreakdown})`;
+                        
+                        if (data.totalLength > 0) {
+                            statusMessage += ` - Total pathway length: ${data.totalLength}`;
+                        }
+                        
+                        status.innerHTML = statusMessage;
                         status.style.color = '#059669';
                         
                         // Update filter status
                         this.updateFilterStatus();
                         
                         // Show detailed results
-                        this.showLocalizationDetails(finalData, hasSensations, hasMuscles);
+                        this.showPathfindingDetails(data, sensationArray, muscleArray);
                         
                     } else {
-                        status.innerHTML = '❌ No anatomical connections found for selected items';
-                        status.style.color = '#dc3545';
+                        // Fallback to showing just the selected items
+                        const selectedItems = [...sensationArray, ...muscleArray];
+                        status.innerHTML = `⚠️ No connecting pathways found. Showing selected items only (${selectedItems.length} items)`;
+                        status.style.color = '#f59e0b';
+                        
+                        // Show just the selected sensations/muscles as individual nodes
+                        await this.showSelectedItemsOnly(sensationArray, muscleArray);
                     }
                 } catch (error) {
                     console.error('Error localizing lesion:', error);
-                    status.innerHTML = '❌ Error during lesion localization';
+                    status.innerHTML = `❌ Error during lesion localization: ${error.message}`;
                     status.style.color = '#dc3545';
+                }
+            }
+
+            showPathfindingDetails(data, sensations, muscles) {
+                // This function can be used to display detailed pathfinding results
+                // in the details panel if needed in the future
+                console.log('Pathfinding results:', {
+                    paths: data.paths,
+                    hub: data.hub,
+                    totalLength: data.totalLength,
+                    selectedSensations: sensations,
+                    selectedMuscles: muscles
+                });
+            }
+
+            async showSelectedItemsOnly(sensations, muscles) {
+                // Fallback function to show just the selected items when no pathways are found
+                try {
+                    const allSelected = [...sensations, ...muscles];
+                    const nodes = [];
+                    const links = [];
+                    
+                    // Fetch individual nodes for selected items
+                    for (const item of allSelected) {
+                        try {
+                            // Try to find the node by name
+                            const response = await fetch(`/api/search?q=${encodeURIComponent(item)}&limit=1`);
+                            const searchData = await response.json();
+                            
+                            if (searchData.nodes && searchData.nodes.length > 0) {
+                                const node = searchData.nodes[0];
+                                node.color = sensations.includes(item) ? '#FF9800' : '#4CAF50';
+                                nodes.push(node);
+                            }
+                        } catch (error) {
+                            console.warn(`Could not find node for: ${item}`);
+                        }
+                    }
+                    
+                    if (nodes.length > 0) {
+                        this.renderGraph({ nodes, links });
+                    }
+                } catch (error) {
+                    console.error('Error showing selected items:', error);
                 }
             }
 
@@ -2115,8 +2144,24 @@
                 localizationStatus.innerHTML = 'Select sensations and/or muscles to analyze';
                 localizationStatus.style.color = '#666';
 
-                // Reload graph data without filters
-                await this.loadGraphData();
+                // Clear the graph instead of loading default data
+                if (this.svg) {
+                    this.svg.select('g').selectAll('*').remove();
+                    
+                    // Show a message indicating filters were cleared
+                    const width = this.svg.attr('width');
+                    const height = this.svg.attr('height');
+                    
+                    this.svg.select('g').append('text')
+                        .attr('x', width / 2)
+                        .attr('y', height / 2)
+                        .attr('text-anchor', 'middle')
+                        .attr('dominant-baseline', 'middle')
+                        .style('font-size', '18px')
+                        .style('fill', '#666')
+                        .style('font-family', 'Inter, sans-serif')
+                        .text('Filters cleared - Select labels or run localization to see data');
+                }
             }
 
             async refreshAndReset() {
@@ -2181,18 +2226,25 @@
                 }
 
                 // Show loading indicator
-                document.getElementById('graph-loading').style.display = 'block';
-
-                // Load fresh default graph data
-                try {
-                    const response = await fetch('/api/graph?limit=50');
-                    const data = await response.json();
-                    this.renderGraph(data);
-                } catch (error) {
-                    console.error('Error loading fresh graph data:', error);
-                } finally {
-                    document.getElementById('graph-loading').style.display = 'none';
+                document.getElementById('graph-loading').style.display = 'none';
+                
+                // Show a message indicating the graph has been cleared
+                if (this.svg) {
+                    const width = this.svg.attr('width');
+                    const height = this.svg.attr('height');
+                    
+                    this.svg.select('g').append('text')
+                        .attr('x', width / 2)
+                        .attr('y', height / 2)
+                        .attr('text-anchor', 'middle')
+                        .attr('dominant-baseline', 'middle')
+                        .style('font-size', '18px')
+                        .style('fill', '#666')
+                        .style('font-family', 'Inter, sans-serif')
+                        .text('Graph cleared - Select labels or run localization to see data');
                 }
+
+                console.log('Graph completely cleared - all nodes and relationships removed');
             }
 
             updateFilterStatus() {
