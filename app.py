@@ -511,6 +511,7 @@ def localize_lesion():
             WITH collect(s) AS sources, size(names) AS total
 
             // Expand 1..6 hops from each source and record min distance to each candidate m
+            // Only follow downstream (outgoing) relationships from sources
             UNWIND sources AS src
             MATCH p = (src)-[*1..6]->(m)
             WITH m, src, min(length(p)) AS d, sources, total
@@ -540,6 +541,7 @@ def localize_lesion():
                           collect(DISTINCT r_between) AS en_edges
 
             // Shortest paths (<=6) from each source to each earliest node
+            // Only follow downstream (outgoing) paths from sources
             UNWIND earliest_nodes AS target
             UNWIND sources AS src
             OPTIONAL MATCH p = shortestPath( (src)-[*..6]->(target) )
@@ -618,7 +620,8 @@ def localize_lesion():
                             "source": start_id,
                             "target": end_id,
                             "type": type(rel).__name__,
-                            "properties": dict(rel)
+                            "properties": dict(rel),
+                            "directed": True  # Mark as directed for arrow display
                         })
                         
                         # Ensure start_node is in the nodes list

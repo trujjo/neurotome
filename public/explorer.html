@@ -2375,7 +2375,8 @@
                 const link = g.selectAll('.link')
                     .data(data.links)
                     .enter().append('line')
-                    .attr('class', 'link');
+                    .attr('class', 'link')
+                    .attr('marker-end', d => d.directed ? 'url(#arrow)' : null);
 
                 // Add relationship labels
                 const linkLabels = g.selectAll('.link-label')
