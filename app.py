@@ -488,221 +488,214 @@ def localize_lesion():
         return jsonify({
             "error": "At least 2 items (sensations/muscles) required for localization",
             "paths": [],
-            "hub": None
+            "hub": None,
+            "nodes": [],
+            "links": [],
+            "earliest_nodes": [],
+            "totalLength": 0,
+            "found": False
         }), 400
     
     with driver.session() as session:
         try:
-            # Build the dynamic query based on selected items
-            # Create the WITH clause for selected nodes
-            selected_nodes_conditions = []
-            params = {}
+            # Create parameters for the selected item names
+            params = {"names": selected_items}
             
-            for i, item in enumerate(selected_items):
-                param_name = f"item_{i}"
-                selected_nodes_conditions.append(f"n.name = ${param_name}")
-                params[param_name] = item
-            
-            where_clause = " OR ".join(selected_nodes_conditions)
-            
-            # Build the dynamic query
-            query = f"""
-            // 1) Get the selected nodes (sensations and muscles)
-            MATCH (n)
-            WHERE ({where_clause}) AND NOT n:artery
-            WITH collect(n) AS picks
-            WHERE size(picks) >= {len(selected_items)}
+            # Build the query following the original pattern
+            query = """
+            WITH $names AS names
+
+            // Gather sources
+            MATCH (s)
+            WHERE s.name IN names
+            WITH collect(s) AS sources, size(names) AS total
+
+            // Expand 1..6 hops from each source and record min distance to each candidate m
+            UNWIND sources AS src
+            MATCH p = (src)-[*1..6]->(m)
+            WITH m, src, min(length(p)) AS d, sources, total
+            WITH m, collect(d) AS dists, sources, total
+            WHERE size(dists) = total
+
+            // Earliest layer = minimal max distance across sources
+            WITH m, sources,
+                 reduce(mx = -1, d IN dists | CASE WHEN d > mx THEN d ELSE mx END) AS layer
+            ORDER BY layer ASC
+            WITH collect({m:m, layer:layer}) AS hits, sources
+
+            // Earliest layer value
+            WITH hits, sources,
+                 reduce(minL = 999999, h IN hits | CASE WHEN h.layer < minL THEN h.layer ELSE minL END) AS earliest
+
+            // Nodes in the earliest layer
+            WITH sources, [h IN hits WHERE h.layer = earliest | h.m] AS earliest_nodes
+
+            // Relationships among earliest nodes (induced subgraph)
+            UNWIND earliest_nodes AS en1
+            UNWIND earliest_nodes AS en2
+            WITH DISTINCT earliest_nodes, sources, en1
+            OPTIONAL MATCH (en1)-[r_between]->(en2)
+            WITH DISTINCT earliest_nodes, sources,
+                          collect(DISTINCT en1) AS en_nodes,
+                          collect(DISTINCT r_between) AS en_edges
+
+            // Shortest paths (<=6) from each source to each earliest node
+            UNWIND earliest_nodes AS target
+            UNWIND sources AS src
+            OPTIONAL MATCH p = shortestPath( (src)-[*..6]->(target) )
+            WITH earliest_nodes, en_nodes, en_edges, collect(p) AS paths
+
+            // Flatten and dedupe without APOC
+            WITH earliest_nodes, en_nodes, en_edges,
+                 [x IN paths WHERE x IS NOT NULL] AS paths2
+            WITH earliest_nodes, en_nodes, en_edges,
+                 reduce(ns = [], p IN paths2 | ns + nodes(p)) AS path_nodes,
+                 reduce(rs = [], p IN paths2 | rs + relationships(p)) AS path_rels
+            WITH earliest_nodes, en_nodes + path_nodes AS all_nodes_list,
+                 en_edges + path_rels AS all_rels_list
+            WITH earliest_nodes, [n IN all_nodes_list WHERE n IS NOT NULL] AS all_nodes_list,
+                 [r IN all_rels_list  WHERE r IS NOT NULL] AS all_rels_list
+            WITH earliest_nodes,
+              reduce(seen = [], n IN all_nodes_list |
+                CASE WHEN any(x IN seen WHERE id(x) = id(n)) THEN seen ELSE seen + n END) AS all_nodes,
+              reduce(seenr = [], r IN all_rels_list |
+                CASE WHEN any(x IN seenr WHERE id(x) = id(r)) THEN seenr ELSE seenr + r END) AS all_rels
+            RETURN all_nodes AS nodes, all_rels AS relationships, earliest_nodes
             """
-            
-            # Add dynamic path finding based on number of selected items
-            if len(selected_items) == 2:
-                query += """
-                WITH picks[0] AS a, picks[1] AS b
-                WHERE a <> b
-                
-                // 2) Try to find the best meeting hub (exclude artery hubs)
-                CALL {
-                WITH a, b
-                MATCH (m)
-                WHERE m <> a AND m <> b AND NOT m:artery
-                MATCH p1 = shortestPath((a)-[*..300]-(m))
-                MATCH p2 = shortestPath((b)-[*..300]-(m))
-                WITH p1, p2, m, length(p1) + length(p2) AS totalLen
-                ORDER BY totalLen ASC
-                RETURN p1, p2, m AS hub, totalLen
-                LIMIT 1
-                }
-                
-                // 3) Return results
-                RETURN
-                CASE WHEN p1 IS NULL OR p2 IS NULL
-                THEN null ELSE p1 END AS p1,
-                CASE WHEN p1 IS NULL OR p2 IS NULL
-                THEN null ELSE p2 END AS p2,
-                null AS p3,
-                CASE WHEN p1 IS NULL OR p2 IS NULL
-                THEN null ELSE hub END AS hub,
-                CASE WHEN p1 IS NULL OR p2 IS NULL
-                THEN a ELSE null END AS a_only,
-                CASE WHEN p1 IS NULL OR p2 IS NULL
-                THEN b ELSE null END AS b_only,
-                null AS c_only,
-                CASE WHEN p1 IS NULL OR p2 IS NULL
-                THEN 0 ELSE totalLen END AS totalLen
-                """
-            elif len(selected_items) == 3:
-                query += """
-                WITH picks[0] AS a, picks[1] AS b, picks[2] AS c
-                WHERE a <> b AND a <> c AND b <> c
-                
-                // 2) Try to find the best meeting hub (exclude artery hubs)
-                CALL {
-                WITH a, b, c
-                MATCH (m)
-                WHERE m <> a AND m <> b AND m <> c AND NOT m:artery
-                MATCH p1 = shortestPath((a)-[*..300]-(m))
-                MATCH p2 = shortestPath((b)-[*..300]-(m))
-                MATCH p3 = shortestPath((c)-[*..300]-(m))
-                WITH p1, p2, p3, m, length(p1) + length(p2) + length(p3) AS totalLen
-                ORDER BY totalLen ASC
-                RETURN p1, p2, p3, m AS hub, totalLen
-                LIMIT 1
-                }
-                
-                // 3) Return results
-                RETURN
-                CASE WHEN p1 IS NULL OR p2 IS NULL OR p3 IS NULL
-                THEN null ELSE p1 END AS p1,
-                CASE WHEN p1 IS NULL OR p2 IS NULL OR p3 IS NULL
-                THEN null ELSE p2 END AS p2,
-                CASE WHEN p1 IS NULL OR p2 IS NULL OR p3 IS NULL
-                THEN null ELSE p3 END AS p3,
-                CASE WHEN p1 IS NULL OR p2 IS NULL OR p3 IS NULL
-                THEN null ELSE hub END AS hub,
-                CASE WHEN p1 IS NULL OR p2 IS NULL OR p3 IS NULL
-                THEN a ELSE null END AS a_only,
-                CASE WHEN p1 IS NULL OR p2 IS NULL OR p3 IS NULL
-                THEN b ELSE null END AS b_only,
-                CASE WHEN p1 IS NULL OR p2 IS NULL OR p3 IS NULL
-                THEN c ELSE null END AS c_only,
-                CASE WHEN p1 IS NULL OR p2 IS NULL OR p3 IS NULL
-                THEN 0 ELSE totalLen END AS totalLen
-                """
-            else:  # 4 or more items
-                query += f"""
-                WITH picks[0..{min(4, len(selected_items))-1}] AS selectedPicks
-                WITH selectedPicks[0] AS a, selectedPicks[1] AS b, selectedPicks[2] AS c, 
-                     CASE WHEN size(selectedPicks) > 3 THEN selectedPicks[3] ELSE null END AS d
-                WHERE a <> b AND a <> c AND b <> c AND (d IS NULL OR (a <> d AND b <> d AND c <> d))
-                
-                // 2) Try to find the best meeting hub (exclude artery hubs)
-                CALL {{
-                WITH a, b, c, d
-                MATCH (m)
-                WHERE m <> a AND m <> b AND m <> c AND (d IS NULL OR m <> d) AND NOT m:artery
-                MATCH p1 = shortestPath((a)-[*..300]-(m))
-                MATCH p2 = shortestPath((b)-[*..300]-(m))
-                MATCH p3 = shortestPath((c)-[*..300]-(m))
-                OPTIONAL MATCH p4 = CASE WHEN d IS NOT NULL THEN shortestPath((d)-[*..300]-(m)) ELSE null END
-                WITH p1, p2, p3, p4, m, 
-                     length(p1) + length(p2) + length(p3) + CASE WHEN p4 IS NOT NULL THEN length(p4) ELSE 0 END AS totalLen
-                ORDER BY totalLen ASC
-                RETURN p1, p2, p3, p4, m AS hub, totalLen
-                LIMIT 1
-                }}
-                
-                // 3) Return results
-                RETURN
-                CASE WHEN p1 IS NULL OR p2 IS NULL OR p3 IS NULL
-                THEN null ELSE p1 END AS p1,
-                CASE WHEN p1 IS NULL OR p2 IS NULL OR p3 IS NULL
-                THEN null ELSE p2 END AS p2,
-                CASE WHEN p1 IS NULL OR p2 IS NULL OR p3 IS NULL
-                THEN null ELSE p3 END AS p3,
-                CASE WHEN p1 IS NULL OR p2 IS NULL OR p3 IS NULL
-                THEN null ELSE hub END AS hub,
-                CASE WHEN p1 IS NULL OR p2 IS NULL OR p3 IS NULL
-                THEN a ELSE null END AS a_only,
-                CASE WHEN p1 IS NULL OR p2 IS NULL OR p3 IS NULL
-                THEN b ELSE null END AS b_only,
-                CASE WHEN p1 IS NULL OR p2 IS NULL OR p3 IS NULL
-                THEN c ELSE null END AS c_only,
-                CASE WHEN p1 IS NULL OR p2 IS NULL OR p3 IS NULL
-                THEN 0 ELSE totalLen END AS totalLen,
-                p4
-                """
             
             result = session.run(query, params)
             record = result.single()
             
-            if record:
-                # Extract paths and nodes
-                paths = []
+            if record and record["nodes"]:
+                nodes = record["nodes"]
+                relationships = record["relationships"]
+                earliest_nodes = record.get("earliest_nodes", [])
+                
+                # Convert Neo4j nodes and relationships to JSON format
                 all_nodes = {}
                 all_links = []
                 
-                # Process each path
-                for path_key in ['p1', 'p2', 'p3', 'p4']:
-                    path = record.get(path_key)
-                    if path:
-                        path_nodes = []
-                        for i, node in enumerate(path.nodes):
-                            node_id = node.element_id
-                            node_data = {
-                                "id": node_id,
-                                "labels": list(node.labels),
-                                "properties": dict(node),
-                                "name": dict(node).get("name", f"Node {node_id}"),
-                                "color": "orange" if i == 0 or i == len(path.nodes)-1 else "lightblue"
-                            }
-                            all_nodes[node_id] = node_data
-                            path_nodes.append(node_id)
-                        
-                        # Add relationships
-                        for rel in path.relationships:
-                            all_links.append({
-                                "source": rel.start_node.element_id,
-                                "target": rel.end_node.element_id,
-                                "type": type(rel).__name__,
-                                "properties": dict(rel)
-                            })
-                        
-                        paths.append(path_nodes)
+                # Process nodes
+                for node in nodes:
+                    node_id = node.element_id
+                    
+                    # Determine node color based on type
+                    is_source = node.get("name") in selected_items
+                    is_earliest = any(id(node) == id(en) for en in earliest_nodes)
+                    
+                    if is_source:
+                        color = "orange"  # Source nodes
+                    elif is_earliest:
+                        color = "red"     # Earliest layer nodes (potential lesion sites)
+                    else:
+                        color = "lightblue"  # Path nodes
+                    
+                    all_nodes[node_id] = {
+                        "id": node_id,
+                        "labels": list(node.labels),
+                        "properties": dict(node),
+                        "name": dict(node).get("name", f"Node {node_id}"),
+                        "color": color,
+                        "isSource": is_source,
+                        "isEarliest": is_earliest
+                    }
                 
-                # Highlight hub if found
-                hub = record.get('hub')
-                if hub:
-                    hub_id = hub.element_id
-                    if hub_id in all_nodes:
-                        all_nodes[hub_id]["color"] = "red"
-                        all_nodes[hub_id]["isHub"] = True
+                # Process relationships - the query already returns only the relevant ones
+                for rel in relationships:
+                    if rel is not None:  # Filter out null relationships
+                        start_id = rel.start_node.element_id
+                        end_id = rel.end_node.element_id
+                        start_node = rel.start_node
+                        end_node = rel.end_node
+                        
+                        # Skip relationships involving malformed nodes (no labels and no meaningful properties)
+                        if (not list(start_node.labels) and not start_node.get("name")) or \
+                           (not list(end_node.labels) and not end_node.get("name")):
+                            continue
+                        
+                        # Add the relationship
+                        all_links.append({
+                            "source": start_id,
+                            "target": end_id,
+                            "type": type(rel).__name__,
+                            "properties": dict(rel)
+                        })
+                        
+                        # Ensure start_node is in the nodes list
+                        if start_id not in all_nodes:
+                            is_source = start_node.get("name") in selected_items
+                            is_earliest = any(id(start_node) == id(en) for en in earliest_nodes)
+                            
+                            if is_source:
+                                color = "orange"
+                            elif is_earliest:
+                                color = "red"
+                            else:
+                                color = "lightblue"
+                                
+                            all_nodes[start_id] = {
+                                "id": start_id,
+                                "labels": list(start_node.labels),
+                                "properties": dict(start_node),
+                                "name": dict(start_node).get("name", f"Node {start_id}"),
+                                "color": color,
+                                "isSource": is_source,
+                                "isEarliest": is_earliest
+                            }
+                        
+                        # Ensure end_node is in the nodes list
+                        if end_id not in all_nodes:
+                            is_source = end_node.get("name") in selected_items
+                            is_earliest = any(id(end_node) == id(en) for en in earliest_nodes)
+                            
+                            if is_source:
+                                color = "orange"
+                            elif is_earliest:
+                                color = "red"
+                            else:
+                                color = "lightblue"
+                                
+                            all_nodes[end_id] = {
+                                "id": end_id,
+                                "labels": list(end_node.labels),
+                                "properties": dict(end_node),
+                                "name": dict(end_node).get("name", f"Node {end_id}"),
+                                "color": color,
+                                "isSource": is_source,
+                                "isEarliest": is_earliest
+                            }
                 
                 return jsonify({
-                    "paths": paths,
-                    "hub": hub.element_id if hub else None,
                     "nodes": list(all_nodes.values()),
                     "links": all_links,
-                    "totalLength": record.get('totalLen', 0),
-                    "found": len(paths) > 0
+                    "earliest_nodes": [node.element_id for node in earliest_nodes],
+                    "paths": all_links,  # Frontend expects 'paths' for counting
+                    "hub": earliest_nodes[0].element_id if earliest_nodes else None,  # Use first earliest node as hub
+                    "totalLength": len(all_links),  # Use number of links as total length
+                    "found": True,
+                    "message": f"Found {len(earliest_nodes)} potential lesion site(s) in the earliest convergence layer"
                 })
             else:
                 return jsonify({
-                    "paths": [],
-                    "hub": None,
                     "nodes": [],
                     "links": [],
-                    "totalLength": 0,
+                    "earliest_nodes": [],
+                    "paths": [],  # Frontend expects 'paths' for counting
+                    "hub": None,  # Frontend checks for hub
+                    "totalLength": 0,  # Frontend displays total length
                     "found": False,
-                    "message": "No pathways found between selected items"
+                    "message": "No convergent pathways found between selected items"
                 })
                 
         except Exception as e:
             return jsonify({
                 "error": f"Error in lesion localization: {str(e)}",
-                "paths": [],
-                "hub": None,
                 "nodes": [],
                 "links": [],
+                "earliest_nodes": [],
+                "paths": [],  # Frontend expects 'paths' for counting
+                "hub": None,  # Frontend checks for hub  
+                "totalLength": 0,  # Frontend displays total length
                 "found": False
             }), 500
 
