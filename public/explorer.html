@@ -827,14 +827,19 @@
 
         /* D3 Graph Styles */
         .node {
-            cursor: pointer;
+            cursor: grab;
             stroke-width: 2px;
             filter: drop-shadow(0 0 6px rgba(249, 115, 22, 0.3));
         }
 
         .node:hover {
+            cursor: grab;
             stroke-width: 3px;
             filter: drop-shadow(0 0 12px rgba(249, 115, 22, 0.6));
+        }
+
+        .node:active {
+            cursor: grabbing;
         }
 
         .link {
@@ -846,12 +851,13 @@
         }
 
         .node-label {
-            font-size: 10px;
+            font-size: 11px;
             font-weight: 600;
             text-anchor: middle;
             pointer-events: none;
-            fill: #e2e8f0;
-            text-shadow: 0 0 6px rgba(0, 0, 0, 0.8);
+            fill: white;
+            text-shadow: 0 0 8px rgba(0, 0, 0, 0.9), 0 0 3px rgba(0, 0, 0, 1);
+            user-select: none;
         }
 
         .link-label {
@@ -2404,7 +2410,34 @@
                     this.simulation = d3.forceSimulation(data.nodes)
                         .force('link', d3.forceLink(data.links).id(d => d.id).distance(100))
                         .force('charge', d3.forceManyBody().strength(-300))
-                        .force('center', d3.forceCenter(width / 2, height / 2));
+                        .force('center', d3.forceCenter(width / 2, height / 2))
+                        .force('collision', d3.forceCollide().radius(25)); // Prevent node overlap
+                        
+                    // Respect fixed positions for hierarchical nodes
+                    this.simulation.on('tick', () => {
+                        data.nodes.forEach(d => {
+                            // Keep nodes with fixed positions (fx, fy) in place
+                            if (d.fx !== undefined) d.x = d.fx;
+                            if (d.fy !== undefined) d.y = d.fy;
+                        });
+                        
+                        link
+                            .attr('x1', d => d.source.x)
+                            .attr('y1', d => d.source.y)
+                            .attr('x2', d => d.target.x)
+                            .attr('y2', d => d.target.y);
+
+                        node
+                            .attr('cx', d => d.x)
+                            .attr('cy', d => d.y);
+
+                        if (this.showLabels) {
+                            labels
+                                .attr('x', d => this.calculateLabelX(d, data.nodes))
+                                .attr('y', d => this.calculateLabelY(d, data.nodes))
+                                .attr('text-anchor', d => d._labelAnchor || 'middle');
+                        }
+                    });
                 } else {
                     // For coordinate layout, stop any existing simulation
                     if (this.simulation) {
@@ -2457,10 +2490,6 @@
                     .enter().append('text')
                     .attr('class', 'node-label')
                     .text(d => this.formatText(d.name))
-                    .style('font-size', '8px')
-                    .style('fill', '#333')
-                    .style('text-anchor', 'middle')
-                    .style('pointer-events', 'none')
                     .style('display', this.showLabels ? 'block' : 'none');
 
                 // Node click handler
@@ -2474,6 +2503,12 @@
                 } else {
                     // Update positions on simulation tick for force layouts
                     this.simulation.on('tick', () => {
+                        // Respect fixed positions for hierarchical nodes
+                        data.nodes.forEach(d => {
+                            if (d.fx !== undefined) d.x = d.fx;
+                            if (d.fy !== undefined) d.y = d.fy;
+                        });
+                        
                         // Update links with proper positioning to avoid overlap with nodes
                         link
                             .attr('x1', d => {
@@ -2515,8 +2550,9 @@
                             .attr('cy', d => d.y);
 
                         labels
-                            .attr('x', d => d.x)
-                            .attr('y', d => d.y + 20);
+                            .attr('x', d => this.calculateLabelX(d, data.nodes))
+                            .attr('y', d => this.calculateLabelY(d, data.nodes))
+                            .attr('text-anchor', d => d._labelAnchor || 'middle');
                     });
                 }
             }
@@ -2625,8 +2661,9 @@
                     .attr('cy', d => d.y || 0);
 
                 labels
-                    .attr('x', d => d.x || 0)
-                    .attr('y', d => (d.y || 0) + 20);
+                    .attr('x', d => this.calculateLabelX(d, data.nodes))
+                    .attr('y', d => this.calculateLabelY(d, data.nodes))
+                    .attr('text-anchor', d => d._labelAnchor || 'middle');
 
                 // Position links - get the actual data arrays
                 const nodeData = node.data();
@@ -2722,6 +2759,9 @@
                 this.svg.selectAll('.node')
                     .attr('stroke-width', d => d.id === node.id ? 4 : 2)
                     .attr('stroke', d => d.id === node.id ? '#ff6b6b' : '#fff');
+                
+                // Show exploration instructions
+                this.showExplorationInstructions(node);
             }
 
             showNodeDetails(node) {
@@ -2789,6 +2829,32 @@
                 section.style.display = 'block';
             }
 
+            showExplorationInstructions(node) {
+                const detailsContainer = document.getElementById('selected-node-details');
+                if (!detailsContainer) return;
+                
+                const instructionsHtml = `
+                    <div class="exploration-instructions" style="
+                        background: rgba(34, 197, 94, 0.1);
+                        border: 1px solid rgba(34, 197, 94, 0.3);
+                        border-radius: 8px;
+                        padding: 1rem;
+                        margin-top: 1rem;
+                    ">
+                        <h5 style="color: #22c55e; margin-bottom: 0.5rem;">🚀 Explore Relationships</h5>
+                        <p style="font-size: 0.9em; margin-bottom: 0.5rem;">Use keyboard shortcuts to reveal connected nodes:</p>
+                        <div style="font-family: monospace; font-size: 0.8em; background: rgba(0, 0, 0, 0.3); padding: 0.5rem; border-radius: 4px;">
+                            <div style="margin-bottom: 0.3rem;">• <strong>Cmd/Ctrl + ↑</strong> → Show upstream nodes <em>(above)</em></div>
+                            <div style="margin-bottom: 0.3rem;">• <strong>Cmd/Ctrl + ↓</strong> → Show downstream nodes <em>(below)</em></div>
+                            <div style="margin-bottom: 0.3rem;">• <strong>Drag node</strong> → Lock position where dropped</div>
+                        </div>
+                        <p style="font-size: 0.8em; color: #94a3b8; margin-top: 0.5rem; margin-bottom: 0;">Nodes appear hierarchically and stay where you move them.</p>
+                    </div>
+                `;
+                
+                detailsContainer.innerHTML += instructionsHtml;
+            }
+
             setupEventListeners() {
                 // Refresh button - complete reset
                 document.getElementById('refresh-btn').addEventListener('click', () => {
@@ -2827,9 +2893,199 @@
                 document.getElementById('localize-lesion-btn').addEventListener('click', () => {
                     this.localizeLesion();
                 });
+
+                // Keyboard shortcuts for upstream/downstream exploration
+                document.addEventListener('keydown', (e) => {
+                    this.handleKeyboardShortcuts(e);
+                });
             }
 
 
+
+            handleKeyboardShortcuts(e) {
+                // Only process shortcuts when a node is selected and Command/Ctrl is pressed
+                if (!this.selectedNode || !(e.metaKey || e.ctrlKey)) return;
+
+                switch(e.key) {
+                    case 'ArrowUp':
+                        e.preventDefault();
+                        this.exploreUpstream(this.selectedNode);
+                        break;
+                    case 'ArrowDown':
+                        e.preventDefault();
+                        this.exploreDownstream(this.selectedNode);
+                        break;
+                }
+            }
+
+            async exploreUpstream(node) {
+                try {
+                    console.log(`Exploring upstream from: ${node.name}`);
+                    const response = await fetch(`/api/node/${encodeURIComponent(node.id)}/upstream`);
+                    if (!response.ok) {
+                        throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+                    }
+                    
+                    const upstreamData = await response.json();
+                    this.addRelationshipsToGraph(upstreamData, 'upstream');
+                } catch (error) {
+                    console.error('Error exploring upstream:', error);
+                    alert('Failed to load upstream relationships. Please try again.');
+                }
+            }
+
+            async exploreDownstream(node) {
+                try {
+                    console.log(`Exploring downstream from: ${node.name}`);
+                    const response = await fetch(`/api/node/${encodeURIComponent(node.id)}/downstream`);
+                    if (!response.ok) {
+                        throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+                    }
+                    
+                    const downstreamData = await response.json();
+                    this.addRelationshipsToGraph(downstreamData, 'downstream');
+                } catch (error) {
+                    console.error('Error exploring downstream:', error);
+                    alert('Failed to load downstream relationships. Please try again.');
+                }
+            }
+
+            addRelationshipsToGraph(relationshipData, direction) {
+                if (!relationshipData || relationshipData.length === 0) {
+                    alert(`No ${direction} relationships found for this node.`);
+                    return;
+                }
+
+                // Get current graph data
+                const currentNodes = this.svg ? this.svg.selectAll('.node').data() : [];
+                const currentLinks = this.svg ? this.svg.selectAll('.link').data() : [];
+                
+                // Create maps for quick lookup
+                const existingNodes = new Map(currentNodes.map(n => [n.id, n]));
+                const existingLinksSet = new Set(currentLinks.map(l => `${l.source.id || l.source}-${l.target.id || l.target}`));
+                
+                const newNodes = [];
+                const newLinks = [];
+                
+                // Get the selected node's position for hierarchical positioning
+                const selectedNodeData = existingNodes.get(this.selectedNode.id);
+                const baseX = selectedNodeData ? selectedNodeData.x : 400;
+                const baseY = selectedNodeData ? selectedNodeData.y : 300;
+                
+                // Calculate hierarchical positions
+                const verticalSpacing = 120; // Distance between levels
+                const horizontalSpacing = 100; // Distance between nodes at same level
+                const nodesAtLevel = relationshipData.length;
+                const startX = baseX - ((nodesAtLevel - 1) * horizontalSpacing) / 2;
+                
+                // Process the relationship data
+                relationshipData.forEach((rel, index) => {
+                    // Calculate positions based on direction
+                    const nodeX = startX + (index * horizontalSpacing);
+                    const nodeY = direction === 'upstream' ? baseY - verticalSpacing : baseY + verticalSpacing;
+                    
+                    // Add source node if not exists
+                    if (!existingNodes.has(rel.source.id)) {
+                        const sourceNode = {
+                            id: rel.source.id,
+                            labels: rel.source.labels,
+                            properties: rel.source.properties,
+                            name: rel.source.properties.name || `Node ${rel.source.id}`,
+                            color: direction === 'upstream' ? 'lightcoral' : 'lightblue',
+                            x: nodeX,
+                            y: nodeY,
+                            fx: nodeX, // Fix position to maintain hierarchy
+                            fy: nodeY
+                        };
+                        newNodes.push(sourceNode);
+                        existingNodes.set(rel.source.id, sourceNode);
+                    }
+                    
+                    // Add target node if not exists
+                    if (!existingNodes.has(rel.target.id)) {
+                        const targetNode = {
+                            id: rel.target.id,
+                            labels: rel.target.labels,
+                            properties: rel.target.properties,
+                            name: rel.target.properties.name || `Node ${rel.target.id}`,
+                            color: direction === 'upstream' ? 'lightcoral' : 'lightblue',
+                            x: nodeX,
+                            y: nodeY,
+                            fx: nodeX, // Fix position to maintain hierarchy
+                            fy: nodeY
+                        };
+                        newNodes.push(targetNode);
+                        existingNodes.set(rel.target.id, targetNode);
+                    }
+                    
+                    // Add relationship if not exists
+                    const linkKey = `${rel.source.id}-${rel.target.id}`;
+                    const reverseLinkKey = `${rel.target.id}-${rel.source.id}`;
+                    
+                    if (!existingLinksSet.has(linkKey) && !existingLinksSet.has(reverseLinkKey)) {
+                        newLinks.push({
+                            source: rel.source.id,
+                            target: rel.target.id,
+                            type: rel.relationship.type,
+                            properties: rel.relationship.properties,
+                            directed: true
+                        });
+                        existingLinksSet.add(linkKey);
+                    }
+                });
+                
+                // Combine all nodes and links
+                const allNodes = [...currentNodes, ...newNodes];
+                const allLinks = [...currentLinks, ...newLinks];
+                
+                // Re-render the graph with hierarchical layout
+                const graphData = {
+                    nodes: allNodes,
+                    links: allLinks
+                };
+                
+                this.renderGraph(graphData);
+                
+                console.log(`Added ${newNodes.length} new nodes and ${newLinks.length} new ${direction} relationships in hierarchical layout`);
+                
+                // Show hierarchy information
+                this.showHierarchyInfo(direction, newNodes.length);
+            }
+
+            showHierarchyInfo(direction, nodeCount) {
+                // Create temporary notification
+                const notification = document.createElement('div');
+                notification.style.cssText = `
+                    position: fixed;
+                    top: 20px;
+                    right: 20px;
+                    background: rgba(34, 197, 94, 0.9);
+                    color: white;
+                    padding: 1rem;
+                    border-radius: 8px;
+                    font-size: 0.9em;
+                    z-index: 1000;
+                    border: 1px solid rgba(34, 197, 94, 0.5);
+                    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+                `;
+                
+                const directionIcon = direction === 'upstream' ? '⬆️' : '⬇️';
+                const positionText = direction === 'upstream' ? 'above' : 'below';
+                
+                notification.innerHTML = `
+                    <strong>${directionIcon} ${direction.toUpperCase()} EXPLORATION</strong><br>
+                    Added ${nodeCount} nodes ${positionText} selected node
+                `;
+                
+                document.body.appendChild(notification);
+                
+                // Remove notification after 3 seconds
+                setTimeout(() => {
+                    if (notification.parentNode) {
+                        notification.parentNode.removeChild(notification);
+                    }
+                }, 3000);
+            }
 
             setupQuickSearch() {
                 const searchInput = document.getElementById('quick-search-input');
@@ -3097,6 +3353,92 @@
                 this.simulation.alpha(1).restart();
             }
 
+            // Dynamic label positioning methods
+            calculateLabelX(node, allNodes) {
+                const nodeRadius = 8;
+                const labelOffset = 15;
+                
+                // Try positions: right, left, above, below
+                const positions = [
+                    { x: node.x + nodeRadius + labelOffset, y: node.y, anchor: 'start' },
+                    { x: node.x - nodeRadius - labelOffset, y: node.y, anchor: 'end' },
+                    { x: node.x, y: node.y - nodeRadius - labelOffset, anchor: 'middle' },
+                    { x: node.x, y: node.y + nodeRadius + labelOffset, anchor: 'middle' }
+                ];
+                
+                // Find position with least overlap
+                let bestPosition = positions[0];
+                let minOverlaps = this.countLabelOverlaps(positions[0], node, allNodes);
+                
+                for (let i = 1; i < positions.length; i++) {
+                    const overlaps = this.countLabelOverlaps(positions[i], node, allNodes);
+                    if (overlaps < minOverlaps) {
+                        minOverlaps = overlaps;
+                        bestPosition = positions[i];
+                    }
+                }
+                
+                // Store the text anchor for later use
+                node._labelAnchor = bestPosition.anchor;
+                return bestPosition.x;
+            }
+
+            calculateLabelY(node, allNodes) {
+                const nodeRadius = 8;
+                const labelOffset = 15;
+                
+                // Try positions: right, left, above, below
+                const positions = [
+                    { x: node.x + nodeRadius + labelOffset, y: node.y, anchor: 'start' },
+                    { x: node.x - nodeRadius - labelOffset, y: node.y, anchor: 'end' },
+                    { x: node.x, y: node.y - nodeRadius - labelOffset, anchor: 'middle' },
+                    { x: node.x, y: node.y + nodeRadius + labelOffset, anchor: 'middle' }
+                ];
+                
+                // Find position with least overlap (same logic as X)
+                let bestPosition = positions[0];
+                let minOverlaps = this.countLabelOverlaps(positions[0], node, allNodes);
+                
+                for (let i = 1; i < positions.length; i++) {
+                    const overlaps = this.countLabelOverlaps(positions[i], node, allNodes);
+                    if (overlaps < minOverlaps) {
+                        minOverlaps = overlaps;
+                        bestPosition = positions[i];
+                    }
+                }
+                
+                return bestPosition.y;
+            }
+
+            countLabelOverlaps(position, currentNode, allNodes) {
+                let overlaps = 0;
+                const labelWidth = 60; // Approximate label width
+                const labelHeight = 12; // Approximate label height
+                
+                for (const otherNode of allNodes) {
+                    if (otherNode.id === currentNode.id) continue;
+                    
+                    // Check distance to other nodes
+                    const distance = Math.sqrt(
+                        Math.pow(position.x - otherNode.x, 2) + 
+                        Math.pow(position.y - otherNode.y, 2)
+                    );
+                    
+                    // If too close to another node, count as overlap
+                    if (distance < 30) {
+                        overlaps++;
+                    }
+                    
+                    // Check if label would overlap with another node's position
+                    if (Math.abs(position.x - otherNode.x) < labelWidth/2 && 
+                        Math.abs(position.y - otherNode.y) < labelHeight) {
+                        overlaps++;
+                    }
+                }
+                
+                return overlaps;
+            }
+
             dragstarted(event, d) {
                 if (this.simulation && !event.active) {
                     this.simulation.alphaTarget(0.3).restart();
@@ -3114,14 +3456,9 @@
                 if (this.simulation && !event.active) {
                     this.simulation.alphaTarget(0);
                 }
-                // For coordinate layout, keep the position fixed
-                if (this.currentLayout === 'coordinates') {
-                    d.fx = event.x;
-                    d.fy = event.y;
-                } else {
-                    d.fx = null;
-                    d.fy = null;
-                }
+                // Keep the position fixed when dragged
+                d.fx = event.x;
+                d.fy = event.y;
             }
         }
 

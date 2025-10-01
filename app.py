@@ -172,6 +172,70 @@ def get_node_relationships(node_id):
             relationships.append(rel_data)
         return jsonify(relationships)
 
+# API endpoint to get upstream relationships for a specific node by element ID
+@app.route("/api/node/<node_id>/upstream")
+def get_node_upstream_relationships(node_id):
+    with driver.session() as session:
+        query = """
+        MATCH (target)-[r]->(n)
+        WHERE n.`element_id` = $node_id OR elementId(n) = $node_id
+        RETURN target, r, n, type(r) as rel_type
+        LIMIT 50
+        """
+        result = session.run(query, node_id=node_id)
+        relationships = []
+        for record in result:
+            rel_data = {
+                "source": {
+                    "id": record["target"].element_id,
+                    "labels": list(record["target"].labels),
+                    "properties": dict(record["target"])
+                },
+                "target": {
+                    "id": record["n"].element_id,
+                    "labels": list(record["n"].labels),
+                    "properties": dict(record["n"])
+                },
+                "relationship": {
+                    "type": record["rel_type"],
+                    "properties": dict(record["r"])
+                }
+            }
+            relationships.append(rel_data)
+        return jsonify(relationships)
+
+# API endpoint to get downstream relationships for a specific node by element ID
+@app.route("/api/node/<node_id>/downstream")
+def get_node_downstream_relationships(node_id):
+    with driver.session() as session:
+        query = """
+        MATCH (n)-[r]->(target)
+        WHERE n.`element_id` = $node_id OR elementId(n) = $node_id
+        RETURN n, r, target, type(r) as rel_type
+        LIMIT 50
+        """
+        result = session.run(query, node_id=node_id)
+        relationships = []
+        for record in result:
+            rel_data = {
+                "source": {
+                    "id": record["n"].element_id,
+                    "labels": list(record["n"].labels),
+                    "properties": dict(record["n"])
+                },
+                "target": {
+                    "id": record["target"].element_id,
+                    "labels": list(record["target"].labels),
+                    "properties": dict(record["target"])
+                },
+                "relationship": {
+                    "type": record["rel_type"],
+                    "properties": dict(record["r"])
+                }
+            }
+            relationships.append(rel_data)
+        return jsonify(relationships)
+
 # API endpoint to search nodes by property
 @app.route("/api/search")
 def search_nodes():
