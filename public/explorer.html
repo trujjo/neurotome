@@ -127,29 +127,6 @@
             transform: translateY(-1px);
         }
 
-        .search-box {
-            width: 100%;
-            padding: 0.75rem;
-            border: 2px solid rgba(255, 255, 255, 0.1);
-            border-radius: 12px;
-            font-size: 1rem;
-            background: rgba(0, 0, 0, 0.3);
-            color: #e2e8f0;
-            transition: all 0.3s ease;
-            margin-bottom: 1rem;
-        }
-
-        .search-box:focus {
-            outline: none;
-            border-color: #f97316;
-            box-shadow: 0 0 0 3px rgba(249, 115, 22, 0.2);
-            background: rgba(0, 0, 0, 0.5);
-        }
-
-        .search-box::placeholder {
-            color: #94a3b8;
-        }
-
         .label-list, .relationship-list {
             list-style: none;
         }
@@ -796,6 +773,58 @@
             opacity: 0.5;
         }
 
+        .search-result-item {
+            padding: 0.75rem;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+            cursor: pointer;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            transition: all 0.3s ease;
+            border-left: 3px solid transparent;
+        }
+
+        .search-result-item:hover {
+            background-color: rgba(107, 114, 128, 0.2);
+            border-left-color: #2196F3;
+            transform: translateX(4px);
+        }
+
+        .search-result-item.selected {
+            background-color: rgba(33, 150, 243, 0.2);
+            border-left-color: #2196F3;
+            color: #e3f2fd;
+        }
+
+        .search-result-labels {
+            font-size: 0.8em;
+            color: #94a3b8;
+            background: rgba(0, 0, 0, 0.4);
+            padding: 2px 6px;
+            border-radius: 4px;
+            margin-left: 0.5rem;
+            border: 1px solid rgba(255, 255, 255, 0.1);
+        }
+
+        .search-result-name {
+            font-weight: 600;
+            color: #e2e8f0;
+        }
+
+        .search-result-check {
+            font-size: 1.2em;
+            font-weight: bold;
+            min-width: 20px;
+            text-align: center;
+        }
+
+        #quick-search-input:focus {
+            outline: none;
+            border-color: #2196F3;
+            box-shadow: 0 0 0 3px rgba(33, 150, 243, 0.2);
+            background: rgba(0, 0, 0, 0.5);
+        }
+
         /* D3 Graph Styles */
         .node {
             cursor: pointer;
@@ -866,9 +895,20 @@
         <!-- Sidebar -->
         <div class="sidebar">
             <div class="section">
-                <h3>🔍 Search</h3>
-                <input type="text" class="search-box" id="search-input" placeholder="Search nodes..." />
-                <div id="search-results"></div>
+                <h3>🔍 Quick Search</h3>
+                <div style="display: flex; gap: 0.5rem; margin-bottom: 1rem;">
+                    <input type="text" id="quick-search-input" placeholder="Search anatomical parts..." 
+                           style="flex: 1; padding: 0.75rem; border: 2px solid rgba(255, 255, 255, 0.1); border-radius: 12px; font-size: 0.9rem; background: rgba(0, 0, 0, 0.3); color: #e2e8f0;">
+                    <button class="btn secondary" id="quick-search-btn" style="background: linear-gradient(135deg, #2196F3, #1976D2); padding: 0.75rem 1rem;">
+                        🔍
+                    </button>
+                </div>
+                <div id="quick-search-results" style="max-height: 300px; overflow-y: auto; border: 1px solid rgba(255, 255, 255, 0.1); border-radius: 8px; background: rgba(0, 0, 0, 0.3); display: none;">
+                    <!-- Search results will appear here -->
+                </div>
+                <button class="btn" id="add-search-results-btn" style="width: 100%; margin-top: 0.5rem; background: linear-gradient(135deg, #4CAF50, #388E3C); display: none;" disabled>
+                    ➕ Add Selected to Visualization
+                </button>
             </div>
 
             <div class="section">
@@ -962,6 +1002,7 @@
                 this.selectedRelationships = new Set(); // Track selected relationships
                 this.selectedSensations = new Set(); // Track selected sensations
                 this.selectedMuscles = new Set(); // Track selected muscles
+                this.selectedSearchResults = new Set(); // Track selected search results
                 this.showLabels = true;
                 this.simulation = null;
                 this.svg = null;
@@ -1007,8 +1048,8 @@
                     console.log('Setting up event listeners...');
                     this.setupEventListeners();
                     
-                    console.log('Setting up search...');
-                    this.setupSearch();
+                    console.log('Setting up quick search...');
+                    this.setupQuickSearch();
                     
                     console.log('Neo4jExplorer initialization complete!');
                 } catch (error) {
@@ -2788,30 +2829,216 @@
                 });
             }
 
-            setupSearch() {
-                const searchInput = document.getElementById('search-input');
-                const searchResults = document.getElementById('search-results');
-                let searchTimeout;
 
-                searchInput.addEventListener('input', (e) => {
-                    clearTimeout(searchTimeout);
-                    const query = e.target.value.trim();
 
+            setupQuickSearch() {
+                const searchInput = document.getElementById('quick-search-input');
+                const searchBtn = document.getElementById('quick-search-btn');
+                const searchResults = document.getElementById('quick-search-results');
+                const addResultsBtn = document.getElementById('add-search-results-btn');
+
+                if (!searchInput || !searchBtn) return;
+
+                // Search on button click or Enter key
+                const performSearch = () => {
+                    const query = searchInput.value.trim();
                     if (query.length < 2) {
-                        searchResults.innerHTML = '';
+                        searchResults.style.display = 'none';
+                        addResultsBtn.style.display = 'none';
                         return;
                     }
+                    this.searchNodes(query);
+                };
 
-                    searchTimeout = setTimeout(async () => {
-                        try {
-                            const response = await fetch(`/api/search?q=${encodeURIComponent(query)}`);
-                            const results = await response.json();
-                            this.renderSearchResults(results);
-                        } catch (error) {
-                            console.error('Error searching:', error);
+                searchBtn.addEventListener('click', performSearch);
+                searchInput.addEventListener('keypress', (e) => {
+                    if (e.key === 'Enter') {
+                        performSearch();
+                    }
+                });
+
+                // Real-time search as user types (with debounce)
+                let searchTimeout;
+                searchInput.addEventListener('input', () => {
+                    clearTimeout(searchTimeout);
+                    searchTimeout = setTimeout(() => {
+                        const query = searchInput.value.trim();
+                        if (query.length >= 2) {
+                            this.searchNodes(query);
+                        } else {
+                            searchResults.style.display = 'none';
+                            addResultsBtn.style.display = 'none';
                         }
                     }, 300);
                 });
+
+                // Add selected results to visualization
+                addResultsBtn.addEventListener('click', () => {
+                    this.addSearchResultsToGraph();
+                });
+            }
+
+            async searchNodes(query) {
+                try {
+                    const response = await fetch(`/api/search?q=${encodeURIComponent(query)}&limit=50`);
+                    if (!response.ok) {
+                        throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+                    }
+                    
+                    const results = await response.json();
+                    this.displaySearchResults(results);
+                } catch (error) {
+                    console.error('Search error:', error);
+                    document.getElementById('quick-search-results').innerHTML = 
+                        '<div style="padding: 1rem; color: #dc3545; text-align: center;">Search failed. Please try again.</div>';
+                    document.getElementById('quick-search-results').style.display = 'block';
+                }
+            }
+
+            displaySearchResults(results) {
+                const searchResults = document.getElementById('quick-search-results');
+                const addResultsBtn = document.getElementById('add-search-results-btn');
+
+                if (results.length === 0) {
+                    searchResults.innerHTML = '<div style="padding: 1rem; text-align: center; color: #94a3b8;">No results found</div>';
+                    searchResults.style.display = 'block';
+                    addResultsBtn.style.display = 'none';
+                    return;
+                }
+
+                let html = '';
+                results.forEach(node => {
+                    const name = node.properties.name || `Node ${node.id}`;
+                    const labels = node.labels.join(', ');
+                    const isSelected = this.selectedSearchResults.has(node.id);
+                    
+                    html += `
+                        <div class="search-result-item ${isSelected ? 'selected' : ''}" 
+                             data-node-id="${node.id}" 
+                             onclick="window.explorer.toggleSearchResult('${node.id}', this)">
+                            <div>
+                                <div class="search-result-name">${this.formatText(name)}</div>
+                                <span class="search-result-labels">${labels}</span>
+                            </div>
+                            <div class="search-result-check" style="color: ${isSelected ? '#2196F3' : '#94a3b8'};">
+                                ${isSelected ? '✓' : '+'}
+                            </div>
+                        </div>
+                    `;
+                });
+
+                searchResults.innerHTML = html;
+                searchResults.style.display = 'block';
+                
+                // Show/hide add button based on selected results
+                if (this.selectedSearchResults.size > 0) {
+                    addResultsBtn.style.display = 'block';
+                    addResultsBtn.disabled = false;
+                    addResultsBtn.textContent = `➕ Add Selected (${this.selectedSearchResults.size}) to Visualization`;
+                } else {
+                    addResultsBtn.style.display = 'none';
+                }
+            }
+
+            toggleSearchResult(nodeId, element) {
+                if (this.selectedSearchResults.has(nodeId)) {
+                    this.selectedSearchResults.delete(nodeId);
+                    element.classList.remove('selected');
+                    element.querySelector('.search-result-check').textContent = '+';
+                    element.querySelector('.search-result-check').style.color = '#94a3b8';
+                } else {
+                    this.selectedSearchResults.add(nodeId);
+                    element.classList.add('selected');
+                    element.querySelector('.search-result-check').textContent = '✓';
+                    element.querySelector('.search-result-check').style.color = '#2196F3';
+                }
+
+                const addResultsBtn = document.getElementById('add-search-results-btn');
+                if (this.selectedSearchResults.size > 0) {
+                    addResultsBtn.style.display = 'block';
+                    addResultsBtn.disabled = false;
+                    addResultsBtn.textContent = `➕ Add Selected (${this.selectedSearchResults.size}) to Visualization`;
+                } else {
+                    addResultsBtn.style.display = 'none';
+                }
+            }
+
+            async addSearchResultsToGraph() {
+                if (this.selectedSearchResults.size === 0) return;
+
+                try {
+                    // Get the selected search results and find their data from the last search
+                    const searchResultsContainer = document.getElementById('quick-search-results');
+                    const selectedItems = searchResultsContainer.querySelectorAll('.search-result-item.selected');
+                    
+                    const newNodes = [];
+                    
+                    // Create nodes from the selected search results without fetching relationships
+                    selectedItems.forEach(item => {
+                        const nodeId = item.getAttribute('data-node-id');
+                        const nameElement = item.querySelector('.search-result-name');
+                        const labelsElement = item.querySelector('.search-result-labels');
+                        
+                        if (nodeId && nameElement) {
+                            const nodeName = nameElement.textContent.trim();
+                            const nodeLabels = labelsElement ? labelsElement.textContent.split(', ') : [];
+                            
+                            const newNode = {
+                                id: nodeId,
+                                labels: nodeLabels,
+                                properties: { name: nodeName },
+                                name: nodeName,
+                                color: "lightgreen", // Color for search results
+                                x: Math.random() * 800 + 100, // Random position to avoid overlap
+                                y: Math.random() * 600 + 100
+                            };
+                            newNodes.push(newNode);
+                        }
+                    });
+
+                    // Add nodes to existing graph data instead of replacing it
+                    if (newNodes.length > 0) {
+                        // Get current graph data
+                        const currentNodes = this.svg ? this.svg.selectAll('.node').data() : [];
+                        const currentLinks = this.svg ? this.svg.selectAll('.link').data() : [];
+                        
+                        // Combine with new nodes (avoid duplicates)
+                        const existingNodeIds = new Set(currentNodes.map(n => n.id));
+                        const uniqueNewNodes = newNodes.filter(n => !existingNodeIds.has(n.id));
+                        
+                        const allNodes = [...currentNodes, ...uniqueNewNodes];
+                        const allLinks = [...currentLinks]; // Keep existing links, don't add new ones
+                        
+                        const graphData = {
+                            nodes: allNodes,
+                            links: allLinks
+                        };
+
+                        this.renderGraph(graphData);
+
+                        // Clear search selections
+                        this.selectedSearchResults.clear();
+                        document.getElementById('add-search-results-btn').style.display = 'none';
+                        
+                        // Update search results display
+                        document.querySelectorAll('.search-result-item').forEach(item => {
+                            item.classList.remove('selected');
+                            const checkElement = item.querySelector('.search-result-check');
+                            if (checkElement) {
+                                checkElement.textContent = '+';
+                                checkElement.style.color = '#94a3b8';
+                            }
+                        });
+
+                        console.log(`Added ${uniqueNewNodes.length} nodes to visualization`);
+                    } else {
+                        alert('No valid nodes found to add.');
+                    }
+
+                } catch (error) {
+                    console.error('Error adding search results to graph:', error);
+                    alert('Failed to add search results to visualization. Please try again.');
+                }
             }
 
             renderSearchResults(results) {

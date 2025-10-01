@@ -108,6 +108,38 @@ def get_node_count(label):
         count = result.single()["count"]
         return jsonify({"count": count})
 
+# API endpoint to get relationships for a specific node by element ID
+@app.route("/api/node/<node_id>/relationships")
+def get_node_relationships_by_element_id(node_id):
+    with driver.session() as session:
+        query = """
+        MATCH (n)-[r]-(m)
+        WHERE n.`element_id` = $node_id OR elementId(n) = $node_id
+        RETURN n, r, m, type(r) as rel_type
+        LIMIT 100
+        """
+        result = session.run(query, node_id=node_id)
+        relationships = []
+        for record in result:
+            rel_data = {
+                "source": {
+                    "id": record["n"].element_id,
+                    "labels": list(record["n"].labels),
+                    "properties": dict(record["n"])
+                },
+                "target": {
+                    "id": record["m"].element_id,
+                    "labels": list(record["m"].labels),
+                    "properties": dict(record["m"])
+                },
+                "relationship": {
+                    "type": record["rel_type"],
+                    "properties": dict(record["r"])
+                }
+            }
+            relationships.append(rel_data)
+        return jsonify(relationships)
+
 # API endpoint to get relationships for a specific node
 @app.route("/api/node/<int:node_id>/relationships")
 def get_node_relationships(node_id):
@@ -145,19 +177,31 @@ def get_node_relationships(node_id):
 def search_nodes():
     query_param = request.args.get('q', '')
     property_name = request.args.get('property', 'name')
-    limit = request.args.get('limit', 20, type=int)
+    limit = request.args.get('limit', 50, type=int)
     
     if not query_param:
         return jsonify([])
     
     with driver.session() as session:
+        # Enhanced search to look in multiple properties and prioritize results
+        # Using case-insensitive matching with toLower()
         query = f"""
         MATCH (n)
-        WHERE n.{property_name} CONTAINS $query
+        WHERE (n.{property_name} IS NOT NULL AND toLower(n.{property_name}) CONTAINS toLower($search_term))
+           OR (n.description IS NOT NULL AND toLower(n.description) CONTAINS toLower($search_term))
+           OR any(label IN labels(n) WHERE toLower(label) CONTAINS toLower($search_term))
         RETURN n, labels(n) as labels
+        ORDER BY 
+            CASE 
+                WHEN n.{property_name} IS NOT NULL AND toLower(n.{property_name}) STARTS WITH toLower($search_term) THEN 1
+                WHEN n.{property_name} IS NOT NULL AND toLower(n.{property_name}) CONTAINS toLower($search_term) THEN 2
+                WHEN any(label IN labels(n) WHERE toLower(label) CONTAINS toLower($search_term)) THEN 3
+                ELSE 4
+            END,
+            n.{property_name}
         LIMIT {limit}
         """
-        result = session.run(query, query=query_param)
+        result = session.run(query, search_term=query_param)
         nodes = []
         for record in result:
             node = record["n"]
