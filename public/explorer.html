@@ -868,11 +868,83 @@
             text-shadow: 0 0 4px rgba(0, 0, 0, 0.8);
         }
 
+        /* Floating exploration popup */
+        .exploration-popup {
+            position: fixed;
+            bottom: 20px;
+            right: 20px;
+            width: 320px;
+            max-height: 400px;
+            background: rgba(15, 15, 35, 0.95);
+            backdrop-filter: blur(20px);
+            border: 1px solid rgba(249, 115, 22, 0.3);
+            border-radius: 12px;
+            padding: 1rem;
+            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.5);
+            z-index: 1000;
+            overflow-y: auto;
+            transform: translateY(100%);
+            opacity: 0;
+            transition: all 0.3s ease;
+        }
+
+        .exploration-popup.visible {
+            transform: translateY(0);
+            opacity: 1;
+        }
+
+        .exploration-popup-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 1rem;
+            padding-bottom: 0.5rem;
+            border-bottom: 1px solid rgba(249, 115, 22, 0.3);
+        }
+
+        .exploration-popup-title {
+            color: #f97316;
+            font-size: 1rem;
+            font-weight: 600;
+        }
+
+        .exploration-popup-close {
+            background: none;
+            border: none;
+            color: #94a3b8;
+            cursor: pointer;
+            font-size: 1.2rem;
+            padding: 0;
+            width: 24px;
+            height: 24px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            border-radius: 4px;
+            transition: all 0.2s ease;
+        }
+
+        .exploration-popup-close:hover {
+            background: rgba(249, 115, 22, 0.2);
+            color: #f97316;
+        }
+
+        .exploration-popup-content {
+            font-size: 0.9rem;
+        }
+
         /* Responsive Design */
         @media (max-width: 1200px) {
             .container {
                 grid-template-columns: 1fr;
                 grid-template-rows: auto auto 1fr;
+            }
+
+            .exploration-popup {
+                bottom: 10px;
+                right: 10px;
+                width: calc(100vw - 20px);
+                max-width: 300px;
             }
         }
 
@@ -888,6 +960,13 @@
             
             .controls {
                 flex-direction: column;
+            }
+
+            .exploration-popup {
+                bottom: 5px;
+                right: 5px;
+                width: calc(100vw - 10px);
+                max-width: 280px;
             }
         }
     </style>
@@ -1000,6 +1079,17 @@
         </div>
     </div>
 
+    <!-- Floating Exploration Popup -->
+    <div id="exploration-popup" class="exploration-popup">
+        <div class="exploration-popup-header">
+            <div class="exploration-popup-title">🚀 Explore Relationships</div>
+            <button class="exploration-popup-close" onclick="explorer.hideExplorationPopup()">&times;</button>
+        </div>
+        <div id="exploration-popup-content" class="exploration-popup-content">
+            <!-- Content will be populated by JavaScript -->
+        </div>
+    </div>
+
     <script>
         class Neo4jExplorer {
             constructor() {
@@ -1013,6 +1103,7 @@
                 this.simulation = null;
                 this.svg = null;
                 this.currentLayout = 'force';
+                this.explorationPopupShown = false; // Track if popup has been shown this session
                 
                 this.init();
             }
@@ -2354,6 +2445,14 @@
 
                 this.svg.call(zoom);
 
+                // Add click handler to hide exploration popup
+                this.svg.on('click', (event) => {
+                    // Check if click is on background (not on a node)
+                    if (event.target === this.svg.node()) {
+                        this.hideExplorationPopup();
+                    }
+                });
+
                 // Create main group
                 this.svg.append('g');
             }
@@ -2484,17 +2583,33 @@
                         .on('drag', this.dragged.bind(this))
                         .on('end', this.dragended.bind(this)));
 
-                // Add node labels
+                // Add node labels with multi-line support
                 const labels = g.selectAll('.node-label')
                     .data(data.nodes)
                     .enter().append('text')
                     .attr('class', 'node-label')
-                    .text(d => this.formatText(d.name))
-                    .style('display', this.showLabels ? 'block' : 'none');
+                    .style('display', this.showLabels ? 'block' : 'none')
+                    .each(function(d) {
+                        const textElement = d3.select(this);
+                        const lines = explorer.splitTextIntoLines(explorer.formatText(d.name));
+                        
+                        lines.forEach((line, index) => {
+                            textElement.append('tspan')
+                                .attr('x', 0) // Will be positioned absolutely later
+                                .attr('dy', index === 0 ? '-0.1em' : '1.1em') // Adjusted baseline
+                                .text(line);
+                        });
+                    });
 
                 // Node click handler
                 node.on('click', (event, d) => {
                     this.selectNode(d);
+                });
+
+                // Node double-click handler for hierarchical relationships
+                node.on('dblclick', (event, d) => {
+                    event.stopPropagation(); // Prevent zoom behavior
+                    this.loadAllRelationshipsHierarchical(d);
                 });
 
                 if (useCoordinates) {
@@ -2552,7 +2667,11 @@
                         labels
                             .attr('x', d => this.calculateLabelX(d, data.nodes))
                             .attr('y', d => this.calculateLabelY(d, data.nodes))
-                            .attr('text-anchor', d => d._labelAnchor || 'middle');
+                            .attr('text-anchor', d => d._labelAnchor || 'middle')
+                            .selectAll('tspan')
+                            .attr('x', function() {
+                                return d3.select(this.parentNode).attr('x');
+                            });
                     });
                 }
             }
@@ -2663,7 +2782,11 @@
                 labels
                     .attr('x', d => this.calculateLabelX(d, data.nodes))
                     .attr('y', d => this.calculateLabelY(d, data.nodes))
-                    .attr('text-anchor', d => d._labelAnchor || 'middle');
+                    .attr('text-anchor', d => d._labelAnchor || 'middle')
+                    .selectAll('tspan')
+                    .attr('x', function() {
+                        return d3.select(this.parentNode).attr('x');
+                    });
 
                 // Position links - get the actual data arrays
                 const nodeData = node.data();
@@ -2768,19 +2891,30 @@
                 const section = document.getElementById('node-details-section');
                 const details = document.getElementById('selected-node-details');
                 
+                // Only show specific properties: location and sublocation
+                const relevantProperties = {};
+                if (node.properties.location) {
+                    relevantProperties.Location = node.properties.location;
+                }
+                if (node.properties.sublocation) {
+                    relevantProperties.Sublocation = node.properties.sublocation;
+                }
+                
                 details.innerHTML = `
                     <div class="node-details">
                         <h4>${this.formatText(node.name || node.id)}</h4>
                         <p><strong>Type:</strong> ${node.labels.map(label => this.formatText(label)).join(', ')}</p>
                         <h5>Properties:</h5>
-                        <ul class="property-list">
-                            ${Object.entries(node.properties).map(([key, value]) => `
-                                <li class="property-item">
-                                    <span class="property-key">${this.formatText(key)}:</span>
-                                    <span class="property-value">${this.formatText(String(value))}</span>
-                                </li>
-                            `).join('')}
-                        </ul>
+                        ${Object.keys(relevantProperties).length > 0 ? `
+                            <ul class="property-list">
+                                ${Object.entries(relevantProperties).map(([key, value]) => `
+                                    <li class="property-item">
+                                        <span class="property-key">${key}:</span>
+                                        <span class="property-value">${this.formatText(String(value))}</span>
+                                    </li>
+                                `).join('')}
+                            </ul>
+                        ` : '<p style="color: #94a3b8; font-style: italic;">No location properties available</p>'}
                     </div>
                 `;
                 
@@ -2789,70 +2923,173 @@
 
             async loadNodeRelationships(nodeId) {
                 try {
-                    const response = await fetch(`/api/node/${nodeId}/relationships`);
-                    const relationships = await response.json();
-                    this.showRelationshipDetails(relationships);
+                    // Load upstream and downstream relationships separately using directed queries
+                    const [upstreamResponse, downstreamResponse] = await Promise.all([
+                        fetch(`/api/node/${nodeId}/upstream`),
+                        fetch(`/api/node/${nodeId}/downstream`)
+                    ]);
+                    
+                    const upstreamRelationships = await upstreamResponse.json();
+                    const downstreamRelationships = await downstreamResponse.json();
+                    
+                    // Combine them for the showRelationshipDetails function
+                    const allRelationships = [
+                        ...upstreamRelationships.map(rel => ({...rel, _direction: 'upstream'})),
+                        ...downstreamRelationships.map(rel => ({...rel, _direction: 'downstream'}))
+                    ];
+                    
+                    this.showRelationshipDetails(allRelationships, upstreamRelationships, downstreamRelationships);
                 } catch (error) {
                     console.error('Error loading node relationships:', error);
                 }
             }
 
-            showRelationshipDetails(relationships) {
+            showRelationshipDetails(allRelationships, upstreamRelationships, downstreamRelationships) {
                 const section = document.getElementById('relationship-details-section');
                 const details = document.getElementById('selected-relationship-details');
                 
-                if (relationships.length === 0) {
-                    details.innerHTML = '<p>No relationships found</p>';
+                // Get currently visualized relationships
+                const currentLinks = this.svg ? this.svg.selectAll('.link').data() : [];
+                const visualizedRelationships = new Set();
+                
+                currentLinks.forEach(link => {
+                    const sourceId = link.source.id || link.source;
+                    const targetId = link.target.id || link.target;
+                    const relKey = `${sourceId}-${targetId}`;
+                    const reverseKey = `${targetId}-${sourceId}`;
+                    visualizedRelationships.add(relKey);
+                    visualizedRelationships.add(reverseKey);
+                });
+                
+                // Filter each direction separately to only unshown relationships
+                const unshownUpstream = upstreamRelationships.filter(rel => {
+                    const sourceId = rel.source.id;
+                    const targetId = rel.target.id;
+                    const relKey = `${sourceId}-${targetId}`;
+                    const reverseKey = `${targetId}-${sourceId}`;
+                    return !visualizedRelationships.has(relKey) && !visualizedRelationships.has(reverseKey);
+                });
+                
+                const unshownDownstream = downstreamRelationships.filter(rel => {
+                    const sourceId = rel.source.id;
+                    const targetId = rel.target.id;
+                    const relKey = `${sourceId}-${targetId}`;
+                    const reverseKey = `${targetId}-${sourceId}`;
+                    return !visualizedRelationships.has(relKey) && !visualizedRelationships.has(reverseKey);
+                });
+
+                const selectedNodeId = this.selectedNode ? this.selectedNode.id : null;
+                if (!selectedNodeId) {
+                    details.innerHTML = '<p>No node selected for relationship analysis</p>';
+                    section.style.display = 'block';
+                    return;
+                }
+                
+                if (unshownUpstream.length === 0 && unshownDownstream.length === 0) {
+                    details.innerHTML = '<p>All relationships for this node are currently visualized</p>';
                     section.style.display = 'block';
                     return;
                 }
 
-                details.innerHTML = relationships.map(rel => `
-                    <div class="relationship-details">
-                        <h5>${this.formatRelationshipName(rel.relationship.type)}</h5>
-                        <p><strong>From:</strong> ${this.formatText(rel.source.properties.name || rel.source.id)} (${rel.source.labels.map(label => this.formatText(label)).join(', ')})</p>
-                        <p><strong>To:</strong> ${this.formatText(rel.target.properties.name || rel.target.id)} (${rel.target.labels.map(label => this.formatText(label)).join(', ')})</p>
-                        ${Object.keys(rel.relationship.properties).length > 0 ? `
-                            <h6>Properties:</h6>
-                            <ul class="property-list">
-                                ${Object.entries(rel.relationship.properties).map(([key, value]) => `
-                                    <li class="property-item">
-                                        <span class="property-key">${this.formatText(key)}:</span>
-                                        <span class="property-value">${this.formatText(String(value))}</span>
-                                    </li>
-                                `).join('')}
-                            </ul>
-                        ` : ''}
-                    </div>
-                `).join('');
-                
+                let html = '';
+
+                // Upstream relationships
+                if (unshownUpstream.length > 0) {
+                    html += `
+                        <div style="margin-bottom: 1.5rem;">
+                            <h4 style="color: #22c55e; margin-bottom: 0.5rem;">⬆️ Unshown Upstream Relationships</h4>
+                            <p style="font-size: 0.9em; color: #94a3b8; margin-bottom: 1rem;">
+                                ${unshownUpstream.length} upstream relationship${unshownUpstream.length !== 1 ? 's' : ''} not currently in visualization
+                            </p>
+                            ${unshownUpstream.map(rel => `
+                                <div class="relationship-details" style="
+                                    background: rgba(34, 197, 94, 0.1);
+                                    border: 1px solid rgba(34, 197, 94, 0.3);
+                                    border-radius: 6px;
+                                    padding: 0.8rem;
+                                    margin-bottom: 0.8rem;
+                                ">
+                                    <h5 style="color: #22c55e; margin-bottom: 0.5rem;">${this.formatRelationshipName(rel.relationship.type)}</h5>
+                                    <p style="margin-bottom: 0.3rem;"><strong>From:</strong> ${this.formatText(rel.source.properties.name || rel.source.id)}</p>
+                                    <p style="margin-bottom: 0.3rem;"><strong>To:</strong> ${this.formatText(rel.target.properties.name || rel.target.id)}</p>
+                                </div>
+                            `).join('')}
+                        </div>
+                    `;
+                }
+
+                // Downstream relationships
+                if (unshownDownstream.length > 0) {
+                    html += `
+                        <div style="margin-bottom: 1rem;">
+                            <h4 style="color: #3b82f6; margin-bottom: 0.5rem;">⬇️ Unshown Downstream Relationships</h4>
+                            <p style="font-size: 0.9em; color: #94a3b8; margin-bottom: 1rem;">
+                                ${unshownDownstream.length} downstream relationship${unshownDownstream.length !== 1 ? 's' : ''} not currently in visualization
+                            </p>
+                            ${unshownDownstream.map(rel => `
+                                <div class="relationship-details" style="
+                                    background: rgba(59, 130, 246, 0.1);
+                                    border: 1px solid rgba(59, 130, 246, 0.3);
+                                    border-radius: 6px;
+                                    padding: 0.8rem;
+                                    margin-bottom: 0.8rem;
+                                ">
+                                    <h5 style="color: #3b82f6; margin-bottom: 0.5rem;">${this.formatRelationshipName(rel.relationship.type)}</h5>
+                                    <p style="margin-bottom: 0.3rem;"><strong>From:</strong> ${this.formatText(rel.source.properties.name || rel.source.id)}</p>
+                                    <p style="margin-bottom: 0.3rem;"><strong>To:</strong> ${this.formatText(rel.target.properties.name || rel.target.id)}</p>
+                                </div>
+                            `).join('')}
+                        </div>
+                    `;
+                }
+
+
+
+                details.innerHTML = html;
                 section.style.display = 'block';
             }
 
             showExplorationInstructions(node) {
-                const detailsContainer = document.getElementById('selected-node-details');
-                if (!detailsContainer) return;
+                // Only show once per session
+                if (this.explorationPopupShown) {
+                    return;
+                }
+                
+                this.explorationPopupShown = true;
+                
+                const popup = document.getElementById('exploration-popup');
+                const content = document.getElementById('exploration-popup-content');
+                
+                if (!popup || !content) return;
                 
                 const instructionsHtml = `
-                    <div class="exploration-instructions" style="
-                        background: rgba(34, 197, 94, 0.1);
-                        border: 1px solid rgba(34, 197, 94, 0.3);
-                        border-radius: 8px;
-                        padding: 1rem;
-                        margin-top: 1rem;
-                    ">
-                        <h5 style="color: #22c55e; margin-bottom: 0.5rem;">🚀 Explore Relationships</h5>
-                        <p style="font-size: 0.9em; margin-bottom: 0.5rem;">Use keyboard shortcuts to reveal connected nodes:</p>
-                        <div style="font-family: monospace; font-size: 0.8em; background: rgba(0, 0, 0, 0.3); padding: 0.5rem; border-radius: 4px;">
-                            <div style="margin-bottom: 0.3rem;">• <strong>Cmd/Ctrl + ↑</strong> → Show upstream nodes <em>(above)</em></div>
-                            <div style="margin-bottom: 0.3rem;">• <strong>Cmd/Ctrl + ↓</strong> → Show downstream nodes <em>(below)</em></div>
-                            <div style="margin-bottom: 0.3rem;">• <strong>Drag node</strong> → Lock position where dropped</div>
-                        </div>
-                        <p style="font-size: 0.8em; color: #94a3b8; margin-top: 0.5rem; margin-bottom: 0;">Nodes appear hierarchically and stay where you move them.</p>
+                    <div style="margin-bottom: 1rem;">
+                        <h6 style="color: #e2e8f0; margin-bottom: 0.8rem; font-size: 0.9rem;">Selected: <span style="color: #f97316;">${this.formatText(node.name || node.id)}</span></h6>
                     </div>
+                    <p style="font-size: 0.85em; margin-bottom: 0.8rem; color: #cbd5e1;">Use keyboard shortcuts to reveal connected nodes:</p>
+                    <div style="font-family: monospace; font-size: 0.75em; background: rgba(0, 0, 0, 0.4); padding: 0.8rem; border-radius: 6px; margin-bottom: 0.8rem;">
+                        <div style="margin-bottom: 0.4rem; color: #22c55e;">• <strong>Cmd/Ctrl + ↑</strong> → Show upstream <em>(above)</em></div>
+                        <div style="margin-bottom: 0.4rem; color: #3b82f6;">• <strong>Cmd/Ctrl + ↓</strong> → Show downstream <em>(below)</em></div>
+                        <div style="margin-bottom: 0.4rem; color: #8b5cf6;">• <strong>Double-click node</strong> → Show ALL relationships</div>
+                        <div style="margin-bottom: 0; color: #f59e0b;">• <strong>Drag node</strong> → Lock position where dropped</div>
+                    </div>
+                    <p style="font-size: 0.75em; color: #94a3b8; margin: 0; text-align: center; font-style: italic;">This popup will disappear in 5 seconds...</p>
                 `;
                 
-                detailsContainer.innerHTML += instructionsHtml;
+                content.innerHTML = instructionsHtml;
+                popup.classList.add('visible');
+                
+                // Auto-hide after 5 seconds
+                setTimeout(() => {
+                    this.hideExplorationPopup();
+                }, 5000);
+            }
+
+            hideExplorationPopup() {
+                const popup = document.getElementById('exploration-popup');
+                if (popup) {
+                    popup.classList.remove('visible');
+                }
             }
 
             setupEventListeners() {
@@ -3085,6 +3322,160 @@
                         notification.parentNode.removeChild(notification);
                     }
                 }, 3000);
+            }
+
+            async loadAllRelationshipsHierarchical(node) {
+                try {
+                    // Set the selected node
+                    this.selectNode(node);
+                    
+                    // Show loading notification
+                    const notification = document.createElement('div');
+                    notification.style.cssText = `
+                        position: fixed;
+                        top: 20px;
+                        right: 20px;
+                        background: rgba(59, 130, 246, 0.9);
+                        color: white;
+                        padding: 1rem;
+                        border-radius: 8px;
+                        font-size: 0.9em;
+                        z-index: 1000;
+                        border: 1px solid rgba(59, 130, 246, 0.5);
+                        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+                    `;
+                    
+                    notification.innerHTML = `
+                        <strong>🔄 LOADING ALL RELATIONSHIPS</strong><br>
+                        Loading hierarchical view for "${this.formatText(node.name || node.id)}"...
+                    `;
+                    
+                    document.body.appendChild(notification);
+                    
+                    // Load both upstream and downstream relationships
+                    const [upstreamResponse, downstreamResponse] = await Promise.all([
+                        fetch(`/api/node/${node.id}/upstream`),
+                        fetch(`/api/node/${node.id}/downstream`)
+                    ]);
+                    
+                    const upstreamData = await upstreamResponse.json();
+                    const downstreamData = await downstreamResponse.json();
+                    
+                    // Remove loading notification
+                    if (notification.parentNode) {
+                        notification.parentNode.removeChild(notification);
+                    }
+                    
+                    // Add relationships in hierarchical order (upstream first, then downstream)
+                    let totalAdded = 0;
+                    
+                    if (upstreamData && upstreamData.length > 0) {
+                        this.addRelationshipsToGraph(upstreamData, 'upstream');
+                        totalAdded += upstreamData.length;
+                    }
+                    
+                    if (downstreamData && downstreamData.length > 0) {
+                        this.addRelationshipsToGraph(downstreamData, 'downstream');
+                        totalAdded += downstreamData.length;
+                    }
+                    
+                    // Show completion notification
+                    if (totalAdded > 0) {
+                        const successNotification = document.createElement('div');
+                        successNotification.style.cssText = `
+                            position: fixed;
+                            top: 20px;
+                            right: 20px;
+                            background: rgba(34, 197, 94, 0.9);
+                            color: white;
+                            padding: 1rem;
+                            border-radius: 8px;
+                            font-size: 0.9em;
+                            z-index: 1000;
+                            border: 1px solid rgba(34, 197, 94, 0.5);
+                            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+                        `;
+                        
+                        const upstreamCount = upstreamData ? upstreamData.length : 0;
+                        const downstreamCount = downstreamData ? downstreamData.length : 0;
+                        
+                        successNotification.innerHTML = `
+                            <strong>✅ HIERARCHICAL VIEW COMPLETE</strong><br>
+                            Added ${upstreamCount} upstream and ${downstreamCount} downstream relationships<br>
+                            <small>Total: ${totalAdded} new relationships</small>
+                        `;
+                        
+                        document.body.appendChild(successNotification);
+                        
+                        // Remove notification after 4 seconds
+                        setTimeout(() => {
+                            if (successNotification.parentNode) {
+                                successNotification.parentNode.removeChild(successNotification);
+                            }
+                        }, 4000);
+                    } else {
+                        // Show no relationships found notification
+                        const noRelNotification = document.createElement('div');
+                        noRelNotification.style.cssText = `
+                            position: fixed;
+                            top: 20px;
+                            right: 20px;
+                            background: rgba(245, 158, 11, 0.9);
+                            color: white;
+                            padding: 1rem;
+                            border-radius: 8px;
+                            font-size: 0.9em;
+                            z-index: 1000;
+                            border: 1px solid rgba(245, 158, 11, 0.5);
+                            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+                        `;
+                        
+                        noRelNotification.innerHTML = `
+                            <strong>ℹ️ NO RELATIONSHIPS FOUND</strong><br>
+                            No upstream or downstream relationships found for this node
+                        `;
+                        
+                        document.body.appendChild(noRelNotification);
+                        
+                        setTimeout(() => {
+                            if (noRelNotification.parentNode) {
+                                noRelNotification.parentNode.removeChild(noRelNotification);
+                            }
+                        }, 3000);
+                    }
+                    
+                } catch (error) {
+                    console.error('Error loading hierarchical relationships:', error);
+                    
+                    // Show error notification
+                    const errorNotification = document.createElement('div');
+                    errorNotification.style.cssText = `
+                        position: fixed;
+                        top: 20px;
+                        right: 20px;
+                        background: rgba(239, 68, 68, 0.9);
+                        color: white;
+                        padding: 1rem;
+                        border-radius: 8px;
+                        font-size: 0.9em;
+                        z-index: 1000;
+                        border: 1px solid rgba(239, 68, 68, 0.5);
+                        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+                    `;
+                    
+                    errorNotification.innerHTML = `
+                        <strong>❌ ERROR LOADING RELATIONSHIPS</strong><br>
+                        Failed to load hierarchical relationships
+                    `;
+                    
+                    document.body.appendChild(errorNotification);
+                    
+                    setTimeout(() => {
+                        if (errorNotification.parentNode) {
+                            errorNotification.parentNode.removeChild(errorNotification);
+                        }
+                    }, 3000);
+                }
             }
 
             setupQuickSearch() {
@@ -3353,17 +3744,50 @@
                 this.simulation.alpha(1).restart();
             }
 
+            splitTextIntoLines(text, maxCharsPerLine = 12) {
+                if (!text || text.length <= maxCharsPerLine) {
+                    return [text || ''];
+                }
+                
+                const words = text.split(' ');
+                const lines = [];
+                let currentLine = '';
+                
+                for (const word of words) {
+                    if (currentLine.length + word.length + 1 <= maxCharsPerLine) {
+                        currentLine += (currentLine ? ' ' : '') + word;
+                    } else {
+                        if (currentLine) {
+                            lines.push(currentLine);
+                            currentLine = word;
+                        } else {
+                            // Word is longer than max chars, split it
+                            lines.push(word.slice(0, maxCharsPerLine));
+                            currentLine = word.slice(maxCharsPerLine);
+                        }
+                    }
+                }
+                
+                if (currentLine) {
+                    lines.push(currentLine);
+                }
+                
+                // Limit to 2 lines max
+                return lines.slice(0, 2);
+            }
+
             // Dynamic label positioning methods
             calculateLabelX(node, allNodes) {
                 const nodeRadius = 8;
-                const labelOffset = 15;
+                const labelOffset = 20; // Increased for multi-line labels
                 
                 // Try positions: right, left, above, below
+                // Adjust for multi-line text (each line is ~1.1em apart)
                 const positions = [
-                    { x: node.x + nodeRadius + labelOffset, y: node.y, anchor: 'start' },
-                    { x: node.x - nodeRadius - labelOffset, y: node.y, anchor: 'end' },
-                    { x: node.x, y: node.y - nodeRadius - labelOffset, anchor: 'middle' },
-                    { x: node.x, y: node.y + nodeRadius + labelOffset, anchor: 'middle' }
+                    { x: node.x + nodeRadius + labelOffset, y: node.y - 5, anchor: 'start' }, // Right, centered on multi-line
+                    { x: node.x - nodeRadius - labelOffset, y: node.y - 5, anchor: 'end' }, // Left, centered on multi-line
+                    { x: node.x, y: node.y - nodeRadius - labelOffset, anchor: 'middle' }, // Above
+                    { x: node.x, y: node.y + nodeRadius + labelOffset + 10, anchor: 'middle' } // Below, accounting for multi-line height
                 ];
                 
                 // Find position with least overlap
@@ -3385,14 +3809,15 @@
 
             calculateLabelY(node, allNodes) {
                 const nodeRadius = 8;
-                const labelOffset = 15;
+                const labelOffset = 20; // Increased for multi-line labels
                 
                 // Try positions: right, left, above, below
+                // Adjust for multi-line text (each line is ~1.1em apart)
                 const positions = [
-                    { x: node.x + nodeRadius + labelOffset, y: node.y, anchor: 'start' },
-                    { x: node.x - nodeRadius - labelOffset, y: node.y, anchor: 'end' },
-                    { x: node.x, y: node.y - nodeRadius - labelOffset, anchor: 'middle' },
-                    { x: node.x, y: node.y + nodeRadius + labelOffset, anchor: 'middle' }
+                    { x: node.x + nodeRadius + labelOffset, y: node.y - 5, anchor: 'start' }, // Right, centered on multi-line
+                    { x: node.x - nodeRadius - labelOffset, y: node.y - 5, anchor: 'end' }, // Left, centered on multi-line
+                    { x: node.x, y: node.y - nodeRadius - labelOffset, anchor: 'middle' }, // Above
+                    { x: node.x, y: node.y + nodeRadius + labelOffset + 10, anchor: 'middle' } // Below, accounting for multi-line height
                 ];
                 
                 // Find position with least overlap (same logic as X)
