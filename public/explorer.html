@@ -980,7 +980,7 @@
         <!-- Sidebar -->
         <div class="sidebar">
             <div class="section">
-                <h3>🔍 Quick Search</h3>
+                <h3>Quick Search</h3>
                 <div style="display: flex; gap: 0.5rem; margin-bottom: 1rem;">
                     <input type="text" id="quick-search-input" placeholder="Search anatomical parts..." 
                            style="flex: 1; padding: 0.75rem; border: 2px solid rgba(255, 255, 255, 0.1); border-radius: 12px; font-size: 0.9rem; background: rgba(0, 0, 0, 0.3); color: #e2e8f0;">
@@ -997,14 +997,14 @@
             </div>
 
             <div class="section">
-                <h3>🏷️ Node Labels</h3>
+                <h3>Node Labels</h3>
                 <ul class="label-list" id="label-list">
                     <li class="loading">Loading labels...</li>
                 </ul>
             </div>
 
             <div class="section">
-                <h3>🔗 Relationships</h3>
+                <h3>Relationships</h3>
                 <div id="relationship-filter-status" style="font-size: 0.8em; color: #94a3b8; margin-bottom: 0.5rem;">
                     Click relationships to filter
                 </div>
@@ -1017,10 +1017,11 @@
         <!-- Main Content -->
         <div class="main-content">
             <div class="controls">
-                <button class="btn" id="refresh-btn">🔄 Reset & Refresh</button>
-                <button class="btn secondary" id="reset-zoom-btn">🎯 Reset Zoom</button>
-                <button class="btn secondary" id="toggle-labels-btn">🏷️ Toggle Labels</button>
-                <button class="btn secondary" id="clear-filters-btn">🧹 Clear Filters</button>
+                <button class="btn" id="refresh-btn">Reset & Refresh</button>
+                <button class="btn secondary" id="reset-zoom-btn">Reset Zoom</button>
+                <button class="btn secondary" id="toggle-labels-btn">Toggle Labels</button>
+                <button class="btn secondary" id="clear-filters-btn">Clear Filters</button>
+                <button class="btn" id="connect-nodes-btn">Connect Nodes on Screen</button>
                 <select id="layout-select" class="btn">
                     <option value="force">Force Layout</option>
                     <option value="coordinates">Coordinate Layout</option>
@@ -1032,6 +1033,10 @@
             <div id="graph-container">
                 <div class="loading" id="graph-loading">
                     <div>Select labels or run localization to see data</div>
+                </div>
+                <div id="analysis-status-bar" style="position:absolute;left:0;right:0;bottom:0;padding:4px 10px;font-size:12px;font-family:system-ui, sans-serif;display:flex;align-items:center;gap:12px;backdrop-filter:blur(8px);background:linear-gradient(to top,rgba(0,0,0,0.55),rgba(0,0,0,0.15));border-top:1px solid rgba(255,255,255,0.08);color:#e2e8f0;min-height:24px;z-index:50;pointer-events:none;">
+                    <span id="analysis-status-text" style="opacity:0.9;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;flex:1;">Ready.</span>
+                    <span id="analysis-status-extra" style="font-weight:500;color:#f97316;display:none;"></span>
                 </div>
             </div>
         </div>
@@ -1067,9 +1072,10 @@
                 <div id="localization-status" style="font-size: 0.8em; color: #666; margin-top: 0.5rem;">Select sensations and/or muscles to analyze</div>
             </div>
 
-            <div class="section" id="node-details-section" style="display: none;">
-                <h3>📄 Analysis Results</h3>
-                <div id="selected-node-details"></div>
+            <div class="section" id="node-details-section" style="display:none;">
+                <!-- Original placeholder retained (now unused visually) -->
+                <h3 style="display:none;">📄 Analysis Results (legacy)</h3>
+                <div id="selected-node-details" style="display:none;"></div>
             </div>
 
             <div class="section" id="relationship-details-section" style="display: none;">
@@ -1089,6 +1095,7 @@
             <!-- Content will be populated by JavaScript -->
         </div>
     </div>
+
 
     <script>
         class Neo4jExplorer {
@@ -2111,6 +2118,147 @@
                 }
             }
 
+            async connectVisibleNodes() {
+                // Get currently visible nodes
+                const visibleNodes = this.getCurrentVisibleNodes();
+
+                // Fallback: if not enough visible nodes, try using selected search results (by name)
+                if (visibleNodes.length < 2) {
+                    // Gather selected search result names (if any)
+                    const selectedSearchNames = [];
+                    if (this.selectedSearchResults && this.selectedSearchResults.size > 0) {
+                        // The search results are rendered somewhere in DOM with data-node-id; collect their names
+                        this.selectedSearchResults.forEach(id => {
+                            const el = document.querySelector(`[data-search-node-id="${id}"]`);
+                            if (el && el.dataset && el.dataset.nodeName) {
+                                selectedSearchNames.push(el.dataset.nodeName);
+                            }
+                        });
+                    }
+
+                    if (selectedSearchNames.length >= 2) {
+                        this.showConnectionStatus(`🔍 Connecting ${selectedSearchNames.length} selected search result nodes...`, '#2d3748');
+                        try {
+                            const res = await fetch('/api/connect-nodes', {
+                                method: 'POST',
+                                headers: {'Content-Type':'application/json'},
+                                body: JSON.stringify({ nodes: selectedSearchNames })
+                            });
+                            if (!res.ok) throw new Error(`HTTP ${res.status}`);
+                            const data = await res.json();
+                            if (data.found && data.nodes && data.nodes.length) {
+                                this.renderPathConnections(data);
+                                const segs = data.segmentCount || (data.paths ? data.paths.length : 0);
+                                this.showConnectionStatus(`✅ Connected ${selectedSearchNames.length} nodes via ${segs} segment(s), ${data.nodes.length} total nodes`, '#059669');
+                            } else {
+                                this.showConnectionStatus('❌ No connecting paths found for selected search results', '#dc3545');
+                            }
+                        } catch (err) {
+                            console.error('Error connecting selected search results:', err);
+                            this.showConnectionStatus('❌ Error connecting selected search results', '#dc3545');
+                        }
+                        return;
+                    }
+
+                    // Final fallback message
+                    this.showConnectionStatus('⚠️ Need at least 2 nodes (visible or selected) to connect. Search & select nodes first.', '#f59e0b');
+                    return;
+                }
+                
+                if (visibleNodes.length > 20) {
+                    this.showConnectionStatus('⚠️ Too many nodes visible (>20). Please filter to see connections clearly.', '#f59e0b');
+                    return;
+                }
+                
+                try {
+                    this.showConnectionStatus('🔍 Computing minimal connecting network...', '#2d3748');
+                    const pathResults = await this.findPathsBetweenNodes(visibleNodes);
+                    if (pathResults.found && pathResults.nodes && pathResults.nodes.length > 0) {
+                        this.renderPathConnections(pathResults);
+                        const segs = pathResults.segmentCount || (pathResults.paths ? pathResults.paths.length : 0);
+                        const totalNodes = pathResults.nodes.length;
+                        this.showConnectionStatus(`✅ Connected ${visibleNodes.length} nodes via ${segs} segment(s), ${totalNodes} total nodes`, '#059669');
+                    } else {
+                        this.showConnectionStatus('❌ No connecting paths found between visible nodes', '#dc3545');
+                    }
+                } catch (e) {
+                    console.error(e);
+                    this.showConnectionStatus('❌ Error computing connections', '#dc3545');
+                }
+            }
+            
+            getCurrentVisibleNodes() {
+                // Get nodes that are currently rendered in the visualization
+                const nodes = [];
+                if (this.svg) {
+                    this.svg.selectAll('.node').each(function(d) {
+                        nodes.push(d);
+                    });
+                }
+                return nodes;
+            }
+            
+            async findPathsBetweenNodes(nodes) {
+                const nodeNames = nodes.map(n => n.properties?.name || n.name || n.id);
+                const res = await fetch('/api/connect-nodes', { method: 'POST', headers: {'Content-Type':'application/json'}, body: JSON.stringify({nodes: nodeNames}) });
+                if(!res.ok) throw new Error('Connect-nodes failed');
+                return await res.json();
+            }
+            
+            renderPathConnections(pathResults) {
+                this.selectedLabel = null;
+                this.selectedRelationships.clear();
+                document.querySelectorAll('.label-item').forEach(i=>i.classList.remove('active'));
+                document.querySelectorAll('.relationship-item').forEach(i=>i.classList.remove('active'));
+                // annotate nodes for highlighting
+                if (pathResults.nodes) {
+                    pathResults.nodes.forEach(n => {
+                        if (n.isSource) n._vizCategory = 'source';
+                        else if (n.isHub) n._vizCategory = 'hub';
+                        else n._vizCategory = 'path';
+                    });
+                }
+                if (pathResults.links) {
+                    pathResults.links.forEach(l => { l._pathEdge = true; });
+                }
+                this.renderGraph(pathResults, { highlightPaths: true });
+                this.addPathLegend();
+                this.updateFilterStatus();
+            }
+
+            addPathLegend() {
+                let legend = document.getElementById('path-legend');
+                if (!legend) {
+                    const controls = document.querySelector('.controls');
+                    legend = document.createElement('div');
+                    legend.id = 'path-legend';
+                    legend.style.cssText = 'margin-top:6px;font-size:12px;display:flex;gap:10px;flex-wrap:wrap;justify-content:center;';
+                    controls.appendChild(legend);
+                }
+                legend.innerHTML = `
+                    <span style="display:flex;align-items:center;gap:4px;"> <span style="width:12px;height:12px;border-radius:50%;background:#ff8c00;display:inline-block;"></span> Source </span>
+                    <span style="display:flex;align-items:center;gap:4px;"> <span style="width:12px;height:12px;border-radius:50%;background:#dc2626;display:inline-block;border:1px solid #991b1b;"></span> Intersection Hub </span>
+                    <span style="display:flex;align-items:center;gap:4px;"> <span style="width:12px;height:12px;border-radius:50%;background:#78b7ff;display:inline-block;"></span> Path Node </span>
+                    <span style="display:flex;align-items:center;gap:4px;"> <span style="width:20px;height:3px;background:#ff8c00;display:inline-block;"></span> Shortest Path Segment </span>
+                `;
+            }
+            
+            showConnectionStatus(message, color) {
+                const bar = document.getElementById('analysis-status-bar');
+                const text = document.getElementById('analysis-status-text');
+                if (!bar || !text) return;
+                text.textContent = message;
+                text.style.color = color;
+                bar.animate([{opacity:0.6},{opacity:1}],{duration:300,easing:'ease-out'});
+                if (color !== '#2d3748') {
+                    clearTimeout(this._analysisStatusTimer);
+                    this._analysisStatusTimer = setTimeout(()=>{
+                        text.textContent = 'Ready.';
+                        text.style.color = '#e2e8f0';
+                    }, 5000);
+                }
+            }
+
             async loadLabels() {
                 try {
                     console.log('Fetching labels from /api/labels...');
@@ -2457,7 +2605,7 @@
                 this.svg.append('g');
             }
 
-            renderGraph(data) {
+            renderGraph(data, options = {}) {
                 if (!data.nodes || data.nodes.length === 0) {
                     return;
                 }
@@ -2544,11 +2692,14 @@
                     }
                 }
 
-                // Create links
+                // Create links with optional path highlighting
                 const link = g.selectAll('.link')
                     .data(data.links)
                     .enter().append('line')
-                    .attr('class', 'link')
+                    .attr('class', d => 'link' + (d._pathEdge ? ' path-edge' : ''))
+                    .attr('stroke', d => d._pathEdge ? '#ff8c00' : '#999')
+                    .attr('stroke-width', d => d._pathEdge ? 3 : 1.2)
+                    .attr('opacity', d => options.highlightPaths && d._pathEdge ? 0.95 : 0.5)
                     .attr('marker-end', d => d.directed ? 'url(#arrow)' : null);
 
                 // Add relationship labels
@@ -2567,17 +2718,18 @@
                 const node = g.selectAll('.node')
                     .data(data.nodes)
                     .enter().append('circle')
-                    .attr('class', 'node')
-                    .attr('r', 8)
+                    .attr('class', d => 'node ' + (d._vizCategory || ''))
+                    .attr('r', d => d._vizCategory === 'hub' ? 10 : 8)
                     .attr('fill', d => {
-                        // Use color from data if available, otherwise default to gray
-                        if (d.color) {
-                            return d.color;
-                        }
-                        // Fallback to gray for nodes without color data
-                        return '#999999';
+                        if (d.color) return d.color;
+                        if (d._vizCategory === 'source') return '#ff8c00';
+                        if (d._vizCategory === 'hub') return '#dc2626';
+                        if (d._vizCategory === 'path') return '#78b7ff';
+                        return '#999';
                     })
-                    .attr('stroke', '#fff')
+                    .attr('stroke', d => d._vizCategory === 'hub' ? '#991b1b' : '#fff')
+                    .attr('stroke-width', d => d._vizCategory === 'hub' ? 2 : 1)
+                    .attr('opacity', d => options.highlightPaths && d._vizCategory ? 0.95 : 0.85)
                     .call(d3.drag()
                         .on('start', this.dragstarted.bind(this))
                         .on('drag', this.dragged.bind(this))
@@ -2888,37 +3040,30 @@
             }
 
             showNodeDetails(node) {
-                const section = document.getElementById('node-details-section');
-                const details = document.getElementById('selected-node-details');
-                
-                // Only show specific properties: location and sublocation
-                const relevantProperties = {};
-                if (node.properties.location) {
-                    relevantProperties.Location = node.properties.location;
-                }
-                if (node.properties.sublocation) {
-                    relevantProperties.Sublocation = node.properties.sublocation;
-                }
-                
-                details.innerHTML = `
-                    <div class="node-details">
-                        <h4>${this.formatText(node.name || node.id)}</h4>
-                        <p><strong>Type:</strong> ${node.labels.map(label => this.formatText(label)).join(', ')}</p>
-                        <h5>Properties:</h5>
-                        ${Object.keys(relevantProperties).length > 0 ? `
-                            <ul class="property-list">
-                                ${Object.entries(relevantProperties).map(([key, value]) => `
-                                    <li class="property-item">
-                                        <span class="property-key">${key}:</span>
-                                        <span class="property-value">${this.formatText(String(value))}</span>
-                                    </li>
-                                `).join('')}
-                            </ul>
-                        ` : '<p style="color: #94a3b8; font-style: italic;">No location properties available</p>'}
-                    </div>
-                `;
-                
-                section.style.display = 'block';
+                const text = document.getElementById('analysis-status-text');
+                if (!text) return;
+                const props = node.properties || {};
+                // Compose single thin line: Name | Labels | location/sublocation if present
+                const name = this.formatText(node.name || node.id);
+                const labels = node.labels.map(l=>this.formatText(l)).join(', ');
+                const locPieces = [];
+                if (props.location) locPieces.push(this.formatText(props.location));
+                if (props.sublocation) locPieces.push(this.formatText(props.sublocation));
+                const loc = locPieces.join(' / ');
+                let line = `📄 ${name}`;
+                if (labels) line += `  |  ${labels}`;
+                if (loc) line += `  |  ${loc}`;
+                text.textContent = line;
+                text.style.color = '#f97316';
+                // Auto fade back after 8s if user hasn't pinned anything (no pin concept now)
+                clearTimeout(this._analysisStatusTimer);
+                this._analysisStatusTimer = setTimeout(()=>{
+                    const current = document.getElementById('analysis-status-text');
+                    if (current && current.textContent === line) {
+                        current.textContent = 'Ready.';
+                        current.style.color = '#e2e8f0';
+                    }
+                }, 8000);
             }
 
             async loadNodeRelationships(nodeId) {
@@ -2945,9 +3090,9 @@
             }
 
             showRelationshipDetails(allRelationships, upstreamRelationships, downstreamRelationships) {
-                const section = document.getElementById('relationship-details-section');
-                const details = document.getElementById('selected-relationship-details');
-                
+                // For thin status bar mode, we append a condensed relationship summary to the line
+                const text = document.getElementById('analysis-status-text');
+
                 // Get currently visualized relationships
                 const currentLinks = this.svg ? this.svg.selectAll('.link').data() : [];
                 const visualizedRelationships = new Set();
@@ -2979,17 +3124,9 @@
                 });
 
                 const selectedNodeId = this.selectedNode ? this.selectedNode.id : null;
-                if (!selectedNodeId) {
-                    details.innerHTML = '<p>No node selected for relationship analysis</p>';
-                    section.style.display = 'block';
-                    return;
-                }
+                if (!selectedNodeId) return;
                 
-                if (unshownUpstream.length === 0 && unshownDownstream.length === 0) {
-                    details.innerHTML = '<p>All relationships for this node are currently visualized</p>';
-                    section.style.display = 'block';
-                    return;
-                }
+                if (unshownUpstream.length === 0 && unshownDownstream.length === 0) return;
 
                 let html = '';
 
@@ -3045,8 +3182,12 @@
 
 
 
-                details.innerHTML = html;
-                section.style.display = 'block';
+                if (text && html) {
+                    // Create a compact summary: counts of upstream/downstream remaining relationships
+                    const ups = unshownUpstream.length;
+                    const downs = unshownDownstream.length;
+                    text.textContent += `  |  ↑${ups} ↓${downs}`;
+                }
             }
 
             showExplorationInstructions(node) {
@@ -3097,6 +3238,32 @@
                 document.getElementById('refresh-btn').addEventListener('click', () => {
                     this.refreshAndReset();
                 });
+                // Floating analysis panel buttons
+                const closeBtn = document.getElementById('analysis-close-btn');
+                const pinBtn = document.getElementById('analysis-pin-btn');
+                const clearBtn = document.getElementById('analysis-clear-btn');
+                const panel = document.getElementById('analysis-float-panel');
+                if (closeBtn && panel) {
+                    closeBtn.addEventListener('click', () => {
+                        if (panel.dataset.pinned === 'true') return; // don't close if pinned
+                        panel.style.display = 'none';
+                    });
+                }
+                if (pinBtn && panel) {
+                    pinBtn.addEventListener('click', () => {
+                        const pinned = panel.dataset.pinned === 'true';
+                        panel.dataset.pinned = pinned ? 'false' : 'true';
+                        pinBtn.textContent = pinned ? 'PIN' : 'UNPIN';
+                        pinBtn.style.background = pinned ? 'rgba(249,115,22,0.15)' : 'rgba(249,115,22,0.35)';
+                        pinBtn.style.borderColor = pinned ? 'rgba(249,115,22,0.4)' : 'rgba(249,115,22,0.65)';
+                    });
+                }
+                if (clearBtn) {
+                    clearBtn.addEventListener('click', () => {
+                        const summary = document.getElementById('analysis-node-summary');
+                        if (summary) summary.innerHTML = '<div style="color:#64748b;font-style:italic;">Cleared. Select a node…</div>';
+                    });
+                }
 
                 // Reset zoom button
                 document.getElementById('reset-zoom-btn').addEventListener('click', () => {
@@ -3118,6 +3285,11 @@
                 // Clear filters button
                 document.getElementById('clear-filters-btn').addEventListener('click', () => {
                     this.clearFilters();
+                });
+
+                // Connect nodes button
+                document.getElementById('connect-nodes-btn').addEventListener('click', () => {
+                    this.connectVisibleNodes();
                 });
 
                 // Layout selector

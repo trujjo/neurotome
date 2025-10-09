@@ -3,6 +3,8 @@ from flask_cors import CORS
 from neo4j import GraphDatabase
 import json
 import os
+import threading
+import uuid
 
 app = Flask(__name__, static_folder='public')
 CORS(app)  # Enable CORS for all routes
@@ -606,223 +608,407 @@ def localize_lesion():
     
     with driver.session() as session:
         try:
-            # Create parameters for the selected item names
-            params = {"names": selected_items}
-            
-            # Build the query following the original pattern
-            query = """
-            WITH $names AS names
-
-            // Gather sources
-            MATCH (s)
-            WHERE s.name IN names
-            WITH collect(s) AS sources, size(names) AS total
-
-            // Expand 1..6 hops from each source and record min distance to each candidate m
-            // Only follow downstream (outgoing) relationships from sources
-            UNWIND sources AS src
-            MATCH p = (src)-[*1..6]->(m)
-            WITH m, src, min(length(p)) AS d, sources, total
-            WITH m, collect(d) AS dists, sources, total
-            WHERE size(dists) = total
-
-            // Earliest layer = minimal max distance across sources
-            WITH m, sources,
-                 reduce(mx = -1, d IN dists | CASE WHEN d > mx THEN d ELSE mx END) AS layer
-            ORDER BY layer ASC
-            WITH collect({m:m, layer:layer}) AS hits, sources
-
-            // Earliest layer value
-            WITH hits, sources,
-                 reduce(minL = 999999, h IN hits | CASE WHEN h.layer < minL THEN h.layer ELSE minL END) AS earliest
-
-            // Nodes in the earliest layer
-            WITH sources, [h IN hits WHERE h.layer = earliest | h.m] AS earliest_nodes
-
-            // Relationships among earliest nodes (induced subgraph)
-            UNWIND earliest_nodes AS en1
-            UNWIND earliest_nodes AS en2
-            WITH DISTINCT earliest_nodes, sources, en1
-            OPTIONAL MATCH (en1)-[r_between]->(en2)
-            WITH DISTINCT earliest_nodes, sources,
-                          collect(DISTINCT en1) AS en_nodes,
-                          collect(DISTINCT r_between) AS en_edges
-
-            // Shortest paths (<=6) from each source to each earliest node
-            // Only follow downstream (outgoing) paths from sources
-            UNWIND earliest_nodes AS target
-            UNWIND sources AS src
-            OPTIONAL MATCH p = shortestPath( (src)-[*..6]->(target) )
-            WITH earliest_nodes, en_nodes, en_edges, collect(p) AS paths
-
-            // Flatten and dedupe without APOC
-            WITH earliest_nodes, en_nodes, en_edges,
-                 [x IN paths WHERE x IS NOT NULL] AS paths2
-            WITH earliest_nodes, en_nodes, en_edges,
-                 reduce(ns = [], p IN paths2 | ns + nodes(p)) AS path_nodes,
-                 reduce(rs = [], p IN paths2 | rs + relationships(p)) AS path_rels
-            WITH earliest_nodes, en_nodes + path_nodes AS all_nodes_list,
-                 en_edges + path_rels AS all_rels_list
-            WITH earliest_nodes, [n IN all_nodes_list WHERE n IS NOT NULL] AS all_nodes_list,
-                 [r IN all_rels_list  WHERE r IS NOT NULL] AS all_rels_list
-            WITH earliest_nodes,
-              reduce(seen = [], n IN all_nodes_list |
-                CASE WHEN any(x IN seen WHERE id(x) = id(n)) THEN seen ELSE seen + n END) AS all_nodes,
-              reduce(seenr = [], r IN all_rels_list |
-                CASE WHEN any(x IN seenr WHERE id(x) = id(r)) THEN seenr ELSE seenr + r END) AS all_rels
-            RETURN all_nodes AS nodes, all_rels AS relationships, earliest_nodes
+            # 1. Fetch source nodes
+            source_query = """
+            MATCH (s) WHERE s.name IN $names RETURN s
             """
-            
-            result = session.run(query, params)
-            record = result.single()
-            
-            if record and record["nodes"]:
-                nodes = record["nodes"]
-                relationships = record["relationships"]
-                earliest_nodes = record.get("earliest_nodes", [])
-                
-                # Convert Neo4j nodes and relationships to JSON format
-                all_nodes = {}
-                all_links = []
-                
-                # Process nodes
-                for node in nodes:
-                    node_id = node.element_id
-                    
-                    # Determine node color based on type
-                    is_source = node.get("name") in selected_items
-                    is_earliest = any(id(node) == id(en) for en in earliest_nodes)
-                    
-                    if is_source:
-                        color = "orange"  # Source nodes
-                    elif is_earliest:
-                        color = "red"     # Earliest layer nodes (potential lesion sites)
-                    else:
-                        color = "lightblue"  # Path nodes
-                    
-                    all_nodes[node_id] = {
-                        "id": node_id,
-                        "labels": list(node.labels),
-                        "properties": dict(node),
-                        "name": dict(node).get("name", f"Node {node_id}"),
-                        "color": color,
-                        "isSource": is_source,
-                        "isEarliest": is_earliest
-                    }
-                
-                # Process relationships - the query already returns only the relevant ones
-                for rel in relationships:
-                    if rel is not None:  # Filter out null relationships
-                        start_id = rel.start_node.element_id
-                        end_id = rel.end_node.element_id
-                        start_node = rel.start_node
-                        end_node = rel.end_node
-                        
-                        # Skip relationships involving malformed nodes (no labels and no meaningful properties)
-                        if (not list(start_node.labels) and not start_node.get("name")) or \
-                           (not list(end_node.labels) and not end_node.get("name")):
-                            continue
-                        
-                        # Add the relationship
-                        all_links.append({
-                            "source": start_id,
-                            "target": end_id,
-                            "type": type(rel).__name__,
-                            "properties": dict(rel),
-                            "directed": True  # Mark as directed for arrow display
-                        })
-                        
-                        # Ensure start_node is in the nodes list
-                        if start_id not in all_nodes:
-                            is_source = start_node.get("name") in selected_items
-                            is_earliest = any(id(start_node) == id(en) for en in earliest_nodes)
-                            
-                            if is_source:
-                                color = "orange"
-                            elif is_earliest:
-                                color = "red"
-                            else:
-                                color = "lightblue"
-                                
-                            all_nodes[start_id] = {
-                                "id": start_id,
-                                "labels": list(start_node.labels),
-                                "properties": dict(start_node),
-                                "name": dict(start_node).get("name", f"Node {start_id}"),
-                                "color": color,
-                                "isSource": is_source,
-                                "isEarliest": is_earliest
-                            }
-                        
-                        # Ensure end_node is in the nodes list
-                        if end_id not in all_nodes:
-                            is_source = end_node.get("name") in selected_items
-                            is_earliest = any(id(end_node) == id(en) for en in earliest_nodes)
-                            
-                            if is_source:
-                                color = "orange"
-                            elif is_earliest:
-                                color = "red"
-                            else:
-                                color = "lightblue"
-                                
-                            all_nodes[end_id] = {
-                                "id": end_id,
-                                "labels": list(end_node.labels),
-                                "properties": dict(end_node),
-                                "name": dict(end_node).get("name", f"Node {end_id}"),
-                                "color": color,
-                                "isSource": is_source,
-                                "isEarliest": is_earliest
-                            }
-                
-                return jsonify({
-                    "nodes": list(all_nodes.values()),
-                    "links": all_links,
-                    "earliest_nodes": [node.element_id for node in earliest_nodes],
-                    "paths": all_links,  # Frontend expects 'paths' for counting
-                    "hub": earliest_nodes[0].element_id if earliest_nodes else None,  # Use first earliest node as hub
-                    "totalLength": len(all_links),  # Use number of links as total length
-                    "found": True,
-                    "message": f"Found {len(earliest_nodes)} potential lesion site(s) in the earliest convergence layer"
-                })
+            src_records = session.run(source_query, names=selected_items)
+            sources = [r["s"] for r in src_records]
+            if len(sources) != len(selected_items):
+                missing = set(selected_items) - set([s.get("name") for s in sources if s.get("name")])
             else:
+                missing = []
+            if not sources:
                 return jsonify({
-                    "nodes": [],
-                    "links": [],
-                    "earliest_nodes": [],
-                    "paths": [],  # Frontend expects 'paths' for counting
-                    "hub": None,  # Frontend checks for hub
-                    "totalLength": 0,  # Frontend displays total length
-                    "found": False,
+                    "nodes": [], "links": [], "earliest_nodes": [], "paths": [],
+                    "hub": None, "totalLength": 0, "found": False,
+                    "message": "No source nodes found", "missing": list(missing)
+                })
+
+            depth_limit = 6
+            # 2. Collect directed distance maps per source based on label rule
+            distance_maps = []  # list of dict element_id -> distance
+            for s in sources:
+                is_sensation = 'sensation' in s.labels
+                if is_sensation:
+                    dist_query = f"""
+                    MATCH (src) WHERE elementId(src) = $id
+                    MATCH p=(src)-[*1..{depth_limit}]->(m)
+                    RETURN m AS node, min(length(p)) AS d
+                    """
+                else:
+                    dist_query = f"""
+                    MATCH (src) WHERE elementId(src) = $id
+                    MATCH p=(src)<-[*1..{depth_limit}]-(m)
+                    RETURN m AS node, min(length(p)) AS d
+                    """
+                recs = session.run(dist_query, id=s.element_id)
+                dist_map = {}
+                for r in recs:
+                    n = r["node"]
+                    if n is None: continue
+                    dist_map[n.element_id] = r["d"]
+                distance_maps.append(dist_map)
+
+            # 3. Find intersection nodes reachable from all sources
+            if not distance_maps:
+                return jsonify({
+                    "nodes": [], "links": [], "earliest_nodes": [], "paths": [],
+                    "hub": None, "totalLength": 0, "found": False,
+                    "message": "No paths explored"
+                })
+
+            common_ids = set(distance_maps[0].keys())
+            for dm in distance_maps[1:]:
+                common_ids &= set(dm.keys())
+
+            # Remove the sources themselves to focus on convergence points
+            source_ids = {s.element_id for s in sources}
+            common_ids -= source_ids
+
+            if not common_ids:
+                return jsonify({
+                    "nodes": [], "links": [], "earliest_nodes": [], "paths": [],
+                    "hub": None, "totalLength": 0, "found": False,
                     "message": "No convergent pathways found between selected items"
                 })
-                
+
+            # 4. Compute layer = max distance among sources for each candidate; choose minimal
+            def layer_for(nid):
+                return max(dm[nid] for dm in distance_maps if nid in dm)
+            layers = {nid: layer_for(nid) for nid in common_ids}
+            min_layer = min(layers.values()) if layers else None
+            earliest_ids = [nid for nid, layer in layers.items() if layer == min_layer]
+
+            # 5. Reconstruct shortest directed paths from each source to each earliest node respecting direction rule
+            collected_nodes = {}
+            collected_rels = []
+
+            def add_node(n, color=None, is_source=False, is_earliest=False):
+                if n.element_id in collected_nodes:
+                    return
+                if color is None:
+                    if is_source:
+                        color = 'orange'
+                    elif is_earliest:
+                        color = 'red'
+                    else:
+                        color = 'lightblue'
+                collected_nodes[n.element_id] = {
+                    'id': n.element_id,
+                    'labels': list(n.labels),
+                    'properties': dict(n),
+                    'name': dict(n).get('name', f'Node {n.element_id}'),
+                    'color': color,
+                    'isSource': is_source,
+                    'isEarliest': is_earliest
+                }
+
+            # Ensure sources added
+            for s in sources:
+                add_node(s, is_source=True, is_earliest=False)
+
+            path_limit = depth_limit
+            for s in sources:
+                is_sensation = 'sensation' in s.labels
+                for target_id in earliest_ids:
+                    if is_sensation:
+                        path_query = f"""
+                        MATCH (src) WHERE elementId(src)=$sid
+                        MATCH (t) WHERE elementId(t)=$tid
+                        OPTIONAL MATCH p = shortestPath( (src)-[*..{path_limit}]->(t) )
+                        RETURN p
+                        """
+                    else:
+                        # Upstream: from target to source (so we can still use outgoing pattern)
+                        path_query = f"""
+                        MATCH (src) WHERE elementId(src)=$sid
+                        MATCH (t) WHERE elementId(t)=$tid
+                        OPTIONAL MATCH p = shortestPath( (t)-[*..{path_limit}]->(src) )
+                        RETURN p
+                        """
+                    rec = session.run(path_query, sid=s.element_id, tid=target_id).single()
+                    p = rec["p"] if rec else None
+                    if not p:
+                        continue
+                    # Collect nodes
+                    for n in p.nodes:
+                        add_node(n, is_source=(n.element_id in source_ids), is_earliest=(n.element_id in earliest_ids))
+                    # Collect relationships (directed true)
+                    for r in p.relationships:
+                        collected_rels.append({
+                            'source': r.start_node.element_id,
+                            'target': r.end_node.element_id,
+                            'type': type(r).__name__,
+                            'properties': dict(r),
+                            'directed': True
+                        })
+
+            # Deduplicate relationships
+            seen_rel = set()
+            dedup_rels = []
+            for rel in collected_rels:
+                key = (rel['source'], rel['target'], rel['type'])
+                if key in seen_rel:
+                    continue
+                seen_rel.add(key)
+                dedup_rels.append(rel)
+
+            # Mark earliest nodes (ensure they exist in collection)
+            earliest_nodes_objs = []
+            fetch_earliest_query = """
+            MATCH (n) WHERE elementId(n) IN $ids RETURN n
+            """
+            for rec in session.run(fetch_earliest_query, ids=earliest_ids):
+                earliest_nodes_objs.append(rec['n'])
+                add_node(rec['n'], is_earliest=True, is_source=(rec['n'].element_id in source_ids))
+
+            return jsonify({
+                'nodes': list(collected_nodes.values()),
+                'links': dedup_rels,
+                'earliest_nodes': earliest_ids,
+                'paths': dedup_rels,  # maintain shape expected by frontend
+                'hub': earliest_ids[0] if earliest_ids else None,
+                'totalLength': len(dedup_rels),
+                'found': True,
+                'message': f'Found {len(earliest_ids)} potential lesion site(s) (layer {min_layer})'
+            })
         except Exception as e:
             return jsonify({
-                "error": f"Error in lesion localization: {str(e)}",
-                "nodes": [],
-                "links": [],
-                "earliest_nodes": [],
-                "paths": [],  # Frontend expects 'paths' for counting
-                "hub": None,  # Frontend checks for hub  
-                "totalLength": 0,  # Frontend displays total length
-                "found": False
+                'error': f'Error in lesion localization (directional): {str(e)}',
+                'nodes': [], 'links': [], 'earliest_nodes': [], 'paths': [],
+                'hub': None, 'totalLength': 0, 'found': False
             }), 500
 
-@app.route("/")
-def index():
-    """Main page - serves the database explorer"""
-    return send_from_directory('public', 'explorer.html')
+# ------------------------------------------------------------
+# Connect arbitrary nodes via directional convergence logic
+# (Sensation sources expand downstream; all others expand upstream.)
+# ------------------------------------------------------------
+@app.route("/api/connect-nodes", methods=["POST"])
+def connect_nodes():
+    """Return combined shortest path subgraph connecting the supplied node names.
 
-# API endpoint to get dermatomes and myotomes data
-@app.route("/api/dermatomes-myotomes")
-def get_dermatomes_myotomes_api():
-    dermatomes, myotomes = get_dermatomes_and_myotomes()
-    return jsonify({
-        "dermatomes": dermatomes,
-        "myotomes": myotomes
-    })
+    Request JSON: {"nodes": [name1, name2, ...]}
+    Response JSON: {
+        nodes: [ {id, labels, properties, name, isSource, isHub, _vizCategory} ],
+        links: [ {source, target, type, properties, _pathEdge: true} ],
+        paths: [ {sourceName, targetName, nodeIds, relationshipIds} ],
+        hubs: [nodeIds],
+        found: bool,
+        message: str
+    }
+    """
+    data = request.get_json() or {}
+    requested = data.get("nodes", [])
+    if not isinstance(requested, list):
+        return jsonify({"error": "'nodes' must be a list"}), 400
+    # De-duplicate while preserving order
+    seen = set()
+    node_names = [n for n in requested if isinstance(n, str) and not (n in seen or seen.add(n))]
+    if len(node_names) < 2:
+        return jsonify({
+            "nodes": [],
+            "links": [],
+            "paths": [],
+            "hubs": [],
+            "found": False,
+            "message": "Provide at least 2 node names"
+        }), 400
+    if len(node_names) > 20:
+        return jsonify({"error": "Maximum of 20 nodes allowed"}), 400
+
+    lower_names = [n.lower() for n in node_names]
+
+    with driver.session() as session:
+        try:
+            fetch_query = """
+            WITH $namesLower AS namesLower
+            MATCH (s)
+            WHERE s.name IS NOT NULL AND toLower(s.name) IN namesLower
+            RETURN s
+            """
+            records = session.run(fetch_query, namesLower=lower_names)
+            sources = [r["s"] for r in records]
+
+            if not sources:
+                return jsonify({
+                    'nodes': [], 'links': [], 'paths': [], 'hubs': [], 'found': False,
+                    'message': 'No supplied names matched any nodes'
+                })
+
+            depth_limit = 25
+            source_ids = {s.element_id for s in sources}
+
+            # 1. Build directional distance maps for each source
+            distance_maps = []
+            for s in sources:
+                is_sensation = 'sensation' in s.labels
+                if is_sensation:
+                    dist_query = f"""
+                    MATCH (src) WHERE elementId(src)=$id
+                    MATCH p=(src)-[*1..{depth_limit}]->(n)
+                    RETURN n AS node, min(length(p)) AS d
+                    """
+                else:
+                    dist_query = f"""
+                    MATCH (src) WHERE elementId(src)=$id
+                    MATCH p=(n)-[*1..{depth_limit}]->(src)
+                    RETURN n AS node, min(length(p)) AS d
+                    """
+                recs = session.run(dist_query, id=s.element_id)
+                dm = {}
+                for r in recs:
+                    node_obj = r['node']
+                    if not node_obj:
+                        continue
+                    if node_obj.element_id == s.element_id:
+                        continue
+                    dm[node_obj.element_id] = r['d']
+                distance_maps.append(dm)
+
+            if not distance_maps:
+                return jsonify({'nodes': [], 'links': [], 'paths': [], 'hubs': [], 'found': False, 'message': 'No traversals possible'})
+
+            # 2. Intersection of reachable node ids
+            common_ids = set(distance_maps[0].keys())
+            for dm in distance_maps[1:]:
+                common_ids &= set(dm.keys())
+            common_ids -= source_ids
+
+            if not common_ids:
+                # Return only sources (no hubs)
+                node_map = {}
+                for s in sources:
+                    node_map[s.element_id] = {
+                        'id': s.element_id,
+                        'labels': list(s.labels),
+                        'properties': dict(s),
+                        'name': dict(s).get('name', f'Node {s.element_id}'),
+                        'isSource': True,
+                        'isHub': False,
+                        '_vizCategory': 'source'
+                    }
+                return jsonify({
+                    'nodes': list(node_map.values()),
+                    'links': [],
+                    'paths': [],
+                    'hubs': [],
+                    'found': False,
+                    'message': 'No directional intersection (hub) nodes found'
+                })
+
+            # 3. Determine earliest layer hubs (minimize max distance across sources)
+            def layer_for(node_id):
+                vals = [dm[node_id] for dm in distance_maps if node_id in dm]
+                return max(vals) if vals else None
+            layers = {nid: layer_for(nid) for nid in common_ids}
+            min_layer = min(layers.values()) if layers else None
+            earliest_ids = [nid for nid, lay in layers.items() if lay == min_layer]
+
+            # 4. Reconstruct directional shortest paths source->hub (sensation) or hub->source (non-sensation)
+            collected_nodes = {}
+            collected_rels = []
+            paths_data = []
+
+            def add_node(n, is_source=False, is_hub=False):
+                existing = collected_nodes.get(n.element_id)
+                if existing:
+                    if is_source:
+                        existing['isSource'] = True
+                        existing['_vizCategory'] = 'source'
+                    if is_hub:
+                        existing['isHub'] = True
+                        existing['_vizCategory'] = 'hub'
+                    return
+                category = 'source' if is_source else ('hub' if is_hub else 'path')
+                collected_nodes[n.element_id] = {
+                    'id': n.element_id,
+                    'labels': list(n.labels),
+                    'properties': dict(n),
+                    'name': dict(n).get('name', f'Node {n.element_id}'),
+                    'isSource': is_source,
+                    'isHub': is_hub,
+                    '_vizCategory': category
+                }
+
+            for s in sources:
+                add_node(s, is_source=True)
+
+            hub_query = """
+            MATCH (n) WHERE elementId(n) IN $ids RETURN n
+            """
+            hub_nodes = {r['n'].element_id: r['n'] for r in session.run(hub_query, ids=earliest_ids)}
+            for hid in earliest_ids:
+                if hid in hub_nodes:
+                    add_node(hub_nodes[hid], is_hub=True)
+
+            for s in sources:
+                is_sensation = 'sensation' in s.labels
+                for hid in earliest_ids:
+                    if hid not in hub_nodes:
+                        continue
+                    if is_sensation:
+                        path_query = f"""
+                        MATCH (src) WHERE elementId(src)=$sid
+                        MATCH (hub) WHERE elementId(hub)=$hid
+                        OPTIONAL MATCH p = shortestPath( (src)-[*..{depth_limit}]->(hub) )
+                        RETURN p
+                        """
+                    else:
+                        path_query = f"""
+                        MATCH (src) WHERE elementId(src)=$sid
+                        MATCH (hub) WHERE elementId(hub)=$hid
+                        OPTIONAL MATCH p = shortestPath( (hub)-[*..{depth_limit}]->(src) )
+                        RETURN p
+                        """
+                    rec = session.run(path_query, sid=s.element_id, hid=hid).single()
+                    p = rec['p'] if rec else None
+                    if not p:
+                        continue
+                    node_ids = [n.element_id for n in p.nodes]
+                    rel_ids = []
+                    for n in p.nodes:
+                        add_node(n, is_source=(n.element_id in source_ids), is_hub=(n.element_id in earliest_ids))
+                    for r in p.relationships:
+                        rel_ids.append(r.element_id)
+                        collected_rels.append({
+                            'source': r.start_node.element_id,
+                            'target': r.end_node.element_id,
+                            'type': type(r).__name__,
+                            'properties': dict(r),
+                            '_pathEdge': True,
+                            'directed': True
+                        })
+                    paths_data.append({
+                        'sourceName': s.get('name'),
+                        'hubId': hid,
+                        'nodeIds': node_ids,
+                        'relationshipIds': rel_ids
+                    })
+
+            # Deduplicate relationships
+            seen_rel = set()
+            dedup_links = []
+            for rel in collected_rels:
+                key = (rel['source'], rel['target'], rel['type'])
+                if key in seen_rel:
+                    continue
+                seen_rel.add(key)
+                dedup_links.append(rel)
+
+            return jsonify({
+                'nodes': list(collected_nodes.values()),
+                'links': dedup_links,
+                'paths': paths_data,
+                'hubs': earliest_ids,
+                'found': True if earliest_ids else False,
+                'message': f'Directional connect: {len(earliest_ids)} hub node(s); {len(paths_data)} path fragment(s); layer={min_layer}'
+            })
+        except Exception as e:
+            return jsonify({
+                'error': f'Directional connect failed: {str(e)}',
+                'nodes': [], 'links': [], 'paths': [], 'hubs': [], 'found': False
+            }), 500
 
 # Legacy routes for backward compatibility
 @app.route("/explorer")
@@ -832,6 +1018,15 @@ def explorer():
 @app.route("/explorer.html")
 def explorer_html():
     return send_from_directory('public', 'explorer.html')
+
+# Simple root route (was inadvertently removed during refactor)
+@app.route("/")
+def root():
+    # Prefer serving index.html if it exists, else simple OK text
+    index_path = os.path.join(app.static_folder or 'public', 'index.html')
+    if os.path.exists(index_path):
+        return send_from_directory('public', 'index.html')
+    return "OK", 200
 
 # Route to access the old index page if needed
 @app.route("/old-index")
