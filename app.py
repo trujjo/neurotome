@@ -342,12 +342,11 @@ def get_graph_data():
             rel_type_conditions = ' OR '.join([f'type(r) = "{rel_type}"' for rel_type in rel_types])
             
             if label_filter:
-                # Modified query: Only show connections between nodes of the same label
+                # Only show connections between nodes of the same label; no limit when label filter is present
                 query = f"""
                 MATCH (n:`{label_filter}`)-[r]-(m:`{label_filter}`)
                 WHERE {rel_type_conditions}
                 RETURN n, r, m
-                LIMIT {limit}
                 """
             else:
                 query = f"""
@@ -357,11 +356,10 @@ def get_graph_data():
                 LIMIT {limit}
                 """
         elif label_filter:
-            # Modified query: Only show connections between nodes of the same label
+            # Only show connections between nodes of the same label; no limit when label filter is present
             query = f"""
             MATCH (n:`{label_filter}`)-[r]-(m:`{label_filter}`)
             RETURN n, r, m
-            LIMIT {limit}
             """
         else:
             query = f"""
@@ -378,35 +376,38 @@ def get_graph_data():
             source_node = record["n"]
             target_node = record["m"]
             relationship = record["r"]
-            
-            # Add source node
-            source_id = source_node.element_id
-            if source_id not in nodes:
-                nodes[source_id] = {
-                    "id": source_id,
+
+            # Ensure nodes are in the node map
+            n_id = source_node.element_id
+            if n_id not in nodes:
+                nodes[n_id] = {
+                    "id": n_id,
                     "labels": list(source_node.labels),
                     "properties": dict(source_node),
-                    "name": dict(source_node).get("name", f"Node {source_id}"),
-                    "color": "gray"  # Default color for regular graph
+                    "name": dict(source_node).get("name", f"Node {n_id}"),
+                    "color": "gray"
                 }
-            
-            # Add target node
-            target_id = target_node.element_id
-            if target_id not in nodes:
-                nodes[target_id] = {
-                    "id": target_id,
+
+            m_id = target_node.element_id
+            if m_id not in nodes:
+                nodes[m_id] = {
+                    "id": m_id,
                     "labels": list(target_node.labels),
                     "properties": dict(target_node),
-                    "name": dict(target_node).get("name", f"Node {target_id}"),
-                    "color": "gray"  # Default color for regular graph
+                    "name": dict(target_node).get("name", f"Node {m_id}"),
+                    "color": "gray"
                 }
-            
-            # Add relationship
+
+            # Use relationship orientation for link direction
+            start_id = relationship.start_node.element_id
+            end_id = relationship.end_node.element_id
+
             links.append({
-                "source": source_id,
-                "target": target_id,
+                "source": start_id,
+                "target": end_id,
                 "type": type(relationship).__name__,
-                "properties": dict(relationship)
+                "properties": dict(relationship),
+                "directed": True
             })
         
         return jsonify({
