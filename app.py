@@ -1022,11 +1022,8 @@ def explorer_html():
 # Simple root route (was inadvertently removed during refactor)
 @app.route("/")
 def root():
-    # Prefer serving index.html if it exists, else simple OK text
-    index_path = os.path.join(app.static_folder or 'public', 'index.html')
-    if os.path.exists(index_path):
-        return send_from_directory('public', 'index.html')
-    return "OK", 200
+    # Serve the database explorer as the main landing page
+    return send_from_directory('public', 'explorer.html')
 
 # Route to access the old index page if needed
 @app.route("/old-index")
