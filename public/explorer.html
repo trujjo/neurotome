@@ -14,28 +14,27 @@
 
         body {
             font-family: 'Inter', 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-            background: linear-gradient(135deg, #0f0f23 0%, #1a1a2e 50%, #16213e 100%);
+            background: #000; /* Clean black theme */
             color: #e2e8f0;
             overflow-x: hidden;
             min-height: 100vh;
         }
 
         .header {
-            background: rgba(15, 15, 35, 0.95);
-            backdrop-filter: blur(20px);
+            background: #000; /* solid black header */
             padding: 1rem 2rem;
-            box-shadow: 0 4px 32px rgba(0, 0, 0, 0.3);
-            border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+            box-shadow: 0 4px 24px rgba(0, 0, 0, 0.6);
+            border-bottom: 1px solid rgba(255, 255, 255, 0.06);
             position: sticky;
             top: 0;
             z-index: 1000;
         }
 
         .header h1 {
-            color: #f97316;
+            color: #cc5500; /* burnt orange */
             font-size: 2rem;
             font-weight: 700;
-            text-shadow: 0 0 20px rgba(249, 115, 22, 0.3);
+            text-shadow: 0 0 18px rgba(204, 85, 0, 0.35);
         }
 
         .container {
@@ -47,34 +46,31 @@
         }
 
         .sidebar {
-            background: rgba(15, 15, 35, 0.9);
-            backdrop-filter: blur(20px);
+            background: rgba(0, 0, 0, 0.85);
             border-radius: 16px;
             padding: 1.5rem;
-            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
-            border: 1px solid rgba(255, 255, 255, 0.1);
+            box-shadow: 0 8px 24px rgba(0, 0, 0, 0.6);
+            border: 1px solid rgba(255, 255, 255, 0.08);
             overflow-y: auto;
         }
 
         .main-content {
-            background: rgba(15, 15, 35, 0.9);
-            backdrop-filter: blur(20px);
+            background: rgba(0, 0, 0, 0.85);
             border-radius: 16px;
             padding: 1.5rem;
-            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
-            border: 1px solid rgba(255, 255, 255, 0.1);
+            box-shadow: 0 8px 24px rgba(0, 0, 0, 0.6);
+            border: 1px solid rgba(255, 255, 255, 0.08);
             overflow: hidden;
             display: flex;
             flex-direction: column;
         }
 
         .details-panel {
-            background: rgba(15, 15, 35, 0.9);
-            backdrop-filter: blur(20px);
+            background: rgba(0, 0, 0, 0.85);
             border-radius: 16px;
             padding: 1.5rem;
-            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
-            border: 1px solid rgba(255, 255, 255, 0.1);
+            box-shadow: 0 8px 24px rgba(0, 0, 0, 0.6);
+            border: 1px solid rgba(255, 255, 255, 0.08);
             overflow-y: auto;
         }
 
@@ -680,7 +676,7 @@
         }
 
         select.btn option {
-            background: #0f0f23;
+            background: #000;
             color: #e2e8f0;
             padding: 0.5rem;
         }
@@ -705,14 +701,14 @@
             background: rgba(96, 165, 250, 0.7);
         }
 
-        /* Glow animation for interactive elements */
+        /* Subtle burnt-orange glow for the title */
         @keyframes glow {
-            0%, 100% { box-shadow: 0 0 5px rgba(96, 165, 250, 0.2); }
-            50% { box-shadow: 0 0 20px rgba(96, 165, 250, 0.4); }
+            0%, 100% { text-shadow: 0 0 10px rgba(204, 85, 0, 0.25); }
+            50% { text-shadow: 0 0 18px rgba(204, 85, 0, 0.45); }
         }
 
         .header h1 {
-            animation: glow 3s ease-in-out infinite;
+            animation: glow 4s ease-in-out infinite;
         }
 
         .node-details, .relationship-details {
@@ -863,9 +859,8 @@
             right: 20px;
             width: 320px;
             max-height: 400px;
-            background: rgba(15, 15, 35, 0.95);
-            backdrop-filter: blur(20px);
-            border: 1px solid rgba(249, 115, 22, 0.3);
+            background: rgba(0, 0, 0, 0.95);
+            border: 1px solid rgba(204, 85, 0, 0.3);
             border-radius: 12px;
             padding: 1rem;
             box-shadow: 0 8px 32px rgba(0, 0, 0, 0.5);
@@ -887,11 +882,11 @@
             align-items: center;
             margin-bottom: 1rem;
             padding-bottom: 0.5rem;
-            border-bottom: 1px solid rgba(249, 115, 22, 0.3);
+            border-bottom: 1px solid rgba(204, 85, 0, 0.3);
         }
 
         .exploration-popup-title {
-            color: #f97316;
+            color: #cc5500;
             font-size: 1rem;
             font-weight: 600;
         }
@@ -913,8 +908,8 @@
         }
 
         .exploration-popup-close:hover {
-            background: rgba(249, 115, 22, 0.2);
-            color: #f97316;
+            background: rgba(204, 85, 0, 0.2);
+            color: #cc5500;
         }
 
         .exploration-popup-content {
@@ -1058,6 +1053,14 @@
                 this.svg = null;
                 this.currentLayout = 'force';
                 this.explorationPopupShown = false; // Track if popup has been shown this session
+                // Directional traversal state for consecutive keyboard exploration
+                this.traversalState = {
+                    direction: null,       // 'upstream' | 'downstream'
+                    startNodeId: null,     // elementId of the anchor node
+                    frontier: [],          // array of node ids to expand from on next step
+                    level: 0,              // how many steps away from the start are currently shown
+                    visited: new Set()     // visited node ids to avoid loops
+                };
                 
                 this.init();
             }
@@ -2975,6 +2978,15 @@
                 this.showNodeDetails(node);
                 this.loadNodeRelationships(node.id);
 
+                // Reset traversal state whenever a new node is selected
+                this.traversalState = {
+                    direction: null,
+                    startNodeId: node.id,
+                    frontier: [],
+                    level: 0,
+                    visited: new Set([node.id])
+                };
+
                 // Highlight selected node
                 this.svg.selectAll('.node')
                     .attr('stroke-width', d => d.id === node.id ? 4 : 2)
@@ -3264,12 +3276,99 @@
                 switch(e.key) {
                     case 'ArrowUp':
                         e.preventDefault();
-                        this.exploreUpstream(this.selectedNode);
+                        this.continueDirectionalExploration('upstream');
                         break;
                     case 'ArrowDown':
                         e.preventDefault();
-                        this.exploreDownstream(this.selectedNode);
+                        this.continueDirectionalExploration('downstream');
                         break;
+                }
+            }
+
+            async continueDirectionalExploration(direction) {
+                // Initialize or continue traversal based on current state
+                if (!this.selectedNode) return;
+
+                if (this.traversalState.direction !== direction || this.traversalState.startNodeId !== this.selectedNode.id) {
+                    // Start a new traversal context
+                    this.traversalState.direction = direction;
+                    this.traversalState.startNodeId = this.selectedNode.id;
+                    this.traversalState.frontier = [this.selectedNode.id];
+                    this.traversalState.level = 0;
+                    this.traversalState.visited = new Set([this.selectedNode.id]);
+                }
+
+                // Perform one expansion step from the current frontier
+                await this.expandTraversalStep();
+            }
+
+            async expandTraversalStep() {
+                const { direction } = this.traversalState;
+                let frontier = this.traversalState.frontier;
+                if (!frontier || frontier.length === 0) {
+                    frontier = [this.selectedNode.id];
+                }
+
+                try {
+                    // Mark current frontier as visited to avoid immediate loops
+                    frontier.forEach(id => this.traversalState.visited.add(id));
+
+                    // Fetch relationships for all nodes in the current frontier
+                    const relsArrays = await Promise.all(frontier.map(async (id) => {
+                        const url = direction === 'upstream'
+                            ? `/api/node/${encodeURIComponent(id)}/upstream`
+                            : `/api/node/${encodeURIComponent(id)}/downstream`;
+                        const res = await fetch(url);
+                        if (!res.ok) return [];
+                        return res.json();
+                    }));
+
+                    // Flatten and de-duplicate relationships by (source-target)
+                    const rels = [].concat(...relsArrays);
+                    const seen = new Set();
+                    const combined = [];
+                    for (const r of rels) {
+                        const key = `${r.source.id}->${r.target.id}`;
+                        if (seen.has(key)) continue;
+                        seen.add(key);
+                        combined.push(r);
+                    }
+
+                    // Add to graph at the correct hierarchical level (one more than current)
+                    const levelToAdd = this.traversalState.level + 1;
+                    const result = this.addRelationshipsToGraph(combined, direction, levelToAdd);
+
+                    // Compute next frontier from the newly added nodes
+                    const nextFrontier = new Set();
+                    for (const rel of combined) {
+                        const nextId = direction === 'upstream' ? rel.source.id : rel.target.id;
+                        if (!this.traversalState.visited.has(nextId)) {
+                            nextFrontier.add(nextId);
+                        }
+                    }
+
+                    // Update visited set with any nodes actually added to the graph
+                    if (result && Array.isArray(result.addedNodeIds)) {
+                        result.addedNodeIds.forEach(id => this.traversalState.visited.add(id));
+                    }
+
+                    // Also mark endpoints of combined rels as visited to mitigate cycles
+                    combined.forEach(rel => {
+                        this.traversalState.visited.add(rel.source.id);
+                        this.traversalState.visited.add(rel.target.id);
+                    });
+
+                    const next = Array.from(nextFrontier);
+                    if (next.length === 0) {
+                        this.showHierarchyInfo(direction, 0);
+                        return;
+                    }
+
+                    this.traversalState.frontier = next;
+                    this.traversalState.level = levelToAdd;
+                    this.showHierarchyInfo(direction, result ? result.addedCount || 0 : 0);
+                } catch (err) {
+                    console.error('Error during directional traversal step:', err);
                 }
             }
 
@@ -3305,10 +3404,10 @@
                 }
             }
 
-            addRelationshipsToGraph(relationshipData, direction) {
+            addRelationshipsToGraph(relationshipData, direction, level = 1) {
                 if (!relationshipData || relationshipData.length === 0) {
                     alert(`No ${direction} relationships found for this node.`);
-                    return;
+                    return { addedNodeIds: [], addedCount: 0 };
                 }
 
                 // Get current graph data
@@ -3337,7 +3436,7 @@
                 relationshipData.forEach((rel, index) => {
                     // Calculate positions based on direction
                     const nodeX = startX + (index * horizontalSpacing);
-                    const nodeY = direction === 'upstream' ? baseY - verticalSpacing : baseY + verticalSpacing;
+                    const nodeY = direction === 'upstream' ? baseY - verticalSpacing * level : baseY + verticalSpacing * level;
                     
                     // Add source node if not exists
                     if (!existingNodes.has(rel.source.id)) {
@@ -3405,6 +3504,8 @@
                 
                 // Show hierarchy information
                 this.showHierarchyInfo(direction, newNodes.length);
+
+                return { addedNodeIds: newNodes.map(n => n.id), addedCount: newNodes.length };
             }
 
             showHierarchyInfo(direction, nodeCount) {
