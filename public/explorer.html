@@ -834,9 +834,7 @@
 
         .link {
             fill: none;
-            stroke: #f97316;
-            stroke-opacity: 0.6;
-            stroke-width: 2px;
+            /* stroke color/width/opacity are set per-link in code to reflect relationship type */
             filter: drop-shadow(0 0 3px rgba(249, 115, 22, 0.2));
         }
 
@@ -1431,7 +1429,9 @@
             updateLocalizationButton() {
                 const button = document.getElementById('localize-lesion-btn');
                 const status = document.getElementById('localization-status');
-                
+                // If localization UI is not present, safely no-op
+                if (!button || !status) return;
+
                 const totalSelections = this.selectedSensations.size + this.selectedMuscles.size;
                 
                 if (totalSelections > 0) {
@@ -2184,7 +2184,7 @@
                     <span style="display:flex;align-items:center;gap:4px;"> <span style="width:12px;height:12px;border-radius:50%;background:#ff8c00;display:inline-block;"></span> Source </span>
                     <span style="display:flex;align-items:center;gap:4px;"> <span style="width:12px;height:12px;border-radius:50%;background:#dc2626;display:inline-block;border:1px solid #991b1b;"></span> Intersection Hub </span>
                     <span style="display:flex;align-items:center;gap:4px;"> <span style="width:12px;height:12px;border-radius:50%;background:#78b7ff;display:inline-block;"></span> Path Node </span>
-                    <span style="display:flex;align-items:center;gap:4px;"> <span style="width:20px;height:3px;background:#ff8c00;display:inline-block;"></span> Shortest Path Segment </span>
+                    <span style="display:flex;align-items:center;gap:4px;"> <span style="width:20px;height:3px;background:#666;display:inline-block;"></span> Path Segment (bold) </span>
                 `;
             }
             
@@ -2550,29 +2550,35 @@
                 // Clear existing elements
                 g.selectAll('*').remove();
 
-                // Add arrow marker definitions
+                // Add arrow marker definitions (one per relationship type for matching colors)
                 const defs = this.svg.select('defs').empty() ? this.svg.append('defs') : this.svg.select('defs');
-                
                 // Clear existing markers
                 defs.selectAll('marker').remove();
-                
-                // Create arrow marker
-                defs.append('marker')
-                    .attr('id', 'arrow')
-                    .attr('viewBox', '0 -5 10 10')
-                    .attr('refX', 15)  // Position arrow at end of line
-                    .attr('refY', 0)
-                    .attr('markerWidth', 6)
-                    .attr('markerHeight', 6)
-                    .attr('orient', 'auto')
-                    .append('path')
-                    .attr('d', 'M0,-5L10,0L0,5')
-                    .attr('fill', '#f97316')
-                    .attr('stroke', '#f97316')
-                    .attr('stroke-width', 1);
+                const safeMarkerId = (t) => (t ? String(t).toLowerCase().replace(/[^a-z0-9]+/g, '-') : 'unknown');
 
-                // Color scale for different node labels
-                const colorScale = d3.scaleOrdinal(d3.schemeCategory10);
+                // Color scales
+                const colorScale = d3.scaleOrdinal(d3.schemeCategory10); // nodes (by label/category elsewhere)
+                const relationshipColor = d3.scaleOrdinal(d3.schemeTableau10); // links by relationship type
+
+                // Create per-relationship arrow markers so arrow color matches link color
+                const getLinkTypeKey = d => ((d && d.type) || 'unknown');
+                const relationshipTypes = Array.from(new Set((data.links || []).map(getLinkTypeKey)));
+                relationshipTypes.forEach((t) => {
+                    const color = relationshipColor(t);
+                    defs.append('marker')
+                        .attr('id', `arrow-${safeMarkerId(t)}`)
+                        .attr('viewBox', '0 -5 10 10')
+                        .attr('refX', 15)
+                        .attr('refY', 0)
+                        .attr('markerWidth', 6)
+                        .attr('markerHeight', 6)
+                        .attr('orient', 'auto')
+                        .append('path')
+                        .attr('d', 'M0,-5L10,0L0,5')
+                        .attr('fill', color)
+                        .attr('stroke', color)
+                        .attr('stroke-width', 1);
+                });
 
                 // Check if we should use coordinate layout
                 const useCoordinates = this.currentLayout === 'coordinates' && this.hasCoordinates(data.nodes);
@@ -2630,10 +2636,14 @@
                     .data(data.links)
                     .enter().append('line')
                     .attr('class', d => 'link' + (d._pathEdge ? ' path-edge' : ''))
-                    .attr('stroke', d => d._pathEdge ? '#ff8c00' : '#999')
-                    .attr('stroke-width', d => d._pathEdge ? 3 : 1.2)
-                    .attr('opacity', d => options.highlightPaths && d._pathEdge ? 0.95 : 0.5)
-                    .attr('marker-end', d => d.directed ? 'url(#arrow)' : null);
+                    .style('stroke', d => relationshipColor(d.type || 'unknown'))
+                    .style('stroke-width', d => d._pathEdge ? 3 : 1.2)
+                    .style('opacity', d => options.highlightPaths && d._pathEdge ? 0.95 : 0.6)
+                    .attr('marker-end', d => {
+                        if (!d.directed) return null;
+                        const key = getLinkTypeKey(d);
+                        return `url(#arrow-${safeMarkerId(key)})`;
+                    });
 
                 // Add relationship labels
                 const linkLabels = g.selectAll('.link-label')
@@ -2642,7 +2652,7 @@
                     .attr('class', 'link-label')
                     .text(d => this.formatRelationshipName(d.type || 'unknown'))
                     .style('font-size', '8px')
-                    .style('fill', '#666')
+                    .style('fill', d => relationshipColor(d.type || 'unknown'))
                     .style('text-anchor', 'middle')
                     .style('pointer-events', 'none')
                     .style('display', this.showLabels ? 'block' : 'none');
@@ -2652,7 +2662,7 @@
                     .data(data.nodes)
                     .enter().append('circle')
                     .attr('class', d => 'node ' + (d._vizCategory || ''))
-                    .attr('r', d => d._vizCategory === 'hub' ? 10 : 8)
+                    .attr('r', d => d._vizCategory === 'hub' ? 11 : 9)
                     .attr('fill', d => {
                         if (d.color) return d.color;
                         if (d._vizCategory === 'source') return '#ff8c00';
@@ -2673,6 +2683,7 @@
                     .data(data.nodes)
                     .enter().append('text')
                     .attr('class', 'node-label')
+                    .style('font-size', '9px')
                     .style('display', this.showLabels ? 'block' : 'none')
                     .each(function(d) {
                         const textElement = d3.select(this);
@@ -2710,34 +2721,35 @@
                         });
                         
                         // Update links with proper positioning to avoid overlap with nodes
+                        const nodeRadiusFor = (n) => (n && n._vizCategory === 'hub' ? 11 : 9);
                         link
                             .attr('x1', d => {
                                 const dx = d.target.x - d.source.x;
                                 const dy = d.target.y - d.source.y;
                                 const length = Math.sqrt(dx * dx + dy * dy);
-                                const nodeRadius = 8;
-                                return length > 0 ? d.source.x + (dx * nodeRadius / length) : d.source.x;
+                                const r = nodeRadiusFor(d.source);
+                                return length > 0 ? d.source.x + (dx * r / length) : d.source.x;
                             })
                             .attr('y1', d => {
                                 const dx = d.target.x - d.source.x;
                                 const dy = d.target.y - d.source.y;
                                 const length = Math.sqrt(dx * dx + dy * dy);
-                                const nodeRadius = 8;
-                                return length > 0 ? d.source.y + (dy * nodeRadius / length) : d.source.y;
+                                const r = nodeRadiusFor(d.source);
+                                return length > 0 ? d.source.y + (dy * r / length) : d.source.y;
                             })
                             .attr('x2', d => {
                                 const dx = d.target.x - d.source.x;
                                 const dy = d.target.y - d.source.y;
                                 const length = Math.sqrt(dx * dx + dy * dy);
-                                const nodeRadius = 8;
-                                return length > 0 ? d.target.x - (dx * nodeRadius / length) : d.target.x;
+                                const r = nodeRadiusFor(d.target);
+                                return length > 0 ? d.target.x - (dx * r / length) : d.target.x;
                             })
                             .attr('y2', d => {
                                 const dx = d.target.x - d.source.x;
                                 const dy = d.target.y - d.source.y;
                                 const length = Math.sqrt(dx * dx + dy * dy);
-                                const nodeRadius = 8;
-                                return length > 0 ? d.target.y - (dy * nodeRadius / length) : d.target.y;
+                                const r = nodeRadiusFor(d.target);
+                                return length > 0 ? d.target.y - (dy * r / length) : d.target.y;
                             });
 
                         // Position relationship labels in the middle of links
@@ -2886,8 +2898,8 @@
                         const dx = targetNode.x - sourceNode.x;
                         const dy = targetNode.y - sourceNode.y;
                         const length = Math.sqrt(dx * dx + dy * dy);
-                        const nodeRadius = 8;
-                        return length > 0 ? sourceNode.x + (dx * nodeRadius / length) : sourceNode.x;
+                        const r = (sourceNode._vizCategory === 'hub' ? 11 : 9);
+                        return length > 0 ? sourceNode.x + (dx * r / length) : sourceNode.x;
                     })
                     .attr('y1', d => {
                         const sourceNode = nodeData.find(n => n.id === d.source);
@@ -2897,8 +2909,8 @@
                         const dx = targetNode.x - sourceNode.x;
                         const dy = targetNode.y - sourceNode.y;
                         const length = Math.sqrt(dx * dx + dy * dy);
-                        const nodeRadius = 8;
-                        return length > 0 ? sourceNode.y + (dy * nodeRadius / length) : sourceNode.y;
+                        const r = (sourceNode._vizCategory === 'hub' ? 11 : 9);
+                        return length > 0 ? sourceNode.y + (dy * r / length) : sourceNode.y;
                     })
                     .attr('x2', d => {
                         const sourceNode = nodeData.find(n => n.id === d.source);
@@ -2908,8 +2920,8 @@
                         const dx = targetNode.x - sourceNode.x;
                         const dy = targetNode.y - sourceNode.y;
                         const length = Math.sqrt(dx * dx + dy * dy);
-                        const nodeRadius = 8;
-                        return length > 0 ? targetNode.x - (dx * nodeRadius / length) : targetNode.x;
+                        const r = (targetNode._vizCategory === 'hub' ? 11 : 9);
+                        return length > 0 ? targetNode.x - (dx * r / length) : targetNode.x;
                     })
                     .attr('y2', d => {
                         const sourceNode = nodeData.find(n => n.id === d.source);
@@ -2919,8 +2931,8 @@
                         const dx = targetNode.x - sourceNode.x;
                         const dy = targetNode.y - sourceNode.y;
                         const length = Math.sqrt(dx * dx + dy * dy);
-                        const nodeRadius = 8;
-                        return length > 0 ? targetNode.y - (dy * nodeRadius / length) : targetNode.y;
+                        const r = (targetNode._vizCategory === 'hub' ? 11 : 9);
+                        return length > 0 ? targetNode.y - (dy * r / length) : targetNode.y;
                     });
 
                 // Position relationship labels in the middle of links
@@ -3850,7 +3862,7 @@
                 this.simulation.alpha(1).restart();
             }
 
-            splitTextIntoLines(text, maxCharsPerLine = 12) {
+            splitTextIntoLines(text, maxCharsPerLine = 16) {
                 if (!text || text.length <= maxCharsPerLine) {
                     return [text || ''];
                 }
@@ -3878,13 +3890,13 @@
                     lines.push(currentLine);
                 }
                 
-                // Limit to 2 lines max
-                return lines.slice(0, 2);
+                // Allow up to 3 lines for better readability
+                return lines.slice(0, 3);
             }
 
             // Dynamic label positioning methods
             calculateLabelX(node, allNodes) {
-                const nodeRadius = 8;
+                const nodeRadius = (node && node._vizCategory === 'hub') ? 11 : 9;
                 const labelOffset = 20; // Increased for multi-line labels
                 
                 // Try positions: right, left, above, below
@@ -3914,7 +3926,7 @@
             }
 
             calculateLabelY(node, allNodes) {
-                const nodeRadius = 8;
+                const nodeRadius = (node && node._vizCategory === 'hub') ? 11 : 9;
                 const labelOffset = 20; // Increased for multi-line labels
                 
                 // Try positions: right, left, above, below
