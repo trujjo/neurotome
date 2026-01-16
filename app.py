@@ -1011,6 +1011,106 @@ def connect_nodes():
                 'nodes': [], 'links': [], 'paths': [], 'hubs': [], 'found': False
             }), 500
 
+# API endpoint to get all arteries
+@app.route("/api/arteries")
+def get_arteries():
+    with driver.session() as session:
+        query = """
+        MATCH (a:Artery)
+        RETURN a.name AS name, a.element_id AS id, a
+        ORDER BY a.name
+        LIMIT 500
+        """
+        result = session.run(query)
+        arteries = []
+        for record in result:
+            arteries.append({
+                "id": record["id"],
+                "name": record["name"],
+                "properties": dict(record["a"])
+            })
+        return jsonify(arteries)
+
+# API endpoint to find shortest path between two arteries
+@app.route("/api/path/arteries", methods=['POST'])
+def find_artery_path():
+    data = request.json
+    start_artery = data.get('start')
+    end_artery = data.get('end')
+    
+    if not start_artery or not end_artery:
+        return jsonify({'error': 'Start and end arteries required'}), 400
+    
+    with driver.session() as session:
+        # Find shortest path between two arteries
+        query = """
+        MATCH (start:Artery), (end:Artery)
+        WHERE start.name = $start_name AND end.name = $end_name
+        CALL apoc.algo.dijkstra(start, end, 'CONNECTS_TO|BRANCHES_FROM|FEEDS|DRAINS_INTO', 'distance')
+        YIELD path, weight
+        RETURN path, weight
+        """
+        
+        # Fallback to simple shortest path if APOC is not available
+        fallback_query = """
+        MATCH (start:Artery {name: $start_name}), (end:Artery {name: $end_name})
+        MATCH path = shortestPath((start)-[*]-(end))
+        RETURN path, length(path) as weight
+        """
+        
+        try:
+            result = session.run(query, start_name=start_artery, end_name=end_artery)
+            paths = list(result)
+            
+            if not paths:
+                # Try fallback query
+                result = session.run(fallback_query, start_name=start_artery, end_name=end_artery)
+                paths = list(result)
+            
+            if paths:
+                path = paths[0]['path']
+                weight = paths[0]['weight']
+                
+                # Extract nodes and relationships from path
+                nodes = []
+                relationships = []
+                
+                for i, node in enumerate(path.nodes):
+                    nodes.append({
+                        "id": node.element_id,
+                        "name": dict(node).get('name', 'Unknown'),
+                        "labels": list(node.labels),
+                        "properties": dict(node),
+                        "position": i
+                    })
+                
+                for rel in path.relationships:
+                    relationships.append({
+                        "type": rel.type,
+                        "start_node": rel.start_node.element_id,
+                        "end_node": rel.end_node.element_id,
+                        "properties": dict(rel)
+                    })
+                
+                return jsonify({
+                    'success': True,
+                    'path_length': weight,
+                    'nodes': nodes,
+                    'relationships': relationships,
+                    'message': f'Path found: {start_artery} → {end_artery} ({len(nodes)} arteries)'
+                })
+            else:
+                return jsonify({
+                    'success': False,
+                    'message': f'No path found between {start_artery} and {end_artery}'
+                }), 404
+                
+        except Exception as e:
+            return jsonify({
+                'error': str(e),
+                'success': False
+            }), 500
+
 # Legacy routes for backward compatibility
 @app.route("/explorer")
 def explorer():

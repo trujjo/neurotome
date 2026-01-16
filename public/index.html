@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Artery Mapper</title>
+    <title>Neurotome</title>
     <script src="https://d3js.org/d3.v7.min.js"></script>
     <style>
         * {
@@ -319,13 +319,13 @@
 <body>
     <div class="container">
         <header>
-            <h1>🧠 Artery Mapper</h1>
+            <h1>Neurotome</h1>
             <p class="subtitle">Neural Pathway Visualization & Analysis</p>
         </header>
 
         <div class="main-content">
             <div class="panel">
-                <h2>🎯 Path Finder</h2>
+                <h2>Path Finder</h2>
                 
                 <div class="message" id="message"></div>
                 <div class="loading" id="loading">
@@ -358,10 +358,28 @@
                         <button id="next-node">Next →</button>
                     </div>
                 </div>
+
+                <hr style="border: 0; border-top: 1px solid rgba(209,213,219,0.1); margin: 1.5rem 0;">
+
+                <h2>Lesion Locator</h2>
+
+                <div class="form-group">
+                    <label for="lesion-search">Artery (lesion point)</label>
+                    <div class="select-wrapper">
+                        <input type="text" id="lesion-search" class="search-input" placeholder="Search artery to test territory...">
+                        <div id="lesion-dropdown" class="dropdown-menu"></div>
+                    </div>
+                </div>
+
+                <button id="find-lesion">Locate Lesion Territory</button>
+
+                <div id="lesion-results" class="node-info" style="margin-top: 1rem;">
+                    <div id="lesion-details" class="node-details"></div>
+                </div>
             </div>
 
             <div class="panel">
-                <h2>🗺️ Visualization</h2>
+                <h2>Visualization</h2>
                 <div id="stats" class="stats">
                     <div class="stat">
                         <span id="path-length" class="stat-value">0</span>
@@ -391,6 +409,9 @@
                 this.startDropdown = document.getElementById('start-dropdown');
                 this.endSearch = document.getElementById('end-search');
                 this.endDropdown = document.getElementById('end-dropdown');
+                this.lesionSearch = document.getElementById('lesion-search');
+                this.lesionDropdown = document.getElementById('lesion-dropdown');
+                this.findLesionBtn = document.getElementById('find-lesion');
                 this.findPathBtn = document.getElementById('find-path');
                 this.message = document.getElementById('message');
                 this.loading = document.getElementById('loading');
@@ -398,6 +419,8 @@
                 this.graphContainer = document.getElementById('graph-container');
                 this.nodeInfo = document.getElementById('node-info');
                 this.nodeDetails = document.getElementById('node-details');
+                this.lesionResults = document.getElementById('lesion-results');
+                this.lesionDetails = document.getElementById('lesion-details');
                 this.prevNodeBtn = document.getElementById('prev-node');
                 this.nextNodeBtn = document.getElementById('next-node');
                 
@@ -423,6 +446,7 @@
             attachEventListeners() {
                 this.startSearch.addEventListener('input', () => this.filterDropdown('start'));
                 this.endSearch.addEventListener('input', () => this.filterDropdown('end'));
+                this.lesionSearch.addEventListener('input', () => this.filterDropdown('lesion'));
 
                 this.startSearch.addEventListener('focus', () => {
                     this.filterDropdown('start');
@@ -434,6 +458,11 @@
                     this.endDropdown.classList.add('active');
                 });
 
+                this.lesionSearch.addEventListener('focus', () => {
+                    this.filterDropdown('lesion');
+                    this.lesionDropdown.classList.add('active');
+                });
+
                 document.addEventListener('click', (e) => {
                     if (!this.startSearch.contains(e.target) && !this.startDropdown.contains(e.target)) {
                         this.startDropdown.classList.remove('active');
@@ -441,9 +470,13 @@
                     if (!this.endSearch.contains(e.target) && !this.endDropdown.contains(e.target)) {
                         this.endDropdown.classList.remove('active');
                     }
+                    if (!this.lesionSearch.contains(e.target) && !this.lesionDropdown.contains(e.target)) {
+                        this.lesionDropdown.classList.remove('active');
+                    }
                 });
 
                 this.findPathBtn.addEventListener('click', () => this.findPath());
+                this.findLesionBtn.addEventListener('click', () => this.locateLesion());
                 this.prevNodeBtn.addEventListener('click', () => this.navigateNode(-1));
                 this.nextNodeBtn.addEventListener('click', () => this.navigateNode(1));
 
@@ -451,7 +484,16 @@
                 document.addEventListener('keydown', (e) => {
                     if (this.pathNodes.length === 0) return;
                     
-                    if (e.key === 'ArrowLeft') {
+                    // Command/Ctrl + Arrow keys for visualizing connections
+                    if ((e.metaKey || e.ctrlKey) && e.key === 'ArrowUp') {
+                        e.preventDefault();
+                        this.visualizeConnections('upstream');
+                    } else if ((e.metaKey || e.ctrlKey) && e.key === 'ArrowDown') {
+                        e.preventDefault();
+                        this.visualizeConnections('downstream');
+                    }
+                    // Regular arrow keys for navigation and showing connections
+                    else if (e.key === 'ArrowLeft') {
                         e.preventDefault();
                         this.navigateNode(-1);
                     } else if (e.key === 'ArrowRight') {
@@ -468,8 +510,13 @@
             }
 
             filterDropdown(type) {
-                const searchInput = type === 'start' ? this.startSearch : this.endSearch;
-                const dropdown = type === 'start' ? this.startDropdown : this.endDropdown;
+                const map = {
+                    start: { input: this.startSearch, dropdown: this.startDropdown },
+                    end: { input: this.endSearch, dropdown: this.endDropdown },
+                    lesion: { input: this.lesionSearch, dropdown: this.lesionDropdown }
+                };
+
+                const { input: searchInput, dropdown } = map[type];
                 const query = searchInput.value.toLowerCase();
 
                 const filtered = this.arteries.filter(a => 
@@ -489,6 +536,119 @@
                         dropdown.classList.remove('active');
                     });
                 });
+            }
+
+            async locateLesion() {
+                const lesionId = this.lesionSearch.dataset.id;
+                const lesionName = this.lesionSearch.value.trim();
+
+                if (!lesionId || !lesionName) {
+                    this.showMessage('Select an artery to locate lesion territory', 'error');
+                    return;
+                }
+
+                this.message.style.display = 'none';
+                this.lesionDetails.innerHTML = '';
+                this.lesionResults.style.display = 'none';
+
+                try {
+                    const response = await fetch('/api/lesion/territory', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ node: lesionName.toLowerCase(), label: 'artery' })
+                    });
+
+                    const text = await response.text();
+                    let data;
+                    try {
+                        data = JSON.parse(text);
+                    } catch (parseErr) {
+                        throw new Error('Server returned non-JSON response');
+                    }
+
+                    if (!response.ok) {
+                        throw new Error(data.error || 'Failed to locate territory');
+                    }
+
+                    this.renderLesionResults(data);
+                    this.renderLesionGraph(data);
+                    this.showMessage(`Lesion territory mapped for ${data.source} (${data.count} nodes)`, 'success');
+                } catch (error) {
+                    console.error('Error locating lesion territory:', error);
+                    this.showMessage(error.message, 'error');
+                }
+            }
+
+            renderLesionResults(data) {
+                if (!data || !Array.isArray(data.territory)) {
+                    this.lesionResults.style.display = 'none';
+                    return;
+                }
+
+                if (data.territory.length === 0) {
+                    this.lesionDetails.innerHTML = `
+                        <p><strong>No exclusive downstream territory found for ${data.source}</strong></p>
+                        <p style="color: #9ca3af; margin-top: 0.5rem;">All downstream nodes have alternate supply sources.</p>
+                    `;
+                } else {
+                    const list = data.territory
+                        .sort((a, b) => a.depth - b.depth || a.name.localeCompare(b.name))
+                        .map((t, idx) => `
+                            <p style="padding: 0.5rem; background: rgba(16, 185, 129, 0.1); border: 1px solid rgba(16, 185, 129, 0.2); border-radius: 6px; margin-bottom: 0.5rem;">
+                                ${idx + 1}. ${t.name} <span style="color:#9ca3af; font-size: 0.85rem;">(depth ${t.depth})</span>
+                            </p>
+                        `).join('');
+
+                    this.lesionDetails.innerHTML = `
+                        <p><strong>${data.territory.length} downstream node${data.territory.length !== 1 ? 's' : ''} exclusively supplied by ${data.source}</strong></p>
+                        <div style="max-height: 220px; overflow-y: auto; margin-top: 0.75rem;">
+                            ${list}
+                        </div>
+                    `;
+                }
+
+                this.lesionResults.style.display = 'block';
+            }
+
+            renderLesionGraph(data) {
+                if (!data || !Array.isArray(data.territory)) return;
+
+                const nodesMap = new Map();
+                const links = [];
+
+                // Add all territory nodes
+                data.territory.forEach(t => {
+                    nodesMap.set(t.id, {
+                        id: t.id,
+                        name: t.name,
+                        inPath: true
+                    });
+                });
+
+                // Add source node
+                const sourceId = data.source_id;
+                nodesMap.set(sourceId, {
+                    id: sourceId,
+                    name: data.source,
+                    inPath: true
+                });
+
+                // Create links from source to each territory node
+                data.territory.forEach(t => {
+                    links.push({
+                        source: sourceId,
+                        target: t.id,
+                        type: 'supplies',
+                        direction: 'forward'
+                    });
+                });
+
+                const nodes = Array.from(nodesMap.values());
+                this.pathNodes = nodes.map(n => n.name);
+                this.renderGraph(nodes, links);
+                if (nodes.length > 0) {
+                    this.selectNode(0);
+                }
             }
 
             async findPath() {
@@ -741,7 +901,7 @@
                     <p><strong>Node ${index + 1} of ${this.pathNodes.length}</strong></p>
                     <p><strong>Name:</strong> ${nodeName}</p>
                     <p style="margin-top: 0.5rem; font-size: 0.85rem; color: #9ca3af;">
-                        ⬆️ Up arrow for upstream | ⬇️ Down arrow for downstream
+                        Up arrow for upstream | Down arrow for downstream
                     </p>
                 `;
                 this.nodeInfo.style.display = 'block';
@@ -819,6 +979,95 @@
                 } catch (error) {
                     console.error('Error loading connections:', error);
                     this.showMessage(`Error loading ${direction} connections`, 'error');
+                }
+            }
+
+            async visualizeConnections(direction) {
+                if (this.currentNodeIndex < 0 || this.currentNodeIndex >= this.pathNodes.length) {
+                    this.showMessage('Select a node first', 'error');
+                    return;
+                }
+
+                const nodeName = this.pathNodes[this.currentNodeIndex];
+                const endpoint = direction === 'upstream' ? '/api/connections/upstream' : '/api/connections/downstream';
+
+                try {
+                    const response = await fetch(endpoint, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ node: nodeName.toLowerCase(), label: 'artery' })
+                    });
+
+                    const data = await response.json();
+
+                    if (!response.ok) {
+                        throw new Error(data.error || 'Failed to load connections');
+                    }
+
+                    if (data.connections.length === 0) {
+                        this.showMessage(`No ${direction} connections to visualize`, 'error');
+                        return;
+                    }
+
+                    // Get current graph data
+                    const svg = d3.select('#graph-container svg');
+                    if (svg.empty()) {
+                        this.showMessage('No active graph to add connections to', 'error');
+                        return;
+                    }
+
+                    // Get existing nodes/links from the current simulation
+                    const existingNodes = this.simulation.nodes();
+                    const existingNodeMap = new Map(existingNodes.map(n => [n.name.toLowerCase(), n]));
+                    const nodeNameLower = nodeName.toLowerCase();
+                    const existingLinks = this.simulation.force('link').links();
+
+                    const newNodes = [];
+                    const newLinks = [];
+
+                    data.connections.forEach(conn => {
+                        const connectedName = direction === 'upstream' ? conn.source : conn.target;
+                        const connectedLower = connectedName.toLowerCase();
+                        const connectedId = direction === 'upstream' ? conn.source_id : conn.target_id;
+
+                        if (!existingNodeMap.has(connectedLower)) {
+                            const baseNode = existingNodeMap.get(nodeNameLower);
+                            if (!baseNode) {
+                                throw new Error('Base node not found in visualization');
+                            }
+                            const newNode = {
+                                id: connectedId,
+                                name: connectedName,
+                                inPath: false,
+                                x: baseNode.x + (Math.random() - 0.5) * 200,
+                                y: baseNode.y + (Math.random() - 0.5) * 200
+                            };
+                            newNodes.push(newNode);
+                            existingNodeMap.set(connectedLower, newNode);
+                        }
+
+                        const sourceKey = direction === 'upstream' ? connectedLower : nodeNameLower;
+                        const targetKey = direction === 'upstream' ? nodeNameLower : connectedLower;
+
+                        newLinks.push({
+                            source: existingNodeMap.get(sourceKey),
+                            target: existingNodeMap.get(targetKey),
+                            type: conn.relationship,
+                            direction: 'forward'
+                        });
+                    });
+
+                    // Merge nodes/links and re-render using the existing positions
+                    const allNodes = existingNodes.concat(newNodes);
+                    const allLinks = existingLinks.concat(newLinks);
+                    this.renderGraph(allNodes, allLinks);
+                    this.updateNodeHighlight();
+
+                    this.showMessage(`Added ${newNodes.length} ${direction} connection${newNodes.length !== 1 ? 's' : ''} to visualization`, 'success');
+
+                } catch (error) {
+                    console.error('Error visualizing connections:', error);
+                    this.showMessage(`Error visualizing ${direction} connections`, 'error');
                 }
             }
 

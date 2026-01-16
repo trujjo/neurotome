@@ -995,6 +995,30 @@
                     <li class="loading">Loading relationships...</li>
                 </ul>
             </div>
+
+            <div class="section">
+                <h3>🩸 Artery Mapping</h3>
+                <div style="font-size: 0.85em; color: #cbd5e1; margin-bottom: 1rem;">
+                    Select starting and ending arteries to find the path between them.
+                </div>
+                <div style="margin-bottom: 1rem;">
+                    <label style="display: block; font-size: 0.8em; color: #f97316; margin-bottom: 0.5rem; font-weight: 600;">Start Artery:</label>
+                    <select id="start-artery" class="btn" style="width: 100%; margin-bottom: 0.5rem;">
+                        <option value="">Select start artery...</option>
+                    </select>
+                </div>
+                <div style="margin-bottom: 1rem;">
+                    <label style="display: block; font-size: 0.8em; color: #f97316; margin-bottom: 0.5rem; font-weight: 600;">End Artery:</label>
+                    <select id="end-artery" class="btn" style="width: 100%; margin-bottom: 0.5rem;">
+                        <option value="">Select end artery...</option>
+                    </select>
+                </div>
+                <button class="btn" id="find-path-btn" style="width: 100%; background: linear-gradient(135deg, #cc5500, #a83d00); border-color: rgba(204, 85, 0, 0.5);">
+                    🔍 Find Path
+                </button>
+                <div id="path-status" style="font-size: 0.85em; color: #cbd5e1; margin-top: 0.5rem; padding: 0.5rem; background: rgba(0, 0, 0, 0.3); border-radius: 8px; display: none;"></div>
+                <div id="path-details" style="margin-top: 1rem; max-height: 200px; overflow-y: auto; border: 1px solid rgba(249, 115, 22, 0.2); border-radius: 8px; padding: 0.75rem; background: rgba(0, 0, 0, 0.2); display: none;"></div>
+            </div>
         </div>
 
         <!-- Main Content -->
@@ -2265,6 +2289,156 @@
                 });
             }
 
+            async loadArteries() {
+                try {
+                    const response = await fetch('/api/arteries');
+                    if (!response.ok) {
+                        throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+                    }
+                    const arteries = await response.json();
+                    this.renderArterySelects(arteries);
+                } catch (error) {
+                    console.error('Error loading arteries:', error);
+                    const startSelect = document.getElementById('start-artery');
+                    const endSelect = document.getElementById('end-artery');
+                    if (startSelect) startSelect.innerHTML = '<option value="">Error loading arteries</option>';
+                    if (endSelect) endSelect.innerHTML = '<option value="">Error loading arteries</option>';
+                }
+            }
+
+            renderArterySelects(arteries) {
+                const startSelect = document.getElementById('start-artery');
+                const endSelect = document.getElementById('end-artery');
+                
+                if (!startSelect || !endSelect) return;
+
+                let html = '<option value="">Select artery...</option>';
+                arteries.forEach(artery => {
+                    const name = artery.name || `Artery ${artery.id}`;
+                    html += `<option value="${name}">${name}</option>`;
+                });
+
+                startSelect.innerHTML = html;
+                endSelect.innerHTML = html;
+            }
+
+            async findArteryPath() {
+                const startArtery = document.getElementById('start-artery').value;
+                const endArtery = document.getElementById('end-artery').value;
+                const statusDiv = document.getElementById('path-status');
+                const detailsDiv = document.getElementById('path-details');
+
+                if (!startArtery || !endArtery) {
+                    statusDiv.textContent = '⚠️ Please select both start and end arteries';
+                    statusDiv.style.display = 'block';
+                    statusDiv.style.color = '#f59e0b';
+                    return;
+                }
+
+                if (startArtery === endArtery) {
+                    statusDiv.textContent = '⚠️ Start and end arteries must be different';
+                    statusDiv.style.display = 'block';
+                    statusDiv.style.color = '#f59e0b';
+                    return;
+                }
+
+                statusDiv.textContent = '🔍 Finding path...';
+                statusDiv.style.display = 'block';
+                statusDiv.style.color = '#2d3748';
+                detailsDiv.style.display = 'none';
+
+                try {
+                    const response = await fetch('/api/path/arteries', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({
+                            start: startArtery,
+                            end: endArtery
+                        })
+                    });
+
+                    const data = await response.json();
+
+                    if (data.success && data.nodes && data.nodes.length > 0) {
+                        statusDiv.textContent = data.message;
+                        statusDiv.style.color = '#059669';
+
+                        // Render path visualization
+                        this.renderPathDetails(data);
+                        detailsDiv.style.display = 'block';
+
+                        // Visualize the path on the graph
+                        this.visualizeArteryPath(data);
+                    } else {
+                        statusDiv.textContent = data.message || '❌ No path found between these arteries';
+                        statusDiv.style.color = '#dc3545';
+                        detailsDiv.style.display = 'none';
+                    }
+                } catch (error) {
+                    console.error('Error finding path:', error);
+                    statusDiv.textContent = '❌ Error finding path: ' + error.message;
+                    statusDiv.style.color = '#dc3545';
+                    detailsDiv.style.display = 'none';
+                }
+            }
+
+            renderPathDetails(data) {
+                const detailsDiv = document.getElementById('path-details');
+                let html = '<div style="font-weight: 600; margin-bottom: 0.5rem; color: #f97316;">Path:</div>';
+                
+                if (data.nodes && data.nodes.length > 0) {
+                    html += '<div style="display: flex; align-items: center; flex-wrap: wrap; gap: 0.25rem; font-size: 0.85em;">';
+                    data.nodes.forEach((node, index) => {
+                        const name = node.name || node.properties?.name || `Node ${node.id}`;
+                        html += `<span style="padding: 0.25rem 0.5rem; background: rgba(249, 115, 22, 0.2); border-radius: 4px; border: 1px solid rgba(249, 115, 22, 0.3);">${name}</span>`;
+                        if (index < data.nodes.length - 1) {
+                            html += '<span style="color: #f97316; font-weight: bold;">→</span>';
+                        }
+                    });
+                    html += '</div>';
+
+                    if (data.path_length !== undefined) {
+                        html += `<div style="margin-top: 0.5rem; font-size: 0.8em; color: #cbd5e1;">Path length: ${data.path_length} connections</div>`;
+                    }
+                }
+
+                detailsDiv.innerHTML = html;
+            }
+
+            visualizeArteryPath(data) {
+                if (!data.nodes || !this.svg) return;
+
+                // Create a simple visualization of the path
+                const pathNodeIds = new Set(data.nodes.map(n => n.id));
+
+                // Highlight the path nodes
+                this.svg.selectAll('.node')
+                    .attr('stroke', d => pathNodeIds.has(d.id) ? '#f97316' : '#fff')
+                    .attr('stroke-width', d => pathNodeIds.has(d.id) ? 3 : 1);
+
+                // Highlight path links
+                if (data.relationships && data.relationships.length > 0) {
+                    const pathLinks = new Set(data.relationships.map(r => `${r.start_node}-${r.end_node}`));
+                    this.svg.selectAll('.link')
+                        .style('stroke', d => {
+                            const linkKey = `${d.source.id}-${d.target.id}`;
+                            const reverseLinkKey = `${d.target.id}-${d.source.id}`;
+                            return pathLinks.has(linkKey) || pathLinks.has(reverseLinkKey) ? '#f97316' : null;
+                        })
+                        .style('stroke-width', d => {
+                            const linkKey = `${d.source.id}-${d.target.id}`;
+                            const reverseLinkKey = `${d.target.id}-${d.source.id}`;
+                            return pathLinks.has(linkKey) || pathLinks.has(reverseLinkKey) ? 2.5 : 1.2;
+                        })
+                        .style('opacity', d => {
+                            const linkKey = `${d.source.id}-${d.target.id}`;
+                            const reverseLinkKey = `${d.target.id}-${d.source.id}`;
+                            return pathLinks.has(linkKey) || pathLinks.has(reverseLinkKey) ? 1 : 0.3;
+                        });
+                }
+            }
+
+
             async loadRelationships() {
                 try {
                     console.log('Fetching relationships from /api/relationships...');
@@ -3260,6 +3434,12 @@
                 if (localizeBtn) {
                     localizeBtn.addEventListener('click', () => this.localizeLesion());
                 }
+
+                // Artery mapping feature
+                this.loadArteries();
+                document.getElementById('find-path-btn').addEventListener('click', () => {
+                    this.findArteryPath();
+                });
 
                 // Keyboard shortcuts for upstream/downstream exploration
                 document.addEventListener('keydown', (e) => {

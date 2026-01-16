@@ -1,0 +1,914 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Artery Mapper</title>
+    <script src="https://d3js.org/d3.v7.min.js"></script>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Inter', 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: #0a0a0a;
+            color: #e5e7eb;
+            overflow-x: hidden;
+            min-height: 100vh;
+        }
+
+        .container {
+            max-width: 1400px;
+            margin: 0 auto;
+            padding: 2rem;
+        }
+
+        header {
+            background: linear-gradient(135deg, #1f2937 0%, #111827 100%);
+            padding: 2rem;
+            border-radius: 12px;
+            border: 1px solid rgba(209, 213, 219, 0.1);
+            margin-bottom: 2rem;
+            box-shadow: 0 4px 24px rgba(0, 0, 0, 0.3);
+        }
+
+        h1 {
+            color: #d97706;
+            font-size: 2.5rem;
+            font-weight: 700;
+            margin-bottom: 0.5rem;
+            text-shadow: 0 0 20px rgba(217, 119, 6, 0.3);
+        }
+
+        .subtitle {
+            color: #9ca3af;
+            font-size: 1rem;
+        }
+
+        .main-content {
+            display: grid;
+            grid-template-columns: 350px 1fr;
+            gap: 2rem;
+        }
+
+        .panel {
+            background: linear-gradient(135deg, #1f2937 0%, #111827 100%);
+            border: 1px solid rgba(209, 213, 219, 0.1);
+            border-radius: 12px;
+            padding: 1.5rem;
+            box-shadow: 0 4px 24px rgba(0, 0, 0, 0.3);
+        }
+
+        .panel h2 {
+            color: #d97706;
+            font-size: 1.3rem;
+            margin-bottom: 1.5rem;
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+
+        .form-group {
+            margin-bottom: 1.5rem;
+        }
+
+        label {
+            display: block;
+            margin-bottom: 0.5rem;
+            color: #d1d5db;
+            font-weight: 500;
+            font-size: 0.95rem;
+        }
+
+        .select-wrapper {
+            position: relative;
+        }
+
+        .search-input {
+            width: 100%;
+            padding: 0.75rem;
+            background: #374151;
+            color: #e5e7eb;
+            border: 1px solid rgba(209, 213, 219, 0.2);
+            border-radius: 8px;
+            font-size: 0.95rem;
+            transition: all 0.2s ease;
+        }
+
+        .search-input:hover {
+            border-color: rgba(217, 119, 6, 0.5);
+            background: #3f4651;
+        }
+
+        .search-input:focus {
+            outline: none;
+            border-color: #d97706;
+            box-shadow: 0 0 0 3px rgba(217, 119, 6, 0.1);
+        }
+
+        .dropdown-menu {
+            position: absolute;
+            top: 100%;
+            left: 0;
+            right: 0;
+            background: #374151;
+            border: 1px solid rgba(217, 119, 6, 0.5);
+            border-top: none;
+            border-radius: 0 0 8px 8px;
+            max-height: 300px;
+            overflow-y: auto;
+            z-index: 1000;
+            display: none;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+        }
+
+        .dropdown-menu.active {
+            display: block;
+        }
+
+        .dropdown-item {
+            padding: 0.75rem;
+            color: #e5e7eb;
+            cursor: pointer;
+            transition: background 0.2s ease;
+            border-bottom: 1px solid rgba(209, 213, 219, 0.1);
+        }
+
+        .dropdown-item:hover {
+            background: #4b5563;
+            color: #d97706;
+        }
+
+        .dropdown-item.selected {
+            background: rgba(217, 119, 6, 0.2);
+            color: #d97706;
+            font-weight: 600;
+        }
+
+        .dropdown-item:last-child {
+            border-bottom: none;
+        }
+
+        .no-results {
+            padding: 1rem;
+            text-align: center;
+            color: #9ca3af;
+            font-size: 0.9rem;
+        }
+
+        #node-info {
+            margin-top: 1rem;
+            padding: 1rem;
+            background: rgba(217, 119, 6, 0.1);
+            border: 1px solid rgba(217, 119, 6, 0.3);
+            border-radius: 8px;
+            display: none;
+        }
+
+        #node-info.active {
+            display: block;
+        }
+
+        #node-info h3 {
+            color: #d97706;
+            margin-bottom: 0.5rem;
+            font-size: 1.1rem;
+        }
+
+        #node-info .node-details {
+            color: #e5e7eb;
+            font-size: 0.9rem;
+            line-height: 1.6;
+        }
+
+        #node-info .nav-buttons {
+            margin-top: 1rem;
+            display: flex;
+            gap: 0.5rem;
+        }
+
+        #node-info button {
+            flex: 1;
+            padding: 0.5rem;
+            font-size: 0.85rem;
+        }
+
+        #node-info button:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
+
+        .node-selected {
+            filter: drop-shadow(0 0 8px rgba(217, 119, 6, 0.8)) !important;
+        }
+
+        .keyboard-hint {
+            font-size: 0.75rem;
+            color: #6b7280;
+            margin-top: 0.5rem;
+        }
+
+        button {
+            width: 100%;
+            padding: 0.875rem;
+            background: linear-gradient(135deg, #d97706 0%, #b86f1a 100%);
+            color: white;
+            border: none;
+            border-radius: 8px;
+            font-size: 1rem;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            box-shadow: 0 4px 12px rgba(217, 119, 6, 0.3);
+        }
+
+        button:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 6px 20px rgba(217, 119, 6, 0.4);
+        }
+
+        button:active {
+            transform: translateY(0);
+        }
+
+        .loading {
+            display: none;
+            text-align: center;
+            color: #9ca3af;
+            padding: 1rem;
+            font-size: 0.9rem;
+        }
+
+        .loading.active {
+            display: block;
+        }
+
+        .spinner {
+            display: inline-block;
+            width: 16px;
+            height: 16px;
+            border: 2px solid rgba(217, 119, 6, 0.3);
+            border-top-color: #d97706;
+            border-radius: 50%;
+            animation: spin 0.8s linear infinite;
+            margin-right: 0.5rem;
+        }
+
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+
+        .visualization {
+            background: linear-gradient(135deg, #1f2937 0%, #111827 100%);
+            border: 1px solid rgba(209, 213, 219, 0.1);
+            border-radius: 12px;
+            overflow: hidden;
+            box-shadow: 0 4px 24px rgba(0, 0, 0, 0.3);
+            min-height: 600px;
+        }
+
+        #graph-container {
+            width: 100%;
+            height: 100%;
+            min-height: 600px;
+        }
+
+        .stats {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 1rem;
+            margin-top: 1.5rem;
+        }
+
+        .stat-box {
+            background: rgba(217, 119, 6, 0.1);
+            border: 1px solid rgba(217, 119, 6, 0.3);
+            border-radius: 8px;
+            padding: 1rem;
+            text-align: center;
+        }
+
+        .stat-value {
+            font-size: 1.5rem;
+            font-weight: 700;
+            color: #d97706;
+        }
+
+        .stat-label {
+            font-size: 0.85rem;
+            color: #9ca3af;
+            margin-top: 0.25rem;
+        }
+
+        .message {
+            padding: 1rem;
+            border-radius: 8px;
+            text-align: center;
+            margin-top: 1rem;
+        }
+
+        .message.info {
+            background: rgba(59, 130, 246, 0.1);
+            color: #60a5fa;
+            border: 1px solid rgba(59, 130, 246, 0.3);
+        }
+
+        .message.error {
+            background: rgba(239, 68, 68, 0.1);
+            color: #f87171;
+            border: 1px solid rgba(239, 68, 68, 0.3);
+        }
+
+        .message.success {
+            background: rgba(16, 185, 129, 0.1);
+            color: #6ee7b7;
+            border: 1px solid rgba(16, 185, 129, 0.3);
+        }
+
+        @media (max-width: 1024px) {
+            .main-content {
+                grid-template-columns: 1fr;
+            }
+
+            .container {
+                padding: 1rem;
+            }
+
+            h1 {
+                font-size: 2rem;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>🧬 Artery Mapper</h1>
+            <p class="subtitle">Find pathways between arteries in the neural network</p>
+        </header>
+
+        <div class="main-content">
+            <!-- Control Panel -->
+            <div class="panel">
+                <h2>🔍 Path Finder</h2>
+                
+                <div class="form-group">
+                    <label for="start-search">Start Artery</label>
+                    <div class="select-wrapper">
+                        <input 
+                            type="text" 
+                            id="start-search" 
+                            class="search-input" 
+                            placeholder="Type to search..."
+                            autocomplete="off"
+                        >
+                        <div id="start-dropdown" class="dropdown-menu"></div>
+                    </div>
+                    <input type="hidden" id="start-artery" value="">
+                </div>
+
+                <div class="form-group">
+                    <label for="end-search">End Artery</label>
+                    <div class="select-wrapper">
+                        <input 
+                            type="text" 
+                            id="end-search" 
+                            class="search-input" 
+                            placeholder="Type to search..."
+                            autocomplete="off"
+                        >
+                        <div id="end-dropdown" class="dropdown-menu"></div>
+                    </div>
+                    <input type="hidden" id="end-artery" value="">
+                </div>
+
+                <button id="find-path-btn">Find Path</button>
+
+                <div class="loading" id="loading">
+                    <div class="spinner"></div>
+                    <span>Finding path...</span>
+                </div>
+
+                <div id="message" class="message" style="display: none;"></div>
+
+                <div id="node-info">
+                    <h3>Node Information</h3>
+                    <div class="node-details" id="node-details"></div>
+                    <div class="nav-buttons">
+                        <button id="prev-node-btn">← Previous</button>
+                        <button id="next-node-btn">Next →</button>
+                    </div>
+                    <div class="keyboard-hint">💡 Tip: Use ← → arrow keys to navigate nodes</div>
+                </div>
+
+                <div class="stats" id="stats" style="display: none;">
+                    <div class="stat-box">
+                        <div class="stat-value" id="path-length">0</div>
+                        <div class="stat-label">Steps</div>
+                    </div>
+                    <div class="stat-box">
+                        <div class="stat-value" id="node-count">0</div>
+                        <div class="stat-label">Nodes</div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Visualization -->
+            <div class="visualization">
+                <div id="graph-container"></div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        class ArteryMapper {
+            constructor() {
+                this.arteries = [];
+                this.simulation = null;
+                this.currentNodeIndex = -1;
+                this.pathNodes = [];
+                
+                this.startSearch = document.getElementById('start-search');
+                this.endSearch = document.getElementById('end-search');
+                this.startHidden = document.getElementById('start-artery');
+                this.endHidden = document.getElementById('end-artery');
+                this.startDropdown = document.getElementById('start-dropdown');
+                this.endDropdown = document.getElementById('end-dropdown');
+                this.findPathBtn = document.getElementById('find-path-btn');
+                this.loading = document.getElementById('loading');
+                this.message = document.getElementById('message');
+                this.stats = document.getElementById('stats');
+                this.graphContainer = document.getElementById('graph-container');
+                this.nodeInfo = document.getElementById('node-info');
+                this.nodeDetails = document.getElementById('node-details');
+                this.prevNodeBtn = document.getElementById('prev-node-btn');
+                this.nextNodeBtn = document.getElementById('next-node-btn');
+
+                this.init();
+            }
+
+            async init() {
+                await this.loadArteries();
+                this.attachEventListeners();
+            }
+
+            async loadArteries() {
+                try {
+                    const response = await fetch('/api/arteries/only');
+                    this.arteries = await response.json();
+                    this.renderDropdowns();
+                    this.showMessage('Ready to find paths', 'success');
+                } catch (error) {
+                    console.error('Error loading arteries:', error);
+                    this.showMessage('Failed to load arteries', 'error');
+                }
+            }
+
+            renderDropdowns() {
+                this.populateDropdown(this.startDropdown, this.arteries, 'start');
+                this.populateDropdown(this.endDropdown, this.arteries, 'end');
+            }
+
+            populateDropdown(dropdownEl, items, type) {
+                dropdownEl.innerHTML = items
+                    .map(a => `<div class="dropdown-item" data-value="${a.name}">${a.name}</div>`)
+                    .join('');
+
+                const searchInput = type === 'start' ? this.startSearch : this.endSearch;
+                const hiddenInput = type === 'start' ? this.startHidden : this.endHidden;
+                const items_data = items;
+
+                dropdownEl.querySelectorAll('.dropdown-item').forEach(item => {
+                    item.addEventListener('click', () => {
+                        searchInput.value = item.dataset.value;
+                        hiddenInput.value = item.dataset.value;
+                        dropdownEl.classList.remove('active');
+                        item.classList.add('selected');
+                    });
+                });
+            }
+
+            attachEventListeners() {
+                // Start artery search
+                this.startSearch.addEventListener('input', (e) => {
+                    this.filterDropdown(e.target.value, this.startDropdown, this.arteries);
+                });
+
+                this.startSearch.addEventListener('focus', () => {
+                    this.startDropdown.classList.add('active');
+                    this.filterDropdown(this.startSearch.value, this.startDropdown, this.arteries);
+                });
+
+                // End artery search
+                this.endSearch.addEventListener('input', (e) => {
+                    this.filterDropdown(e.target.value, this.endDropdown, this.arteries);
+                });
+
+                this.endSearch.addEventListener('focus', () => {
+                    this.endDropdown.classList.add('active');
+                    this.filterDropdown(this.endSearch.value, this.endDropdown, this.arteries);
+                });
+
+                // Close dropdowns when clicking outside
+                document.addEventListener('click', (e) => {
+                    if (!e.target.closest('.select-wrapper')) {
+                        this.startDropdown.classList.remove('active');
+                        this.endDropdown.classList.remove('active');
+                    }
+                });
+
+                this.findPathBtn.addEventListener('click', () => this.findPath());
+                this.prevNodeBtn.addEventListener('click', () => this.navigateNode(-1));
+                this.nextNodeBtn.addEventListener('click', () => this.navigateNode(1));
+
+                // Keyboard navigation
+                document.addEventListener('keydown', (e) => {
+                    if (this.pathNodes.length === 0) return;
+                    
+                    if (e.key === 'ArrowLeft') {
+                        e.preventDefault();
+                        this.navigateNode(-1);
+                    } else if (e.key === 'ArrowRight') {
+                        e.preventDefault();
+                        this.navigateNode(1);
+                    } else if (e.key === 'ArrowUp') {
+                        e.preventDefault();
+                        this.showConnections('upstream');
+                    } else if (e.key === 'ArrowDown') {
+                        e.preventDefault();
+                        this.showConnections('downstream');
+                    }
+                });
+            }
+
+            filterDropdown(query, dropdownEl, items) {
+                const filtered = items.filter(a => 
+                    a.name.toLowerCase().includes(query.toLowerCase())
+                );
+
+                if (filtered.length === 0) {
+                    dropdownEl.innerHTML = '<div class="no-results">No arteries found</div>';
+                } else {
+                    dropdownEl.innerHTML = filtered
+                        .map(a => `<div class="dropdown-item" data-value="${a.name}">${a.name}</div>`)
+                        .join('');
+
+                    const type = dropdownEl.id.includes('start') ? 'start' : 'end';
+                    const hiddenInput = type === 'start' ? this.startHidden : this.endHidden;
+                    const searchInput = type === 'start' ? this.startSearch : this.endSearch;
+
+                    dropdownEl.querySelectorAll('.dropdown-item').forEach(item => {
+                        item.addEventListener('click', () => {
+                            searchInput.value = item.dataset.value;
+                            hiddenInput.value = item.dataset.value;
+                            dropdownEl.classList.remove('active');
+                        });
+                    });
+                }
+            }
+
+            async findPath() {
+                const start = this.startHidden.value.trim();
+                const end = this.endHidden.value.trim();
+
+                if (!start || !end) {
+                    this.showMessage('Please select both start and end arteries', 'error');
+                    return;
+                }
+
+                if (start === end) {
+                    this.showMessage('Start and end arteries must be different', 'error');
+                    return;
+                }
+
+                this.loading.classList.add('active');
+                this.message.style.display = 'none';
+                this.stats.style.display = 'none';
+                this.nodeInfo.style.display = 'none';
+                this.currentNodeIndex = -1;
+                this.pathNodes = [];
+
+                try {
+                    const response = await fetch('/api/path/find', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ 
+                            start: start.toLowerCase(), 
+                            end: end.toLowerCase(),
+                            label: 'artery'
+                        })
+                    });
+
+                    const data = await response.json();
+                    
+                    if (!response.ok || !data.found) {
+                        throw new Error(data.message || 'Path not found');
+                    }
+
+                    this.pathNodes = data.arteries.map(a => a.name);
+                    this.visualizePath(data);
+                    this.displayStats(data);
+                    this.showMessage(`Found path with ${data.distance} steps - Click nodes for info`, 'success');
+                } catch (error) {
+                    console.error('Error finding path:', error);
+                    this.showMessage(`Error: ${error.message}`, 'error');
+                } finally {
+                    this.loading.classList.remove('active');
+                }
+            }
+
+            visualizePath(data) {
+                const nodes = data.arteries.map(a => ({
+                    id: a.id,
+                    name: a.name,
+                    inPath: true
+                }));
+
+                const links = [];
+                for (let i = 0; i < data.relationships.length; i++) {
+                    links.push({
+                        source: data.arteries[i].id,
+                        target: data.arteries[i + 1].id,
+                        type: data.relationships[i]
+                    });
+                }
+
+                this.renderGraph(nodes, links);
+            }
+
+            renderGraph(nodes, links) {
+                this.graphContainer.innerHTML = '';
+
+                const width = this.graphContainer.clientWidth;
+                const height = this.graphContainer.clientHeight;
+
+                const svg = d3.select('#graph-container')
+                    .append('svg')
+                    .attr('width', width)
+                    .attr('height', height);
+
+                const g = svg.append('g');
+
+                // Define arrowhead marker
+                svg.append('defs').append('marker')
+                    .attr('id', 'arrowhead')
+                    .attr('markerWidth', 10)
+                    .attr('markerHeight', 10)
+                    .attr('refX', 28)
+                    .attr('refY', 3)
+                    .attr('orient', 'auto')
+                    .append('polygon')
+                    .attr('points', '0 0, 10 3, 0 6')
+                    .attr('fill', '#d97706');
+
+                // Zoom behavior
+                const zoom = d3.zoom()
+                    .scaleExtent([0.1, 4])
+                    .on('zoom', (event) => {
+                        g.attr('transform', event.transform);
+                    });
+
+                svg.call(zoom);
+
+                // LINEAR DISPLAY: Set initial positions from left to right
+                const padding = 100;
+                const usableWidth = width - (2 * padding);
+                const spacing = nodes.length > 1 ? usableWidth / (nodes.length - 1) : 0;
+                
+                nodes.forEach((node, i) => {
+                    node.x = padding + (i * spacing);
+                    node.y = height / 2;
+                });
+
+                // Force simulation
+                this.simulation = d3.forceSimulation(nodes)
+                    .force('link', d3.forceLink(links)
+                        .id(d => d.id)
+                        .distance(120))
+                    .force('charge', d3.forceManyBody().strength(-400))
+                    .force('center', d3.forceCenter(width / 2, height / 2))
+                    .force('collision', d3.forceCollide().radius(40));
+
+                // Links
+                const link = g.append('g')
+                    .selectAll('line')
+                    .data(links)
+                    .join('line')
+                    .attr('stroke', '#d97706')
+                    .attr('stroke-width', 2)
+                    .attr('opacity', 0.6)
+                    .attr('marker-end', 'url(#arrowhead)');
+
+                // Link labels
+                const linkLabel = g.append('g')
+                    .selectAll('text')
+                    .data(links)
+                    .join('text')
+                    .attr('font-size', '11px')
+                    .attr('fill', '#9ca3af')
+                    .attr('text-anchor', 'middle')
+                    .text(d => d.type);
+
+                // Nodes
+                const node = g.append('g')
+                    .selectAll('circle')
+                    .data(nodes)
+                    .join('circle')
+                    .attr('r', 12)
+                    .attr('fill', '#d97706')
+                    .attr('stroke', '#b86f1a')
+                    .attr('stroke-width', 2)
+                    .style('cursor', 'pointer')
+                    .on('click', (event, d) => {
+                        const index = nodes.findIndex(n => n.id === d.id);
+                        this.selectNode(index);
+                    })
+                    .call(this.drag(this.simulation));
+
+                // Node labels
+                const nodeLabel = g.append('g')
+                    .selectAll('text')
+                    .data(nodes)
+                    .join('text')
+                    .attr('font-size', '12px')
+                    .attr('fill', '#e5e7eb')
+                    .attr('text-anchor', 'middle')
+                    .attr('dy', '0.3em')
+                    .text(d => d.name.substring(0, 15));
+
+                this.simulation.on('tick', () => {
+                    link
+                        .attr('x1', d => d.source.x)
+                        .attr('y1', d => d.source.y)
+                        .attr('x2', d => d.target.x)
+                        .attr('y2', d => d.target.y);
+
+                    linkLabel
+                        .attr('x', d => (d.source.x + d.target.x) / 2)
+                        .attr('y', d => (d.source.y + d.target.y) / 2);
+
+                    node
+                        .attr('cx', d => d.x)
+                        .attr('cy', d => d.y);
+
+                    nodeLabel
+                        .attr('x', d => d.x)
+                        .attr('y', d => d.y);
+                });
+
+                // Double-click to unpin
+                node.on('dblclick', (event, d) => {
+                    d.fx = null;
+                    d.fy = null;
+                });
+            }
+
+            drag(simulation) {
+                const dragstarted = (event, d) => {
+                    if (!event.active) simulation.alphaTarget(0.3).restart();
+                    d.fx = d.x;
+                    d.fy = d.y;
+                };
+
+                const dragged = (event, d) => {
+                    d.fx = event.x;
+                    d.fy = event.y;
+                };
+
+                const dragended = (event, d) => {
+                    if (!event.active) simulation.alphaTarget(0);
+                };
+
+                return d3.drag()
+                    .on('start', dragstarted)
+                    .on('drag', dragged)
+                    .on('end', dragended);
+            }
+
+            displayStats(data) {
+                document.getElementById('path-length').textContent = data.distance;
+                document.getElementById('node-count').textContent = data.arteries.length;
+                this.stats.style.display = 'grid';
+            }
+
+            selectNode(index) {
+                if (index < 0 || index >= this.pathNodes.length) return;
+                this.currentNodeIndex = index;
+                this.showNodeInfo(index);
+                this.updateNodeHighlight();
+            }
+
+            showNodeInfo(index) {
+                if (index < 0 || index >= this.pathNodes.length) return;
+
+                const nodeName = this.pathNodes[index];
+                this.nodeDetails.innerHTML = `
+                    <p><strong>Node ${index + 1} of ${this.pathNodes.length}</strong></p>
+                    <p><strong>Name:</strong> ${nodeName}</p>
+                    <p style="margin-top: 0.5rem; font-size: 0.85rem; color: #9ca3af;">
+                        ⬆️ Up arrow for upstream | ⬇️ Down arrow for downstream
+                    </p>
+                `;
+                this.nodeInfo.style.display = 'block';
+            }
+
+            updateNodeHighlight() {
+                // Remove previous highlights
+                d3.selectAll('.node-selected').classed('node-selected', false);
+
+                // Add highlight to current node
+                if (this.currentNodeIndex >= 0 && this.pathNodes[this.currentNodeIndex]) {
+                    const currentNodeName = this.pathNodes[this.currentNodeIndex];
+                    d3.selectAll('circle').filter(d => d.name === currentNodeName).classed('node-selected', true);
+                }
+
+                // Update button states
+                this.prevNodeBtn.disabled = this.currentNodeIndex <= 0;
+                this.nextNodeBtn.disabled = this.currentNodeIndex >= this.pathNodes.length - 1;
+            }
+
+            navigateNode(direction) {
+                const newIndex = this.currentNodeIndex + direction;
+                if (newIndex >= 0 && newIndex < this.pathNodes.length) {
+                    this.selectNode(newIndex);
+                }
+            }
+
+            async showConnections(direction) {
+                if (this.currentNodeIndex < 0 || this.currentNodeIndex >= this.pathNodes.length) {
+                    this.showMessage('Select a node first', 'error');
+                    return;
+                }
+
+                const nodeName = this.pathNodes[this.currentNodeIndex];
+                const endpoint = direction === 'upstream' ? '/api/connections/upstream' : '/api/connections/downstream';
+
+                try {
+                    const response = await fetch(endpoint, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ node: nodeName.toLowerCase(), label: 'artery' })
+                    });
+
+                    const data = await response.json();
+
+                    if (!response.ok) {
+                        throw new Error(data.error || 'Failed to load connections');
+                    }
+                        throw new Error(data.error || 'Failed to load connections');
+                    }
+
+                    // Display connections in node-details
+                    if (data.connections.length === 0) {
+                        this.nodeDetails.innerHTML = `
+                            <p><strong>${direction.charAt(0).toUpperCase() + direction.slice(1)} Connections for ${nodeName}</strong></p>
+                            <p style="color: #9ca3af; margin-top: 0.5rem;">No ${direction} connections found</p>
+                        `;
+                    } else {
+                        let connectionsHtml = `
+                            <p><strong>${data.connections.length} ${direction.charAt(0).toUpperCase() + direction.slice(1)} Connection${data.connections.length !== 1 ? 's' : ''}</strong></p>
+                            <div style="margin-top: 0.75rem; max-height: 300px; overflow-y: auto;">
+                        `;
+
+                        data.connections.forEach(conn => {
+                            const source = direction === 'upstream' ? conn.source : nodeName;
+                            const target = direction === 'upstream' ? nodeName : conn.target;
+                            connectionsHtml += `
+                                <div style="padding: 0.5rem; background: rgba(217, 119, 6, 0.1); border-radius: 6px; margin-bottom: 0.5rem; border-left: 2px solid #d97706;">
+                                    <span style="font-size: 0.85rem;">${source}</span>
+                                    <span style="color: #9ca3af; margin: 0 0.3rem;">—[${conn.relationship}]→</span>
+                                    <span style="font-size: 0.85rem;">${target}</span>
+                                </div>
+                            `;
+                        });
+
+                        connectionsHtml += '</div>';
+                        this.nodeDetails.innerHTML = connectionsHtml;
+                    }
+
+                    this.nodeInfo.style.display = 'block';
+                    this.showMessage(`${direction === 'upstream' ? '⬆️' : '⬇️'} ${data.connections.length} ${direction} connection${data.connections.length !== 1 ? 's' : ''}`, 'success');
+
+                } catch (error) {
+                    console.error('Error loading connections:', error);
+                    this.showMessage(`Error loading ${direction} connections`, 'error');
+                }
+            }
+
+            showMessage(text, type) {
+                this.message.textContent = text;
+                this.message.className = `message ${type}`;
+                this.message.style.display = 'block';
+            }
+        }
+
+        // Initialize on page load
+        document.addEventListener('DOMContentLoaded', () => {
+            new ArteryMapper();
+        });
+    </script>
+</body>
+</html>

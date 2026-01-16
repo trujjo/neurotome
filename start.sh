@@ -1,38 +1,31 @@
 #!/bin/bash
 
-# Start script for Neurotome project
-# This script starts both the Flask API server and the Node.js web server
+# Start script for Artery Mapper
+# This script starts the Flask API server
 
-echo "🧠 Starting Neurotome servers..."
+echo "🧬 Starting Artery Mapper..."
+
+# Kill any existing Flask processes on port 5001
+lsof -i :5001 | grep LISTEN | awk '{print $2}' | xargs kill -9 2>/dev/null || true
+
+# Wait a moment
+sleep 1
 
 # Start Flask API server in the background
-echo "Starting Flask API server on port 5000..."
-python3 app.py &
+echo "Starting Flask API server on port 5001..."
+cd /Users/jonptrujillo/Documents/Github/neuronetwork
+python3 app_new.py > /tmp/artery-mapper.log 2>&1 &
 FLASK_PID=$!
 
-# Wait a moment for Flask to start
-sleep 2
+echo "✅ Artery Mapper started (PID: $FLASK_PID)"
+echo "📍 Open http://127.0.0.1:5001/ in your browser"
+echo "📝 Logs: tail -f /tmp/artery-mapper.log"
 
-# Start Node.js web server in the background
-echo "Starting Node.js web server on port 3000..."
-npm start &
-NODE_PID=$!
+# Save PID for reference
+echo $FLASK_PID > /tmp/artery-mapper.pid
 
-echo ""
-echo "🎉 Servers started successfully!"
-echo "📊 Neo4j Database Explorer: http://localhost:5000/explorer"
-echo "🌐 Main website: http://localhost:3000"
-echo "🔗 Flask API available at: http://localhost:5000/api/*"
-echo ""
-echo "Press Ctrl+C to stop all servers"
-
-# Function to cleanup processes on exit
-cleanup() {
-    echo ""
-    echo "Stopping servers..."
-    kill $FLASK_PID 2>/dev/null
-    kill $NODE_PID 2>/dev/null
-    echo "Servers stopped."
+# Keep script running and monitor the process
+wait $FLASK_PID
     exit 0
 }
 

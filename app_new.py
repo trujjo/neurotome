@@ -211,11 +211,13 @@ def get_upstream_connections():
     try:
         with driver.session() as session:
             query = f"""
-            MATCH (target:{label} {{name: $name}})<-[rel]-(source:{label})
+            MATCH (target:{label})
+            WHERE toLower(target.name) = toLower($name)
+            MATCH (target)<-[:supplies]-(source:{label})
             RETURN 
                 source.name AS source_name,
                 elementId(source) AS source_id,
-                type(rel) AS relationship,
+                'supplies' AS relationship,
                 target.name AS target_name,
                 elementId(target) AS target_id
             ORDER BY source.name
@@ -259,11 +261,13 @@ def get_downstream_connections():
     try:
         with driver.session() as session:
             query = f"""
-            MATCH (source:{label} {{name: $name}})-[rel]->(target:{label})
+            MATCH (source:{label})
+            WHERE toLower(source.name) = toLower($name)
+            MATCH (source)-[:supplies]->(target:{label})
             RETURN 
                 source.name AS source_name,
                 elementId(source) AS source_id,
-                type(rel) AS relationship,
+                'supplies' AS relationship,
                 target.name AS target_name,
                 elementId(target) AS target_id
             ORDER BY target.name
@@ -285,6 +289,60 @@ def get_downstream_connections():
                 'direction': 'downstream',
                 'connections': connections,
                 'count': len(connections)
+            })
+
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+
+@app.route('/api/lesion/territory', methods=['POST'])
+def get_lesion_territory():
+    """Return downstream territory exclusively supplied by the given artery"""
+    data = request.json
+    node_name = data.get('node', '').strip()
+    label = data.get('label', 'artery')
+
+    if not node_name:
+        return jsonify({'error': 'Node name required'}), 400
+
+    if not driver:
+        return jsonify({'error': 'Database connection failed'}), 500
+
+    try:
+        with driver.session() as session:
+            # Get all downstream territory supplied by this artery
+            query = f"""
+            MATCH (source:{label})
+            WHERE toLower(source.name) = toLower($name)
+            
+            MATCH (source)-[:supplies*1..]->(down:{label})
+            
+            RETURN source.name AS source_name,
+                   elementId(source) AS source_id,
+                   collect(DISTINCT {{
+                       name: down.name,
+                       id: elementId(down)
+                   }}) AS territory,
+                   count(DISTINCT down) AS count
+            """
+
+            result = session.run(query, name=node_name)
+            record = result.single()
+
+            if not record:
+                return jsonify({
+                    'source': node_name,
+                    'territory': [],
+                    'count': 0
+                })
+
+            print(f'DEBUG: Count={record["count"]}, Territory len={len(record["territory"])}')
+            
+            return jsonify({
+                'source': record['source_name'],
+                'source_id': record['source_id'],
+                'territory': record['territory'],
+                'count': record['count']
             })
 
     except Exception as e:

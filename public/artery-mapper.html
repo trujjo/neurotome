@@ -1,0 +1,536 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Artery Mapper</title>
+    <script src="https://d3js.org/d3.v7.min.js"></script>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Inter', 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: #0a0a0a;
+            color: #e5e7eb;
+            overflow-x: hidden;
+            min-height: 100vh;
+        }
+
+        .container {
+            max-width: 1400px;
+            margin: 0 auto;
+            padding: 2rem;
+        }
+
+        header {
+            background: linear-gradient(135deg, #1f2937 0%, #111827 100%);
+            padding: 2rem;
+            border-radius: 12px;
+            border: 1px solid rgba(209, 213, 219, 0.1);
+            margin-bottom: 2rem;
+            box-shadow: 0 4px 24px rgba(0, 0, 0, 0.3);
+        }
+
+        h1 {
+            color: #d97706;
+            font-size: 2.5rem;
+            font-weight: 700;
+            margin-bottom: 0.5rem;
+            text-shadow: 0 0 20px rgba(217, 119, 6, 0.3);
+        }
+
+        .subtitle {
+            color: #9ca3af;
+            font-size: 1rem;
+        }
+
+        .main-content {
+            display: grid;
+            grid-template-columns: 350px 1fr;
+            gap: 2rem;
+        }
+
+        .panel {
+            background: linear-gradient(135deg, #1f2937 0%, #111827 100%);
+            border: 1px solid rgba(209, 213, 219, 0.1);
+            border-radius: 12px;
+            padding: 1.5rem;
+            box-shadow: 0 4px 24px rgba(0, 0, 0, 0.3);
+        }
+
+        .panel h2 {
+            color: #d97706;
+            font-size: 1.3rem;
+            margin-bottom: 1.5rem;
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+
+        .form-group {
+            margin-bottom: 1.5rem;
+        }
+
+        label {
+            display: block;
+            margin-bottom: 0.5rem;
+            color: #d1d5db;
+            font-weight: 500;
+            font-size: 0.95rem;
+        }
+
+        select {
+            width: 100%;
+            padding: 0.75rem;
+            background: #374151;
+            color: #e5e7eb;
+            border: 1px solid rgba(209, 213, 219, 0.2);
+            border-radius: 8px;
+            font-size: 0.95rem;
+            cursor: pointer;
+            transition: all 0.2s ease;
+        }
+
+        select:hover {
+            border-color: rgba(217, 119, 6, 0.5);
+            background: #3f4651;
+        }
+
+        select:focus {
+            outline: none;
+            border-color: #d97706;
+            box-shadow: 0 0 0 3px rgba(217, 119, 6, 0.1);
+        }
+
+        button {
+            width: 100%;
+            padding: 0.875rem;
+            background: linear-gradient(135deg, #d97706 0%, #b86f1a 100%);
+            color: white;
+            border: none;
+            border-radius: 8px;
+            font-size: 1rem;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            box-shadow: 0 4px 12px rgba(217, 119, 6, 0.3);
+        }
+
+        button:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 6px 20px rgba(217, 119, 6, 0.4);
+        }
+
+        button:active {
+            transform: translateY(0);
+        }
+
+        .loading {
+            display: none;
+            text-align: center;
+            color: #9ca3af;
+            padding: 1rem;
+            font-size: 0.9rem;
+        }
+
+        .loading.active {
+            display: block;
+        }
+
+        .spinner {
+            display: inline-block;
+            width: 16px;
+            height: 16px;
+            border: 2px solid rgba(217, 119, 6, 0.3);
+            border-top-color: #d97706;
+            border-radius: 50%;
+            animation: spin 0.8s linear infinite;
+            margin-right: 0.5rem;
+        }
+
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+
+        .visualization {
+            background: linear-gradient(135deg, #1f2937 0%, #111827 100%);
+            border: 1px solid rgba(209, 213, 219, 0.1);
+            border-radius: 12px;
+            overflow: hidden;
+            box-shadow: 0 4px 24px rgba(0, 0, 0, 0.3);
+            min-height: 600px;
+        }
+
+        #graph-container {
+            width: 100%;
+            height: 100%;
+            min-height: 600px;
+        }
+
+        .stats {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 1rem;
+            margin-top: 1.5rem;
+        }
+
+        .stat-box {
+            background: rgba(217, 119, 6, 0.1);
+            border: 1px solid rgba(217, 119, 6, 0.3);
+            border-radius: 8px;
+            padding: 1rem;
+            text-align: center;
+        }
+
+        .stat-value {
+            font-size: 1.5rem;
+            font-weight: 700;
+            color: #d97706;
+        }
+
+        .stat-label {
+            font-size: 0.85rem;
+            color: #9ca3af;
+            margin-top: 0.25rem;
+        }
+
+        .message {
+            padding: 1rem;
+            border-radius: 8px;
+            text-align: center;
+            margin-top: 1rem;
+        }
+
+        .message.info {
+            background: rgba(59, 130, 246, 0.1);
+            color: #60a5fa;
+            border: 1px solid rgba(59, 130, 246, 0.3);
+        }
+
+        .message.error {
+            background: rgba(239, 68, 68, 0.1);
+            color: #f87171;
+            border: 1px solid rgba(239, 68, 68, 0.3);
+        }
+
+        .message.success {
+            background: rgba(16, 185, 129, 0.1);
+            color: #6ee7b7;
+            border: 1px solid rgba(16, 185, 129, 0.3);
+        }
+
+        @media (max-width: 1024px) {
+            .main-content {
+                grid-template-columns: 1fr;
+            }
+
+            .container {
+                padding: 1rem;
+            }
+
+            h1 {
+                font-size: 2rem;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>🧬 Artery Mapper</h1>
+            <p class="subtitle">Find pathways between arteries in the neural network</p>
+        </header>
+
+        <div class="main-content">
+            <!-- Control Panel -->
+            <div class="panel">
+                <h2>🔍 Path Finder</h2>
+                
+                <div class="form-group">
+                    <label for="start-artery">Start Artery</label>
+                    <select id="start-artery">
+                        <option value="">Loading arteries...</option>
+                    </select>
+                </div>
+
+                <div class="form-group">
+                    <label for="end-artery">End Artery</label>
+                    <select id="end-artery">
+                        <option value="">Loading arteries...</option>
+                    </select>
+                </div>
+
+                <button id="find-path-btn">Find Path</button>
+
+                <div class="loading" id="loading">
+                    <div class="spinner"></div>
+                    <span>Finding path...</span>
+                </div>
+
+                <div id="message" class="message" style="display: none;"></div>
+
+                <div class="stats" id="stats" style="display: none;">
+                    <div class="stat-box">
+                        <div class="stat-value" id="path-length">0</div>
+                        <div class="stat-label">Steps</div>
+                    </div>
+                    <div class="stat-box">
+                        <div class="stat-value" id="node-count">0</div>
+                        <div class="stat-label">Nodes</div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Visualization -->
+            <div class="visualization">
+                <div id="graph-container"></div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        class ArteryMapper {
+            constructor() {
+                this.arteries = [];
+                this.simulation = null;
+                
+                this.startSelect = document.getElementById('start-artery');
+                this.endSelect = document.getElementById('end-artery');
+                this.findPathBtn = document.getElementById('find-path-btn');
+                this.loading = document.getElementById('loading');
+                this.message = document.getElementById('message');
+                this.stats = document.getElementById('stats');
+                this.graphContainer = document.getElementById('graph-container');
+
+                this.init();
+            }
+
+            async init() {
+                await this.loadArteries();
+                this.attachEventListeners();
+            }
+
+            async loadArteries() {
+                try {
+                    const response = await fetch('/api/arteries/only');
+                    this.arteries = await response.json();
+                    this.populateDropdowns();
+                    this.showMessage('Ready to find paths', 'success');
+                } catch (error) {
+                    console.error('Error loading arteries:', error);
+                    this.showMessage('Failed to load arteries', 'error');
+                }
+            }
+
+            populateDropdowns() {
+                const options = this.arteries
+                    .map(a => `<option value="${a.name}">${a.name}</option>`)
+                    .join('');
+                
+                this.startSelect.innerHTML = '<option value="">Select start artery...</option>' + options;
+                this.endSelect.innerHTML = '<option value="">Select end artery...</option>' + options;
+            }
+
+            attachEventListeners() {
+                this.findPathBtn.addEventListener('click', () => this.findPath());
+            }
+
+            async findPath() {
+                const start = this.startSelect.value;
+                const end = this.endSelect.value;
+
+                if (!start || !end) {
+                    this.showMessage('Please select both start and end arteries', 'error');
+                    return;
+                }
+
+                this.loading.classList.add('active');
+                this.message.style.display = 'none';
+                this.stats.style.display = 'none';
+
+                try {
+                    const response = await fetch('/api/path/find', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ start, end })
+                    });
+
+                    if (!response.ok) throw new Error('Path not found');
+
+                    const data = await response.json();
+                    this.visualizePath(data);
+                    this.displayStats(data);
+                    this.showMessage(`Found path with ${data.distance} steps`, 'success');
+                } catch (error) {
+                    console.error('Error finding path:', error);
+                    this.showMessage('No path found between these arteries', 'error');
+                } finally {
+                    this.loading.classList.remove('active');
+                }
+            }
+
+            visualizePath(data) {
+                const nodes = data.arteries.map(a => ({
+                    id: a.id,
+                    name: a.name,
+                    inPath: true
+                }));
+
+                const links = [];
+                for (let i = 0; i < data.relationships.length; i++) {
+                    links.push({
+                        source: data.arteries[i].id,
+                        target: data.arteries[i + 1].id,
+                        type: data.relationships[i]
+                    });
+                }
+
+                this.renderGraph(nodes, links);
+            }
+
+            renderGraph(nodes, links) {
+                this.graphContainer.innerHTML = '';
+
+                const width = this.graphContainer.clientWidth;
+                const height = this.graphContainer.clientHeight;
+
+                const svg = d3.select('#graph-container')
+                    .append('svg')
+                    .attr('width', width)
+                    .attr('height', height);
+
+                const g = svg.append('g');
+
+                // Zoom behavior
+                const zoom = d3.zoom()
+                    .scaleExtent([0.1, 4])
+                    .on('zoom', (event) => {
+                        g.attr('transform', event.transform);
+                    });
+
+                svg.call(zoom);
+
+                // Force simulation
+                this.simulation = d3.forceSimulation(nodes)
+                    .force('link', d3.forceLink(links)
+                        .id(d => d.id)
+                        .distance(120))
+                    .force('charge', d3.forceManyBody().strength(-400))
+                    .force('center', d3.forceCenter(width / 2, height / 2))
+                    .force('collision', d3.forceCollide().radius(40));
+
+                // Links
+                const link = g.append('g')
+                    .selectAll('line')
+                    .data(links)
+                    .join('line')
+                    .attr('stroke', '#d97706')
+                    .attr('stroke-width', 2)
+                    .attr('opacity', 0.6);
+
+                // Link labels
+                const linkLabel = g.append('g')
+                    .selectAll('text')
+                    .data(links)
+                    .join('text')
+                    .attr('font-size', '11px')
+                    .attr('fill', '#9ca3af')
+                    .attr('text-anchor', 'middle')
+                    .text(d => d.type);
+
+                // Nodes
+                const node = g.append('g')
+                    .selectAll('circle')
+                    .data(nodes)
+                    .join('circle')
+                    .attr('r', 12)
+                    .attr('fill', '#d97706')
+                    .attr('stroke', '#b86f1a')
+                    .attr('stroke-width', 2)
+                    .style('cursor', 'grab')
+                    .call(this.drag(this.simulation));
+
+                // Node labels
+                const nodeLabel = g.append('g')
+                    .selectAll('text')
+                    .data(nodes)
+                    .join('text')
+                    .attr('font-size', '12px')
+                    .attr('fill', '#e5e7eb')
+                    .attr('text-anchor', 'middle')
+                    .attr('dy', '0.3em')
+                    .text(d => d.name.substring(0, 15));
+
+                this.simulation.on('tick', () => {
+                    link
+                        .attr('x1', d => d.source.x)
+                        .attr('y1', d => d.source.y)
+                        .attr('x2', d => d.target.x)
+                        .attr('y2', d => d.target.y);
+
+                    linkLabel
+                        .attr('x', d => (d.source.x + d.target.x) / 2)
+                        .attr('y', d => (d.source.y + d.target.y) / 2);
+
+                    node
+                        .attr('cx', d => d.x)
+                        .attr('cy', d => d.y);
+
+                    nodeLabel
+                        .attr('x', d => d.x)
+                        .attr('y', d => d.y);
+                });
+
+                // Double-click to unpin
+                node.on('dblclick', (event, d) => {
+                    d.fx = null;
+                    d.fy = null;
+                });
+            }
+
+            drag(simulation) {
+                const dragstarted = (event, d) => {
+                    if (!event.active) simulation.alphaTarget(0.3).restart();
+                    d.fx = d.x;
+                    d.fy = d.y;
+                };
+
+                const dragged = (event, d) => {
+                    d.fx = event.x;
+                    d.fy = event.y;
+                };
+
+                const dragended = (event, d) => {
+                    if (!event.active) simulation.alphaTarget(0);
+                };
+
+                return d3.drag()
+                    .on('start', dragstarted)
+                    .on('drag', dragged)
+                    .on('end', dragended);
+            }
+
+            displayStats(data) {
+                document.getElementById('path-length').textContent = data.distance;
+                document.getElementById('node-count').textContent = data.arteries.length;
+                this.stats.style.display = 'grid';
+            }
+
+            showMessage(text, type) {
+                this.message.textContent = text;
+                this.message.className = `message ${type}`;
+                this.message.style.display = 'block';
+            }
+        }
+
+        // Initialize on page load
+        document.addEventListener('DOMContentLoaded', () => {
+            new ArteryMapper();
+        });
+    </script>
+</body>
+</html>
