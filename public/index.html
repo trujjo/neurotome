@@ -1,0 +1,838 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Artery Mapper</title>
+    <script src="https://d3js.org/d3.v7.min.js"></script>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Inter', 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: #0a0a0a;
+            color: #e5e7eb;
+            overflow-x: hidden;
+            min-height: 100vh;
+        }
+
+        .container {
+            max-width: 1400px;
+            margin: 0 auto;
+            padding: 2rem;
+        }
+
+        header {
+            background: linear-gradient(135deg, #1f2937 0%, #111827 100%);
+            padding: 2rem;
+            border-radius: 12px;
+            border: 1px solid rgba(209, 213, 219, 0.1);
+            margin-bottom: 2rem;
+            box-shadow: 0 4px 24px rgba(0, 0, 0, 0.3);
+        }
+
+        h1 {
+            color: #d97706;
+            font-size: 2.5rem;
+            font-weight: 700;
+            margin-bottom: 0.5rem;
+            text-shadow: 0 0 20px rgba(217, 119, 6, 0.3);
+        }
+
+        .subtitle {
+            color: #9ca3af;
+            font-size: 1rem;
+        }
+
+        .main-content {
+            display: grid;
+            grid-template-columns: 350px 1fr;
+            gap: 2rem;
+        }
+
+        .panel {
+            background: linear-gradient(135deg, #1f2937 0%, #111827 100%);
+            border: 1px solid rgba(209, 213, 219, 0.1);
+            border-radius: 12px;
+            padding: 1.5rem;
+            box-shadow: 0 4px 24px rgba(0, 0, 0, 0.3);
+        }
+
+        .panel h2 {
+            color: #d97706;
+            font-size: 1.3rem;
+            margin-bottom: 1.5rem;
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+
+        .form-group {
+            margin-bottom: 1.5rem;
+        }
+
+        label {
+            display: block;
+            margin-bottom: 0.5rem;
+            color: #d1d5db;
+            font-weight: 500;
+            font-size: 0.95rem;
+        }
+
+        .select-wrapper {
+            position: relative;
+        }
+
+        .search-input {
+            width: 100%;
+            padding: 0.75rem;
+            background: #374151;
+            color: #e5e7eb;
+            border: 1px solid rgba(209, 213, 219, 0.2);
+            border-radius: 8px;
+            font-size: 0.95rem;
+            transition: all 0.2s ease;
+        }
+
+        .search-input:focus {
+            outline: none;
+            border-color: #d97706;
+            box-shadow: 0 0 0 3px rgba(217, 119, 6, 0.1);
+        }
+
+        .dropdown-menu {
+            position: absolute;
+            top: 100%;
+            left: 0;
+            right: 0;
+            max-height: 200px;
+            overflow-y: auto;
+            background: #374151;
+            border: 1px solid rgba(209, 213, 219, 0.2);
+            border-radius: 8px;
+            margin-top: 0.25rem;
+            z-index: 1000;
+            display: none;
+        }
+
+        .dropdown-menu.active {
+            display: block;
+        }
+
+        .dropdown-item {
+            padding: 0.75rem;
+            cursor: pointer;
+            transition: background 0.2s ease;
+            border-bottom: 1px solid rgba(209, 213, 219, 0.1);
+        }
+
+        .dropdown-item:last-child {
+            border-bottom: none;
+        }
+
+        .dropdown-item:hover {
+            background: #4b5563;
+        }
+
+        button {
+            width: 100%;
+            padding: 0.85rem;
+            background: linear-gradient(135deg, #d97706 0%, #b86f1a 100%);
+            color: white;
+            border: none;
+            border-radius: 8px;
+            font-size: 1rem;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            box-shadow: 0 4px 12px rgba(217, 119, 6, 0.3);
+        }
+
+        button:hover:not(:disabled) {
+            transform: translateY(-2px);
+            box-shadow: 0 6px 20px rgba(217, 119, 6, 0.4);
+        }
+
+        button:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+            transform: none;
+        }
+
+        .message {
+            padding: 1rem;
+            border-radius: 8px;
+            margin-bottom: 1rem;
+            display: none;
+            animation: slideIn 0.3s ease;
+        }
+
+        @keyframes slideIn {
+            from {
+                opacity: 0;
+                transform: translateY(-10px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        .message.success {
+            background: rgba(16, 185, 129, 0.15);
+            border: 1px solid rgba(16, 185, 129, 0.3);
+            color: #10b981;
+        }
+
+        .message.error {
+            background: rgba(239, 68, 68, 0.15);
+            border: 1px solid rgba(239, 68, 68, 0.3);
+            color: #ef4444;
+        }
+
+        .loading {
+            display: none;
+            text-align: center;
+            padding: 1rem;
+            color: #d97706;
+        }
+
+        .loading.active {
+            display: block;
+        }
+
+        .spinner {
+            border: 3px solid rgba(217, 119, 6, 0.1);
+            border-radius: 50%;
+            border-top: 3px solid #d97706;
+            width: 40px;
+            height: 40px;
+            animation: spin 1s linear infinite;
+            margin: 0 auto 0.5rem;
+        }
+
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+
+        .stats {
+            display: none;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 1rem;
+            padding: 1.5rem;
+            background: rgba(217, 119, 6, 0.05);
+            border: 1px solid rgba(217, 119, 6, 0.2);
+            border-radius: 8px;
+            margin-bottom: 1.5rem;
+        }
+
+        .stat {
+            text-align: center;
+        }
+
+        .stat-value {
+            font-size: 2rem;
+            font-weight: 700;
+            color: #d97706;
+            display: block;
+        }
+
+        .stat-label {
+            font-size: 0.875rem;
+            color: #9ca3af;
+            margin-top: 0.25rem;
+        }
+
+        .node-info {
+            display: none;
+            background: rgba(217, 119, 6, 0.05);
+            border: 1px solid rgba(217, 119, 6, 0.2);
+            border-radius: 8px;
+            padding: 1.5rem;
+            margin-bottom: 1.5rem;
+        }
+
+        .node-details {
+            margin-bottom: 1rem;
+        }
+
+        .node-details p {
+            margin-bottom: 0.5rem;
+            line-height: 1.6;
+        }
+
+        .nav-buttons {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 0.75rem;
+        }
+
+        .nav-buttons button {
+            font-size: 0.9rem;
+            padding: 0.65rem;
+        }
+
+        .visualization {
+            position: relative;
+            min-height: 600px;
+        }
+
+        #graph-container {
+            width: 100%;
+            height: 600px;
+            background: #111827;
+            border-radius: 12px;
+            border: 1px solid rgba(209, 213, 219, 0.1);
+            overflow: hidden;
+        }
+
+        .node-selected {
+            fill: #fbbf24 !important;
+            stroke: #f59e0b !important;
+            stroke-width: 3px !important;
+        }
+
+        /* Scrollbar styling */
+        .dropdown-menu::-webkit-scrollbar {
+            width: 8px;
+        }
+
+        .dropdown-menu::-webkit-scrollbar-track {
+            background: #1f2937;
+        }
+
+        .dropdown-menu::-webkit-scrollbar-thumb {
+            background: #4b5563;
+            border-radius: 4px;
+        }
+
+        .dropdown-menu::-webkit-scrollbar-thumb:hover {
+            background: #6b7280;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>🧠 Artery Mapper</h1>
+            <p class="subtitle">Neural Pathway Visualization & Analysis</p>
+        </header>
+
+        <div class="main-content">
+            <div class="panel">
+                <h2>🎯 Path Finder</h2>
+                
+                <div class="message" id="message"></div>
+                <div class="loading" id="loading">
+                    <div class="spinner"></div>
+                    <p>Finding path...</p>
+                </div>
+
+                <div class="form-group">
+                    <label for="start-search">Start Artery</label>
+                    <div class="select-wrapper">
+                        <input type="text" id="start-search" class="search-input" placeholder="Search for start artery...">
+                        <div id="start-dropdown" class="dropdown-menu"></div>
+                    </div>
+                </div>
+
+                <div class="form-group">
+                    <label for="end-search">End Artery</label>
+                    <div class="select-wrapper">
+                        <input type="text" id="end-search" class="search-input" placeholder="Search for end artery...">
+                        <div id="end-dropdown" class="dropdown-menu"></div>
+                    </div>
+                </div>
+
+                <button id="find-path">Find Path</button>
+
+                <div id="node-info" class="node-info">
+                    <div id="node-details" class="node-details"></div>
+                    <div class="nav-buttons">
+                        <button id="prev-node">← Previous</button>
+                        <button id="next-node">Next →</button>
+                    </div>
+                </div>
+            </div>
+
+            <div class="panel">
+                <h2>🗺️ Visualization</h2>
+                <div id="stats" class="stats">
+                    <div class="stat">
+                        <span id="path-length" class="stat-value">0</span>
+                        <span class="stat-label">Path Length</span>
+                    </div>
+                    <div class="stat">
+                        <span id="node-count" class="stat-value">0</span>
+                        <span class="stat-label">Nodes</span>
+                    </div>
+                </div>
+                <div class="visualization">
+                    <div id="graph-container"></div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        class ArteryMapper {
+            constructor() {
+                this.arteries = [];
+                this.simulation = null;
+                this.currentNodeIndex = -1;
+                this.pathNodes = [];
+                
+                this.startSearch = document.getElementById('start-search');
+                this.startDropdown = document.getElementById('start-dropdown');
+                this.endSearch = document.getElementById('end-search');
+                this.endDropdown = document.getElementById('end-dropdown');
+                this.findPathBtn = document.getElementById('find-path');
+                this.message = document.getElementById('message');
+                this.loading = document.getElementById('loading');
+                this.stats = document.getElementById('stats');
+                this.graphContainer = document.getElementById('graph-container');
+                this.nodeInfo = document.getElementById('node-info');
+                this.nodeDetails = document.getElementById('node-details');
+                this.prevNodeBtn = document.getElementById('prev-node');
+                this.nextNodeBtn = document.getElementById('next-node');
+                
+                this.init();
+            }
+
+            async init() {
+                await this.loadArteries();
+                this.attachEventListeners();
+            }
+
+            async loadArteries() {
+                try {
+                    const response = await fetch('/api/arteries/only');
+                    const data = await response.json();
+                    this.arteries = data;
+                } catch (error) {
+                    console.error('Error loading arteries:', error);
+                    this.showMessage('Failed to load arteries', 'error');
+                }
+            }
+
+            attachEventListeners() {
+                this.startSearch.addEventListener('input', () => this.filterDropdown('start'));
+                this.endSearch.addEventListener('input', () => this.filterDropdown('end'));
+
+                this.startSearch.addEventListener('focus', () => {
+                    this.filterDropdown('start');
+                    this.startDropdown.classList.add('active');
+                });
+
+                this.endSearch.addEventListener('focus', () => {
+                    this.filterDropdown('end');
+                    this.endDropdown.classList.add('active');
+                });
+
+                document.addEventListener('click', (e) => {
+                    if (!this.startSearch.contains(e.target) && !this.startDropdown.contains(e.target)) {
+                        this.startDropdown.classList.remove('active');
+                    }
+                    if (!this.endSearch.contains(e.target) && !this.endDropdown.contains(e.target)) {
+                        this.endDropdown.classList.remove('active');
+                    }
+                });
+
+                this.findPathBtn.addEventListener('click', () => this.findPath());
+                this.prevNodeBtn.addEventListener('click', () => this.navigateNode(-1));
+                this.nextNodeBtn.addEventListener('click', () => this.navigateNode(1));
+
+                // Keyboard navigation
+                document.addEventListener('keydown', (e) => {
+                    if (this.pathNodes.length === 0) return;
+                    
+                    if (e.key === 'ArrowLeft') {
+                        e.preventDefault();
+                        this.navigateNode(-1);
+                    } else if (e.key === 'ArrowRight') {
+                        e.preventDefault();
+                        this.navigateNode(1);
+                    } else if (e.key === 'ArrowUp') {
+                        e.preventDefault();
+                        this.showConnections('upstream');
+                    } else if (e.key === 'ArrowDown') {
+                        e.preventDefault();
+                        this.showConnections('downstream');
+                    }
+                });
+            }
+
+            filterDropdown(type) {
+                const searchInput = type === 'start' ? this.startSearch : this.endSearch;
+                const dropdown = type === 'start' ? this.startDropdown : this.endDropdown;
+                const query = searchInput.value.toLowerCase();
+
+                const filtered = this.arteries.filter(a => 
+                    a.name.toLowerCase().includes(query)
+                );
+
+                dropdown.innerHTML = filtered.slice(0, 50).map(a => `
+                    <div class="dropdown-item" data-id="${a.id}" data-name="${a.name}">
+                        ${a.name}
+                    </div>
+                `).join('');
+
+                dropdown.querySelectorAll('.dropdown-item').forEach(item => {
+                    item.addEventListener('click', () => {
+                        searchInput.value = item.dataset.name;
+                        searchInput.dataset.id = item.dataset.id;
+                        dropdown.classList.remove('active');
+                    });
+                });
+            }
+
+            async findPath() {
+                const startId = this.startSearch.dataset.id;
+                const endId = this.endSearch.dataset.id;
+
+                if (!startId || !endId) {
+                    this.showMessage('Please select both start and end arteries', 'error');
+                    return;
+                }
+
+                this.loading.classList.add('active');
+                this.message.style.display = 'none';
+
+                try {
+                    const response = await fetch('/api/path/find', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ 
+                            start: this.startSearch.value.toLowerCase(),
+                            end: this.endSearch.value.toLowerCase(),
+                            label: 'artery'
+                        })
+                    });
+
+                    const data = await response.json();
+
+                    if (!response.ok) {
+                        throw new Error(data.error || 'Failed to find path');
+                    }
+
+                    this.pathNodes = data.arteries.map(a => a.name);
+                    this.visualizePath(data);
+                    this.displayStats(data);
+                    this.selectNode(0);
+                    this.showMessage(`Path found with ${data.arteries.length} nodes!`, 'success');
+                } catch (error) {
+                    console.error('Error finding path:', error);
+                    this.showMessage(error.message, 'error');
+                } finally {
+                    this.loading.classList.remove('active');
+                }
+            }
+
+            visualizePath(data) {
+                const nodes = data.arteries.map(a => ({
+                    id: a.id,
+                    name: a.name,
+                    inPath: true
+                }));
+
+                const links = [];
+                for (let i = 0; i < data.relationships.length; i++) {
+                    links.push({
+                        source: data.arteries[i].id,
+                        target: data.arteries[i + 1].id,
+                        type: data.relationships[i],
+                        direction: data.directions[i]
+                    });
+                }
+
+                this.renderGraph(nodes, links);
+            }
+
+            renderGraph(nodes, links) {
+                this.graphContainer.innerHTML = '';
+
+                const width = this.graphContainer.clientWidth;
+                const height = this.graphContainer.clientHeight;
+
+                const svg = d3.select('#graph-container')
+                    .append('svg')
+                    .attr('width', width)
+                    .attr('height', height);
+
+                const g = svg.append('g');
+
+                // Define arrowhead markers for both directions
+                const defs = svg.append('defs');
+                
+                // Forward arrow (end of line)
+                defs.append('marker')
+                    .attr('id', 'arrowhead-forward')
+                    .attr('markerWidth', 10)
+                    .attr('markerHeight', 10)
+                    .attr('refX', 32)
+                    .attr('refY', 3)
+                    .attr('orient', 'auto')
+                    .append('polygon')
+                    .attr('points', '0 0, 10 3, 0 6')
+                    .attr('fill', '#d97706');
+                
+                // Backward arrow (start of line)
+                defs.append('marker')
+                    .attr('id', 'arrowhead-backward')
+                    .attr('markerWidth', 10)
+                    .attr('markerHeight', 10)
+                    .attr('refX', -22)
+                    .attr('refY', 3)
+                    .attr('orient', 'auto')
+                    .append('polygon')
+                    .attr('points', '10 0, 0 3, 10 6')
+                    .attr('fill', '#d97706');
+
+                // Zoom behavior
+                const zoom = d3.zoom()
+                    .scaleExtent([0.1, 4])
+                    .on('zoom', (event) => {
+                        g.attr('transform', event.transform);
+                    });
+
+                svg.call(zoom);
+
+                // DIAGONAL DISPLAY: Set initial positions from top-left to bottom-right
+                const padding = 100;
+                const usableWidth = width - (2 * padding);
+                const usableHeight = height - (2 * padding);
+                const spacingX = nodes.length > 1 ? usableWidth / (nodes.length - 1) : 0;
+                const spacingY = nodes.length > 1 ? usableHeight / (nodes.length - 1) : 0;
+                
+                nodes.forEach((node, i) => {
+                    node.x = padding + (i * spacingX);
+                    node.y = padding + (i * spacingY);
+                });
+
+                // Force simulation
+                this.simulation = d3.forceSimulation(nodes)
+                    .force('link', d3.forceLink(links)
+                        .id(d => d.id)
+                        .distance(120))
+                    .force('charge', d3.forceManyBody().strength(-400))
+                    .force('center', d3.forceCenter(width / 2, height / 2))
+                    .force('collision', d3.forceCollide().radius(50));
+
+                // Links
+                const link = g.append('g')
+                    .selectAll('line')
+                    .data(links)
+                    .join('line')
+                    .attr('stroke', '#d97706')
+                    .attr('stroke-width', 2)
+                    .attr('opacity', 0.6)
+                    .attr('marker-end', d => d.direction === 'forward' ? 'url(#arrowhead-forward)' : null)
+                    .attr('marker-start', d => d.direction === 'backward' ? 'url(#arrowhead-backward)' : null);
+
+                // Link labels
+                const linkLabel = g.append('g')
+                    .selectAll('text')
+                    .data(links)
+                    .join('text')
+                    .attr('font-size', '11px')
+                    .attr('fill', '#9ca3af')
+                    .attr('text-anchor', 'middle')
+                    .text(d => d.type);
+
+                // Nodes
+                const node = g.append('g')
+                    .selectAll('circle')
+                    .data(nodes)
+                    .join('circle')
+                    .attr('r', 20)
+                    .attr('fill', '#d97706')
+                    .attr('stroke', '#b86f1a')
+                    .attr('stroke-width', 2)
+                    .style('cursor', 'pointer')
+                    .on('click', (event, d) => {
+                        const index = nodes.findIndex(n => n.id === d.id);
+                        this.selectNode(index);
+                    })
+                    .call(this.drag(this.simulation));
+
+                // Node labels
+                const nodeLabel = g.append('g')
+                    .selectAll('text')
+                    .data(nodes)
+                    .join('text')
+                    .attr('font-size', '14px')
+                    .attr('fill', '#e5e7eb')
+                    .attr('text-anchor', 'middle')
+                    .attr('dy', '0.3em')
+                    .text(d => d.name.substring(0, 30));
+
+                this.simulation.on('tick', () => {
+                    link
+                        .attr('x1', d => d.source.x)
+                        .attr('y1', d => d.source.y)
+                        .attr('x2', d => d.target.x)
+                        .attr('y2', d => d.target.y);
+
+                    linkLabel
+                        .attr('x', d => (d.source.x + d.target.x) / 2)
+                        .attr('y', d => (d.source.y + d.target.y) / 2);
+
+                    node
+                        .attr('cx', d => d.x)
+                        .attr('cy', d => d.y);
+
+                    nodeLabel
+                        .attr('x', d => d.x)
+                        .attr('y', d => d.y);
+                });
+
+                // Double-click to unpin
+                node.on('dblclick', (event, d) => {
+                    d.fx = null;
+                    d.fy = null;
+                });
+            }
+
+            drag(simulation) {
+                const dragstarted = (event, d) => {
+                    if (!event.active) simulation.alphaTarget(0.3).restart();
+                    d.fx = d.x;
+                    d.fy = d.y;
+                };
+
+                const dragged = (event, d) => {
+                    d.fx = event.x;
+                    d.fy = event.y;
+                };
+
+                const dragended = (event, d) => {
+                    if (!event.active) simulation.alphaTarget(0);
+                };
+
+                return d3.drag()
+                    .on('start', dragstarted)
+                    .on('drag', dragged)
+                    .on('end', dragended);
+            }
+
+            displayStats(data) {
+                document.getElementById('path-length').textContent = data.distance;
+                document.getElementById('node-count').textContent = data.arteries.length;
+                this.stats.style.display = 'grid';
+            }
+
+            selectNode(index) {
+                if (index < 0 || index >= this.pathNodes.length) return;
+                this.currentNodeIndex = index;
+                this.showNodeInfo(index);
+                this.updateNodeHighlight();
+            }
+
+            showNodeInfo(index) {
+                if (index < 0 || index >= this.pathNodes.length) return;
+
+                const nodeName = this.pathNodes[index];
+                this.nodeDetails.innerHTML = `
+                    <p><strong>Node ${index + 1} of ${this.pathNodes.length}</strong></p>
+                    <p><strong>Name:</strong> ${nodeName}</p>
+                    <p style="margin-top: 0.5rem; font-size: 0.85rem; color: #9ca3af;">
+                        ⬆️ Up arrow for upstream | ⬇️ Down arrow for downstream
+                    </p>
+                `;
+                this.nodeInfo.style.display = 'block';
+            }
+
+            updateNodeHighlight() {
+                // Remove previous highlights
+                d3.selectAll('.node-selected').classed('node-selected', false);
+
+                // Add highlight to current node
+                if (this.currentNodeIndex >= 0 && this.pathNodes[this.currentNodeIndex]) {
+                    const currentNodeName = this.pathNodes[this.currentNodeIndex];
+                    d3.selectAll('circle').filter(d => d.name === currentNodeName).classed('node-selected', true);
+                }
+
+                // Update button states
+                this.prevNodeBtn.disabled = this.currentNodeIndex <= 0;
+                this.nextNodeBtn.disabled = this.currentNodeIndex >= this.pathNodes.length - 1;
+            }
+
+            navigateNode(direction) {
+                const newIndex = this.currentNodeIndex + direction;
+                if (newIndex >= 0 && newIndex < this.pathNodes.length) {
+                    this.selectNode(newIndex);
+                }
+            }
+
+            async showConnections(direction) {
+                if (this.currentNodeIndex < 0 || this.currentNodeIndex >= this.pathNodes.length) {
+                    this.showMessage('Select a node first', 'error');
+                    return;
+                }
+
+                const nodeName = this.pathNodes[this.currentNodeIndex];
+                const endpoint = direction === 'upstream' ? '/api/connections/upstream' : '/api/connections/downstream';
+
+                try {
+                    const response = await fetch(endpoint, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ node: nodeName.toLowerCase(), label: 'artery' })
+                    });
+
+                    const data = await response.json();
+
+                    if (!response.ok) {
+                        throw new Error(data.error || 'Failed to load connections');
+                    }
+
+                    // Display connections in node-details
+                    if (data.connections.length === 0) {
+                        this.nodeDetails.innerHTML = `
+                            <p><strong>${direction.charAt(0).toUpperCase() + direction.slice(1)} Connections for ${nodeName}</strong></p>
+                            <p style="color: #9ca3af; margin-top: 0.5rem;">No ${direction} connections found</p>
+                        `;
+                    } else {
+                        let connectionsHtml = `
+                            <p><strong>${data.connections.length} ${direction.charAt(0).toUpperCase() + direction.slice(1)} Connection${data.connections.length !== 1 ? 's' : ''}</strong></p>
+                            <div style="max-height: 200px; overflow-y: auto; margin-top: 0.75rem;">
+                        `;
+                        
+                        data.connections.forEach((conn, idx) => {
+                            const connectedNode = direction === 'upstream' ? conn.source : conn.target;
+                            connectionsHtml += `
+                                <p style="padding: 0.5rem; background: rgba(217, 119, 6, 0.1); border-radius: 4px; margin-bottom: 0.5rem;">
+                                    ${idx + 1}. ${connectedNode}
+                                </p>
+                            `;
+                        });
+                        
+                        connectionsHtml += '</div>';
+                        this.nodeDetails.innerHTML = connectionsHtml;
+                    }
+
+                } catch (error) {
+                    console.error('Error loading connections:', error);
+                    this.showMessage(`Error loading ${direction} connections`, 'error');
+                }
+            }
+
+            showMessage(text, type) {
+                this.message.textContent = text;
+                this.message.className = `message ${type}`;
+                this.message.style.display = 'block';
+            }
+        }
+
+        // Initialize on page load
+        document.addEventListener('DOMContentLoaded', () => {
+            new ArteryMapper();
+        });
+    </script>
+</body>
+</html>
